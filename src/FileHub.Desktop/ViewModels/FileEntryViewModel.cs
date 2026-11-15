@@ -1,7 +1,7 @@
-using Cobalt.Files.Models;
+using FileHub.Files.Models;
 using FluentAvalonia.UI.Controls;
 
-namespace Cobalt.Desktop.ViewModels;
+namespace FileHub.Desktop.ViewModels;
 
 public sealed class FileEntryViewModel
 {

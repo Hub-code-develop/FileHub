@@ -6,9 +6,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
-    <RootNamespace>Cobalt.Desktop</RootNamespace>
-    <AssemblyName>Cobalt</AssemblyName>
-    <ApplicationTitle>Cobalt Files</ApplicationTitle>
+    <RootNamespace>FileHub.Desktop</RootNamespace>
+    <AssemblyName>FileHub</AssemblyName>
+    <ApplicationTitle>FileHub</ApplicationTitle>
     <!-- Avalonia 12.1 默认开启编译绑定（要求每个 XAML 都写 x:DataType）。
          本项目用经典反射绑定，显式关掉，避免 XAML 编译期 AVLN2100。 -->
     <AvaloniaUseCompiledBindingsByDefault>false</AvaloniaUseCompiledBindingsByDefault>
@@ -22,19 +22,19 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Cobalt.Files\Cobalt.Files.csproj" />
+    <ProjectReference Include="..\FileHub.Files\FileHub.Files.csproj" />
   </ItemGroup>
 
   <!--
-    CodeNet .NET 10.0.400 SDK 的 Microsoft.CSharp.CurrentVersion.targets 把
+    CodeNet arm64 SDK（10.0.400）的 Microsoft.CSharp.CurrentVersion.targets 把
     CallTarget Targets="$(TargetsTriggeredByCompilation)" 整段注释掉了，
     Avalonia 12 的 CompileAvaloniaXaml 因此不会自动触发：
     构建显示 0 错误，但运行时报 "No precompiled XAML found"。
     这里在 CoreCompile 之后显式调用一次，保证 XAML 被编译进程序集。
-    若换回官方 .NET SDK 且该钩子恢复，可由 EnableAvaloniaXamlCompilation=false 之外的
-    方式关闭本目标（默认开启不影响，CompileAvaloniaXaml 自身有幂等判断）。
+    官方 SDK / CodeNet x64 SDK 自带该钩子；MSBuild 保证同一 Target 在一次构建中
+    只执行一次，重复声明不会重复编译，因此在任何 SDK 上都安全。
   -->
-  <Target Name="CobaltCompileAvaloniaXaml" AfterTargets="CoreCompile"
+  <Target Name="FileHubCompileAvaloniaXaml" AfterTargets="CoreCompile"
           DependsOnTargets="CompileAvaloniaXaml"
           Condition="'$(EnableAvaloniaXamlCompilation)' != 'false' and '$(DesignTimeBuild)' != 'true'" />
 

@@ -1,6 +1,6 @@
-using Cobalt.Files.Models;
+using FileHub.Files.Models;
 
-namespace Cobalt.Files.Services;
+namespace FileHub.Files.Services;
 
 public static class FileSystemService
 {

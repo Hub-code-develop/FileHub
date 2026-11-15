@@ -1,0 +1,75 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: ${{ matrix.os }} / ${{ matrix.rid }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            rid: linux-x64
+          - os: windows-latest
+            rid: win-x64
+          - os: macos-latest
+            rid: osx-arm64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # global.json 固定 10.0.400，让 setup-dotnet 按它装，避免 rollForward 找不到 SDK。
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      # 显式指定配置：CodeHub-FluentUI 尚未上 nuget.org，靠仓库内 local-feed/ 离线还原。
+      - name: Restore
+        run: dotnet restore FileHub.slnx --configfile NuGet.Config
+
+      # 注意：解决方案级 dotnet build 不接受 -r（NETSDK1134），RID 只在单项目 publish 上指定。
+      - name: Build
+        run: dotnet build FileHub.slnx -c Release --no-restore -m:2 -nodeReuse:false
+
+      - name: Restore for RID
+        run: dotnet restore src/FileHub.Desktop/FileHub.Desktop.csproj --configfile NuGet.Config -r ${{ matrix.rid }}
+
+      # 指定 RID 会把所有平台的 SkiaSharp/HarfBuzzSharp native 库都摊平复制（约 564 MB，
+      # 其中大半是 Windows 的 .pdb）；带 RID 的 framework-dependent publish 只带本平台资产，约 31 MB。
+      - name: Publish
+        run: dotnet publish src/FileHub.Desktop/FileHub.Desktop.csproj -c Release --no-restore -r ${{ matrix.rid }} --self-contained false -o publish
+
+      # 关键门禁：CodeNet arm64 SDK 上 CompileAvaloniaXaml 钩子缺失会导致
+      # "构建成功但没有预编译 XAML"。检查产物里必须有 XAML 编译器写入的标记。
+      - name: Verify precompiled XAML
+        shell: bash
+        run: |
+          if grep -a -q '!XamlIlPopulate' publish/FileHub.dll; then
+            echo "OK: XAML precompiled into FileHub.dll"
+          else
+            echo "FAIL: no precompiled XAML in FileHub.dll" >&2
+            exit 1
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: FileHub-${{ matrix.rid }}-net10.0
+          path: publish/
+          if-no-files-found: error
+          retention-days: 14

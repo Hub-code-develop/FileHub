@@ -1,4 +1,4 @@
-namespace Cobalt.Desktop.Models;
+namespace FileHub.Desktop.Models;
 
 public sealed class PathSegment
 {

@@ -1,4 +1,4 @@
-namespace Cobalt.Files.Services;
+namespace FileHub.Files.Services;
 
 public enum ClipboardOperation
 {

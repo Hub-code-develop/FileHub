@@ -1,6 +1,0 @@
-<Solution>
-  <Folder Name="/src/">
-    <Project Path="src/Cobalt.Desktop/Cobalt.Desktop.csproj" />
-    <Project Path="src/Cobalt.Files/Cobalt.Files.csproj" />
-  </Folder>
-</Solution>

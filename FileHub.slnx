@@ -1,0 +1,6 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/FileHub.Desktop/FileHub.Desktop.csproj" />
+    <Project Path="src/FileHub.Files/FileHub.Files.csproj" />
+  </Folder>
+</Solution>

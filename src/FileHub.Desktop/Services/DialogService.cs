@@ -3,7 +3,7 @@ using Avalonia.Input.Platform;
 using Avalonia.Media;
 using FluentAvalonia.UI.Controls;
 
-namespace Cobalt.Desktop.Services;
+namespace FileHub.Desktop.Services;
 
 /// <summary>统一用 FluentUI-CodeHub 的 FAContentDialog 做输入 / 确认 / 信息弹窗。</summary>
 public sealed class DialogService

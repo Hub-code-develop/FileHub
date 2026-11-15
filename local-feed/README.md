@@ -10,4 +10,4 @@
 - 如果之后该包发布到 nuget.org，删掉 `NuGet.Config` 里的 `codehub-local` 一行，
   再删除本目录即可
 - 需要升级版本时：替换这里的 nupkg，并同步修改
-  `src/Cobalt.Desktop/Cobalt.Desktop.csproj` 里的 `PackageReference` 版本
+  `src/FileHub.Desktop/FileHub.Desktop.csproj` 里的 `PackageReference` 版本

@@ -1,6 +1,6 @@
-using Cobalt.Files.Services;
+using FileHub.Files.Services;
 
-namespace Cobalt.Files.Models;
+namespace FileHub.Files.Models;
 
 /// <summary>目录中的一个条目。所有展示用文本都在这里算好，UI 只负责绑定。</summary>
 public sealed class FileEntry

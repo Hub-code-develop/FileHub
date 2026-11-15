@@ -1,14 +1,14 @@
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:sty="using:FluentAvalonia.Styling"
-             x:Class="Cobalt.Desktop.App"
+             x:Class="FileHub.Desktop.App"
              RequestedThemeVariant="Default">
 
     <Application.Styles>
         <!-- FluentUI-CodeHub（FluentAvalonia 的 CodeHub 分支）主题。
              PreferSystemTheme=False 是为了让手动的浅色/深色切换不被系统设置覆盖。 -->
         <sty:FluentAvaloniaTheme PreferSystemTheme="False" PreferUserAccentColor="True" />
-        <StyleInclude Source="avares://Cobalt/Styles/AppStyles.axaml" />
+        <StyleInclude Source="avares://FileHub/Styles/AppStyles.axaml" />
     </Application.Styles>
 
 </Application>

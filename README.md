@@ -1,7 +1,9 @@
 # FileHub
 
+[![Build](https://github.com/Hub-code-develop/FileHub/actions/workflows/build.yml/badge.svg)](https://github.com/Hub-code-develop/FileHub/actions/workflows/build.yml)
+
 一个用 **.NET 10 + Avalonia 12 + FluentUI-CodeHub（`CodeHub-FluentUI`）** 写的跨平台文件管理器。
-仓库名 FileHub，项目/程序集内部代号 **Cobalt**（钴）。
+项目名、程序集名、命名空间与仓库名统一为 FileHub。
 
 ## 技术栈
 
@@ -43,30 +45,32 @@
 ```bash
 ./build.sh
 ./build.sh -c Release          # 透传任意 dotnet build 参数
-dotnet run --project src/Cobalt.Desktop/Cobalt.Desktop.csproj
+dotnet run --project src/FileHub.Desktop/FileHub.Desktop.csproj
 ```
 
 `build.sh` 带资源护栏（`nice -n 20`、`-m:2`、`-nodeReuse:false`），并按下述优先级挑 SDK：
 
-1. 环境变量 `COBALT_DOTNET`
+1. 环境变量 `FILEHUB_DOTNET`
 2. `$HOME/dotnet11x64/dotnet`（若存在）
 3. PATH 里的 `dotnet`
 
 即普通机器上直接用官方 .NET 10 SDK 就行；只有遇到下面这两个环境级问题时才需要指定 SDK。
 
-### 为什么有 `CobaltCompileAvaloniaXaml` 这个 target
+### 为什么有 `FileHubCompileAvaloniaXaml` 这个 target
 
-CodeNet 的 .NET 10.0.400 SDK 把 `Microsoft.CSharp.CurrentVersion.targets` 里
+CodeNet **arm64** SDK（10.0.400）把 `Microsoft.CSharp.CurrentVersion.targets` 里
 `CallTarget Targets="$(TargetsTriggeredByCompilation)"` 整段注释掉了，而 Avalonia 12 的
 `CompileAvaloniaXaml` 正是靠这个钩子触发的。后果是：构建显示 0 错误，产物里却只有原始 XAML，
-运行时报 `No precompiled XAML found for Cobalt.Desktop.App`。
+运行时报 `No precompiled XAML found for FileHub.Desktop.App`。
 
-`src/Cobalt.Desktop/Cobalt.Desktop.csproj` 里加了一个 `AfterTargets="CoreCompile"` 的显式调用，
+`src/FileHub.Desktop/FileHub.Desktop.csproj` 里加了一个 `AfterTargets="CoreCompile"` 的显式调用，
 强制编译 XAML（不依赖 SDK 钩子，换任何 SDK 都生效）。另外 Avalonia 12.1 默认开启编译绑定，
 本项目用反射绑定，所以显式设了 `AvaloniaUseCompiledBindingsByDefault=false`。
+官方 SDK 与 CodeNet x64 SDK 自带该钩子，而 MSBuild 保证同一 Target 在一次构建中只执行一次，
+重复声明不会二次编译，CI 走官方 SDK 也安全。
 
 ⚠️ 已知环境限制：**arm64 CodeNet SDK 在执行 XAML 编译任务时会 SIGSEGV(139)**（signalfix 的老问题）。
-官方 arm64 SDK 或 x64 SDK 均可，作者机器上实测 x64 SDK 15s / 0 警告 0 错误。
+官方 arm64 SDK 或 x64 SDK 均可，作者机器上实测 x64 SDK 7s / 0 警告 0 错误。
 
 ### 关于 `local-feed/`
 
@@ -76,20 +80,39 @@ CodeNet 的 .NET 10.0.400 SDK 把 `Microsoft.CSharp.CurrentVersion.targets` 里
 详见 `local-feed/README.md`；若该包日后上了 nuget.org，删掉 `NuGet.Config` 里的
 `codehub-local` 与这个目录即可。包依赖 Avalonia 12.1.0 / net10.0，版本不要随意改。
 
+## GitHub Actions
+
+`.github/workflows/build.yml` 在 push 到 `main`、PR 和手动触发时跑三平台矩阵：
+
+| Runner | RID | 流程 |
+| --- | --- | --- |
+| `ubuntu-latest` | `linux-x64` | restore → Release build → RID restore → publish → XAML 门禁 → 上传 artifact |
+| `windows-latest` | `win-x64` | 同上 |
+| `macos-latest` | `osx-arm64` | 同上 |
+
+- SDK 由 `actions/setup-dotnet@v4` 按 `global.json`（10.0.400）安装，不需要任何密钥
+- `dotnet restore --configfile NuGet.Config` 显式使用仓库自带的 `local-feed/`，私有源 / token 都不需要
+- 解决方案级 `dotnet build` 不接受 `-r`（NETSDK1134），所以 RID 只加在单项目 `dotnet publish` 上；
+  带 RID 的 framework-dependent publish 只带本平台 native 库，约 **31 MB**（不带 RID 会摊平成 564 MB，大半是 Windows 的 `.pdb`）
+- **XAML 门禁**：检查 `publish/FileHub.dll` 里必须含 `!XamlIlPopulate`，
+  专门防「构建显示 0 错误但 XAML 没预编译」这个坑再次溜过去
+- 每个平台上传 `FileHub-<rid>-net10.0` artifact（`publish/`，保留 14 天）
+
 ## 结构
 
 ```
 FileHub/
-├── Cobalt.slnx            解决方案
+├── .github/workflows/     build.yml（三平台 CI）
+├── FileHub.slnx           解决方案
 ├── global.json            SDK 10.0.400
 ├── NuGet.Config           nuget.org + 仓库内离线源
 ├── local-feed/            CodeHub-FluentUI 的 nupkg（MIT）
 ├── build.sh               带资源护栏的构建脚本
 └── src/
-    ├── Cobalt.Files/      纯逻辑，无 UI 依赖，可单测
+    ├── FileHub.Files/     纯逻辑，无 UI 依赖，可单测
     │   ├── Models/        FileEntry / LocationEntry
     │   └── Services/      FileSystemService / RecycleBinService / PlatformService / FileClipboard
-    └── Cobalt.Desktop/    Avalonia 应用
+    └── FileHub.Desktop/   Avalonia 应用
         ├── App.axaml      主题入口
         ├── Styles/        应用样式
         ├── ViewModels/    MainViewModel + 命令 + 条目 VM
@@ -99,10 +122,10 @@ FileHub/
 
 ## 验证情况
 
-- `build.sh`：0 警告 0 错误，XAML 已编译进 `Cobalt.dll`（可见 `!XamlIlPopulate`）
-- 无窗口 headless 验证：`App.axaml` + `FluentAvaloniaTheme` + `AppStyles.axaml` 加载成功；
-  `MainWindow.axaml` 全部控件实例化成功；主目录枚举 54 项 / 7 个位置 / 3 段面包屑；
-  筛选 54→0→54 正常
+- `build.sh`：0 警告 0 错误，XAML 已编译进 `FileHub.dll`（可见 `!XamlIlPopulate`）
+- 全量改名后重新做无窗口 headless 验证：`App.axaml` + `FluentAvaloniaTheme` +
+  `avares://FileHub/Styles/AppStyles.axaml` 加载成功；`MainWindow.axaml` 全部控件实例化成功；
+  主目录枚举 55 项 / 7 个位置 / 3 段面包屑；筛选 55→0→55 正常
 - 未做真实 GUI 窗口冒烟测试
 
 ## 已知限制 / 后续可加

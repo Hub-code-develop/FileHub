@@ -1,11 +1,11 @@
 using System.Collections.ObjectModel;
 using System.Windows.Input;
-using Cobalt.Desktop.Models;
-using Cobalt.Files.Models;
-using Cobalt.Files.Services;
+using FileHub.Desktop.Models;
+using FileHub.Files.Models;
+using FileHub.Files.Services;
 using FluentAvalonia.UI.Controls;
 
-namespace Cobalt.Desktop.ViewModels;
+namespace FileHub.Desktop.ViewModels;
 
 /// <summary>UI 侧能力注入，ViewModel 不直接依赖 Window / TopLevel。</summary>
 public sealed class UiServices

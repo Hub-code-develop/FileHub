@@ -3,14 +3,14 @@ using System.Windows.Input;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
-using Cobalt.Desktop.Models;
-using Cobalt.Desktop.Services;
-using Cobalt.Desktop.ViewModels;
-using Cobalt.Files.Models;
-using Cobalt.Files.Services;
+using FileHub.Desktop.Models;
+using FileHub.Desktop.Services;
+using FileHub.Desktop.ViewModels;
+using FileHub.Files.Models;
+using FileHub.Files.Services;
 using FluentAvalonia.UI.Controls;
 
-namespace Cobalt.Desktop.Views;
+namespace FileHub.Desktop.Views;
 
 public partial class MainWindow : Window
 {

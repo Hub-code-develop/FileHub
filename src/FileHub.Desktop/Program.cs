@@ -1,6 +1,6 @@
 using Avalonia;
 
-namespace Cobalt.Desktop;
+namespace FileHub.Desktop;
 
 internal static class Program
 {

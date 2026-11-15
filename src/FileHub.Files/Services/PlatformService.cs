@@ -1,6 +1,6 @@
 using System.Diagnostics;
 
-namespace Cobalt.Files.Services;
+namespace FileHub.Files.Services;
 
 public static class PlatformService
 {

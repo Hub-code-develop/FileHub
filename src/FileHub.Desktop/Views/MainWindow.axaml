@@ -1,10 +1,10 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:ui="using:FluentAvalonia.UI.Controls"
-        x:Class="Cobalt.Desktop.Views.MainWindow"
+        x:Class="FileHub.Desktop.Views.MainWindow"
         Width="1180" Height="760"
         MinWidth="760" MinHeight="460"
-        Title="Cobalt Files — 跨平台文件管理器">
+        Title="FileHub — 跨平台文件管理器">
 
   <ui:FANavigationView x:Name="Nav"
                        PaneDisplayMode="Left"
@@ -13,7 +13,7 @@
                        IsSettingsVisible="False"
                        IsBackButtonVisible="False"
                        IsPaneToggleButtonVisible="True"
-                       PaneTitle="Cobalt Files">
+                       PaneTitle="FileHub">
     <ui:FANavigationView.MenuItems>
       <!-- 快速访问与卷由代码按平台动态生成 -->
     </ui:FANavigationView.MenuItems>

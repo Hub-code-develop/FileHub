@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
-namespace Cobalt.Desktop.ViewModels;
+namespace FileHub.Desktop.ViewModels;
 
 public abstract class ViewModelBase : INotifyPropertyChanged
 {

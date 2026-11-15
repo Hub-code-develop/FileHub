@@ -1,4 +1,4 @@
-namespace Cobalt.Files.Models;
+namespace FileHub.Files.Models;
 
 public enum LocationKind
 {

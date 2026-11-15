@@ -2,9 +2,9 @@ using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Avalonia.Styling;
-using Cobalt.Desktop.Views;
+using FileHub.Desktop.Views;
 
-namespace Cobalt.Desktop;
+namespace FileHub.Desktop;
 
 public partial class App : Application
 {

@@ -1,6 +1,6 @@
 using System.Windows.Input;
 
-namespace Cobalt.Desktop.ViewModels;
+namespace FileHub.Desktop.ViewModels;
 
 public sealed class RelayCommand : ICommand
 {

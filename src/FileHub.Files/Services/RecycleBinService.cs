@@ -1,6 +1,6 @@
 using System.Diagnostics;
 
-namespace Cobalt.Files.Services;
+namespace FileHub.Files.Services;
 
 /// <summary>
 /// 跨平台「移到回收站」。Windows 走 Shell 回收站 API，macOS 直接移到 ~/.Trash，
