@@ -1,0 +1,201 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="using:FluentAvalonia.UI.Controls"
+        x:Class="Cobalt.Desktop.Views.MainWindow"
+        Width="1180" Height="760"
+        MinWidth="760" MinHeight="460"
+        Title="Cobalt Files — 跨平台文件管理器">
+
+  <ui:FANavigationView x:Name="Nav"
+                       PaneDisplayMode="Left"
+                       OpenPaneLength="230"
+                       AlwaysShowHeader="False"
+                       IsSettingsVisible="False"
+                       IsBackButtonVisible="False"
+                       IsPaneToggleButtonVisible="True"
+                       PaneTitle="Cobalt Files">
+    <ui:FANavigationView.MenuItems>
+      <!-- 快速访问与卷由代码按平台动态生成 -->
+    </ui:FANavigationView.MenuItems>
+
+    <Grid RowDefinitions="Auto,Auto,Auto,*,Auto">
+
+      <!-- 工具栏 -->
+      <Border Grid.Row="0" Padding="10,8" BorderThickness="0,0,0,1"
+              BorderBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}">
+        <Grid ColumnDefinitions="*,Auto">
+          <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="4">
+            <Button Classes="toolButton" ToolTip.Tip="后退 (Alt+←)"
+                    Command="{Binding GoBackCommand}" IsEnabled="{Binding CanGoBack}">
+              <ui:FASymbolIcon Symbol="Back" FontSize="16" />
+            </Button>
+            <Button Classes="toolButton" ToolTip.Tip="前进 (Alt+→)"
+                    Command="{Binding GoForwardCommand}" IsEnabled="{Binding CanGoForward}">
+              <ui:FASymbolIcon Symbol="ChevronRight" FontSize="16" />
+            </Button>
+            <Button Classes="toolButton" ToolTip.Tip="上一级 (Backspace)"
+                    Command="{Binding GoUpCommand}" IsEnabled="{Binding CanGoUp}">
+              <ui:FASymbolIcon Symbol="Up" FontSize="16" />
+            </Button>
+            <Button Classes="toolButton" ToolTip.Tip="刷新 (F5)" Command="{Binding RefreshCommand}">
+              <ui:FASymbolIcon Symbol="Refresh" FontSize="16" />
+            </Button>
+
+            <Border Width="1" Height="22" Margin="6,0" Background="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
+
+            <Button Classes="toolButton" ToolTip.Tip="新建文件夹" Command="{Binding NewFolderCommand}">
+              <ui:FASymbolIcon Symbol="Add" FontSize="16" />
+            </Button>
+            <Button Classes="toolButton" ToolTip.Tip="复制 (Ctrl+C)" Command="{Binding CopyCommand}">
+              <ui:FASymbolIcon Symbol="Copy" FontSize="16" />
+            </Button>
+            <Button Classes="toolButton" ToolTip.Tip="剪切 (Ctrl+X)" Command="{Binding CutCommand}">
+              <ui:FASymbolIcon Symbol="Cut" FontSize="16" />
+            </Button>
+            <Button Classes="toolButton" ToolTip.Tip="粘贴 (Ctrl+V)" Command="{Binding PasteCommand}">
+              <ui:FASymbolIcon Symbol="Paste" FontSize="16" />
+            </Button>
+            <Button Classes="toolButton" ToolTip.Tip="重命名 (F2)" Command="{Binding RenameCommand}">
+              <ui:FASymbolIcon Symbol="Edit" FontSize="16" />
+            </Button>
+            <Button Classes="toolButton" ToolTip.Tip="移到回收站 (Delete)" Command="{Binding DeleteCommand}">
+              <ui:FASymbolIcon Symbol="Delete" FontSize="16" />
+            </Button>
+
+            <Border Width="1" Height="22" Margin="6,0" Background="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
+
+            <Button Classes="toolButton" ToolTip.Tip="显示/隐藏隐藏文件" Command="{Binding ToggleHiddenCommand}">
+              <ui:FASymbolIcon Symbol="View" FontSize="16" />
+            </Button>
+          </StackPanel>
+
+          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4">
+            <Button Classes="toolButton" ToolTip.Tip="切换视图" Command="{Binding ToggleViewCommand}">
+              <ui:FASymbolIcon Symbol="ViewAll" FontSize="16" />
+            </Button>
+            <Button Classes="toolButton" ToolTip.Tip="切换主题" Command="{Binding ToggleThemeCommand}">
+              <ui:FASymbolIcon Symbol="Settings" FontSize="16" />
+            </Button>
+          </StackPanel>
+        </Grid>
+      </Border>
+
+      <!-- 地址栏 + 搜索 -->
+      <Border Grid.Row="1" Padding="10,8" BorderThickness="0,0,0,1"
+              BorderBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}">
+        <Grid ColumnDefinitions="Auto,*,Auto,220">
+          <Button Grid.Column="0" Classes="toolButton" ToolTip.Tip="编辑路径 (Ctrl+L)"
+                  Command="{Binding EditAddressCommand}">
+            <ui:FASymbolIcon Symbol="Edit" FontSize="15" />
+          </Button>
+
+          <ui:FABreadcrumbBar x:Name="Breadcrumb" Grid.Column="1" Margin="8,0"
+                              VerticalAlignment="Center"
+                              ItemsSource="{Binding Breadcrumbs}"
+                              IsVisible="{Binding !IsAddressEditing}" />
+
+          <TextBox x:Name="AddressBox" Grid.Column="1" Margin="8,0"
+                   Text="{Binding AddressText, Mode=TwoWay}"
+                   PlaceholderText="输入完整路径后回车，支持 ~ 开头"
+                   IsVisible="{Binding IsAddressEditing}" />
+
+          <Button Grid.Column="2" Classes="toolButton" ToolTip.Tip="在当前目录递归搜索"
+                  Command="{Binding DeepSearchCommand}">
+            <ui:FASymbolIcon Symbol="Find" FontSize="15" />
+          </Button>
+
+          <TextBox x:Name="SearchBox" Grid.Column="3" Margin="6,0,0,0"
+                   Text="{Binding SearchQuery, Mode=TwoWay}"
+                   PlaceholderText="筛选当前目录…" />
+        </Grid>
+      </Border>
+
+      <!-- 列头（与数据行共用同一套列宽） -->
+      <Border Grid.Row="2" Padding="6,2" BorderThickness="0,0,0,1" IsVisible="{Binding IsDetailsView}"
+              BorderBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}">
+        <Grid ColumnDefinitions="34,*,110,150,160">
+          <Button Grid.Column="1" Classes="columnHeader" Content="名称"
+                  Command="{Binding SetSortCommand}" CommandParameter="Name" />
+          <Button Grid.Column="2" Classes="columnHeader" Content="大小"
+                  Command="{Binding SetSortCommand}" CommandParameter="Size" />
+          <Button Grid.Column="3" Classes="columnHeader" Content="类型"
+                  Command="{Binding SetSortCommand}" CommandParameter="Kind" />
+          <Button Grid.Column="4" Classes="columnHeader" Content="修改时间"
+                  Command="{Binding SetSortCommand}" CommandParameter="Modified" />
+        </Grid>
+      </Border>
+
+      <!-- 内容区 -->
+      <Grid Grid.Row="3" x:Name="ContentArea">
+        <ListBox x:Name="FileList" ItemsSource="{Binding Entries}" SelectionMode="Multiple"
+                 IsVisible="{Binding IsDetailsView}" Background="Transparent"
+                 BorderThickness="0" Padding="4">
+          <ListBox.ItemTemplate>
+            <DataTemplate>
+              <Grid ColumnDefinitions="34,*,110,150,160" VerticalAlignment="Center">
+                <ui:FASymbolIcon Grid.Column="0" Symbol="{Binding Symbol}" FontSize="17"
+                                 HorizontalAlignment="Center" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="1" Text="{Binding Name}" VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis" Margin="4,0" />
+                <TextBlock Grid.Column="2" Text="{Binding SizeText}" VerticalAlignment="Center" Margin="8,0" />
+                <TextBlock Grid.Column="3" Text="{Binding Kind}" VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis" Margin="8,0" />
+                <TextBlock Grid.Column="4" Text="{Binding ModifiedText}" VerticalAlignment="Center" Margin="8,0" />
+              </Grid>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+
+        <ListBox x:Name="GridList" ItemsSource="{Binding Entries}" SelectionMode="Multiple"
+                 IsVisible="{Binding IsGridView}" Background="Transparent"
+                 BorderThickness="0" Padding="8">
+          <ListBox.ItemsPanel>
+            <ItemsPanelTemplate>
+              <WrapPanel Orientation="Horizontal" />
+            </ItemsPanelTemplate>
+          </ListBox.ItemsPanel>
+          <ListBox.ItemTemplate>
+            <DataTemplate>
+              <StackPanel Width="108" Spacing="6" Margin="4">
+                <ui:FASymbolIcon Symbol="{Binding Symbol}" FontSize="38" HorizontalAlignment="Center" />
+                <TextBlock Classes="gridTileName" Text="{Binding Name}" HorizontalAlignment="Center" />
+              </StackPanel>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+
+        <TextBlock Text="这个文件夹是空的" FontSize="15" Opacity="0.6"
+                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                   IsVisible="{Binding IsEmpty}" IsHitTestVisible="False" />
+
+        <ui:FAProgressRing Width="40" Height="40" IsActive="{Binding IsLoading}"
+                           IsVisible="{Binding IsLoading}"
+                           HorizontalAlignment="Center" VerticalAlignment="Center" />
+
+        <ui:FASkeleton Height="44" Margin="12,10" VerticalAlignment="Top"
+                       IsLoading="{Binding IsLoading}" IsActive="{Binding IsLoading}"
+                       IsVisible="{Binding IsLoading}">
+          <Border Height="44" Background="#12808080" CornerRadius="4" />
+        </ui:FASkeleton>
+
+        <ui:FAInfoBar Margin="14" VerticalAlignment="Bottom" IsClosable="True"
+                      IsOpen="{Binding IsInfoOpen, Mode=TwoWay}"
+                      Title="{Binding InfoTitle}"
+                      Message="{Binding InfoMessage}"
+                      Severity="{Binding InfoSeverity}" />
+      </Grid>
+
+      <!-- 状态栏 -->
+      <Border Grid.Row="4" Padding="12,7" BorderThickness="0,1,0,0"
+              BorderBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}">
+        <Grid ColumnDefinitions="*,Auto,Auto">
+          <TextBlock Grid.Column="0" Text="{Binding StatusText}" FontSize="12" VerticalAlignment="Center" />
+          <TextBlock Grid.Column="1" Text="{Binding SelectionText}" FontSize="12" Margin="16,0"
+                     VerticalAlignment="Center" />
+          <TextBlock Grid.Column="2" Text="{Binding PlatformText}" FontSize="11" Opacity="0.6"
+                     VerticalAlignment="Center" />
+        </Grid>
+      </Border>
+    </Grid>
+  </ui:FANavigationView>
+</Window>

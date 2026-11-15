@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>Cobalt.Desktop</RootNamespace>
+    <AssemblyName>Cobalt</AssemblyName>
+    <ApplicationTitle>Cobalt Files</ApplicationTitle>
+    <!-- Avalonia 12.1 默认开启编译绑定（要求每个 XAML 都写 x:DataType）。
+         本项目用经典反射绑定，显式关掉，避免 XAML 编译期 AVLN2100。 -->
+    <AvaloniaUseCompiledBindingsByDefault>false</AvaloniaUseCompiledBindingsByDefault>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="12.1.0" />
+    <PackageReference Include="Avalonia.Desktop" Version="12.1.0" />
+    <!-- FluentUI-CodeHub：FluentAvalonia 的 CodeHub 分支，绑定 Avalonia 12.1.0 -->
+    <PackageReference Include="CodeHub-FluentUI" Version="3.1.0-codehub.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Cobalt.Files\Cobalt.Files.csproj" />
+  </ItemGroup>
+
+  <!--
+    CodeNet .NET 10.0.400 SDK 的 Microsoft.CSharp.CurrentVersion.targets 把
+    CallTarget Targets="$(TargetsTriggeredByCompilation)" 整段注释掉了，
+    Avalonia 12 的 CompileAvaloniaXaml 因此不会自动触发：
+    构建显示 0 错误，但运行时报 "No precompiled XAML found"。
+    这里在 CoreCompile 之后显式调用一次，保证 XAML 被编译进程序集。
+    若换回官方 .NET SDK 且该钩子恢复，可由 EnableAvaloniaXamlCompilation=false 之外的
+    方式关闭本目标（默认开启不影响，CompileAvaloniaXaml 自身有幂等判断）。
+  -->
+  <Target Name="CobaltCompileAvaloniaXaml" AfterTargets="CoreCompile"
+          DependsOnTargets="CompileAvaloniaXaml"
+          Condition="'$(EnableAvaloniaXamlCompilation)' != 'false' and '$(DesignTimeBuild)' != 'true'" />
+
+</Project>
