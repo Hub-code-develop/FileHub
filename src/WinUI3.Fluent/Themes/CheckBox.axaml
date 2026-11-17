@@ -1,0 +1,94 @@
+<!--
+  CheckBox — ported from WinUI 3 controls/dev/CommonStyles/CheckBox_themeresources.xaml
+  Copyright (c) Microsoft Corporation. MIT License. See THIRD-PARTY-NOTICES.md.
+
+  CheckBoxSize 20 · CheckBoxBorderThickness 1 · CheckBoxHeight 32 · CornerRadius 4
+  Box sits 8 px before the label, vertically centred, exactly as in the original.
+-->
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <Styles.Resources>
+    <ControlTheme x:Key="{x:Type CheckBox}" TargetType="CheckBox">
+      <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+      <Setter Property="MinHeight" Value="32" />
+      <Setter Property="FontFamily" Value="{StaticResource WinUIFontFamily}" />
+      <Setter Property="FontSize" Value="{StaticResource ControlContentThemeFontSize}" />
+      <Setter Property="HorizontalAlignment" Value="Left" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="HorizontalContentAlignment" Value="Left" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Panel Background="Transparent">
+            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+              <Border Name="PART_Box"
+                      Width="20" Height="20"
+                      CornerRadius="{StaticResource ControlCornerRadius}"
+                      BorderThickness="1"
+                      BorderBrush="{DynamicResource ControlStrongStrokeColorDefaultBrush}"
+                      Background="{DynamicResource ControlFillColorTransparentBrush}">
+                <Panel>
+                  <Path Name="PART_Glyph"
+                        Data="M 0,4.6 L 3.6,8.4 L 11,0.6"
+                        Width="12" Height="9"
+                        Stretch="Uniform"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Stroke="{DynamicResource TextOnAccentFillColorPrimaryBrush}"
+                        StrokeThickness="1.5"
+                        StrokeLineCap="Round"
+                        StrokeJoin="Round"
+                        IsVisible="False" />
+                  <Rectangle Name="PART_Dash"
+                             Width="10" Height="2"
+                             RadiusX="1" RadiusY="1"
+                             HorizontalAlignment="Center"
+                             VerticalAlignment="Center"
+                             Fill="{DynamicResource TextOnAccentFillColorPrimaryBrush}"
+                             IsVisible="False" />
+                </Panel>
+              </Border>
+              <ContentPresenter Name="PART_ContentPresenter"
+                                Content="{TemplateBinding Content}"
+                                ContentTemplate="{TemplateBinding ContentTemplate}"
+                                VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}" />
+            </StackPanel>
+          </Panel>
+        </ControlTemplate>
+      </Setter>
+
+      <Style Selector="^:pointerover /template/ Border#PART_Box">
+        <Setter Property="Background" Value="{DynamicResource ControlAltFillColorSecondaryBrush}" />
+      </Style>
+      <Style Selector="^:pressed /template/ Border#PART_Box">
+        <Setter Property="Background" Value="{DynamicResource ControlAltFillColorTertiaryBrush}" />
+      </Style>
+
+      <Style Selector="^:checked /template/ Border#PART_Box">
+        <Setter Property="Background" Value="{DynamicResource AccentFillColorDefaultBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AccentFillColorDefaultBrush}" />
+      </Style>
+      <Style Selector="^:checked /template/ Path#PART_Glyph">
+        <Setter Property="IsVisible" Value="True" />
+      </Style>
+      <Style Selector="^:checked:pointerover /template/ Border#PART_Box">
+        <Setter Property="Background" Value="{DynamicResource AccentFillColorSecondaryBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AccentFillColorSecondaryBrush}" />
+      </Style>
+      <Style Selector="^:checked:pressed /template/ Border#PART_Box">
+        <Setter Property="Background" Value="{DynamicResource AccentFillColorTertiaryBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AccentFillColorTertiaryBrush}" />
+      </Style>
+
+      <Style Selector="^:indeterminate /template/ Border#PART_Box">
+        <Setter Property="Background" Value="{DynamicResource AccentFillColorDefaultBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AccentFillColorDefaultBrush}" />
+      </Style>
+      <Style Selector="^:indeterminate /template/ Rectangle#PART_Dash">
+        <Setter Property="IsVisible" Value="True" />
+      </Style>
+    </ControlTheme>
+  </Styles.Resources>
+
+</Styles>

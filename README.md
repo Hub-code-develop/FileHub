@@ -12,6 +12,8 @@ This English file is the primary README. The Chinese translation is
 [README.zh-CN.md](README.zh-CN.md). Documentation defaults to English; the application UI does
 not (see [UI language](#ui-language)).
 
+![FileHub main window](docs/filehub-main.png)
+
 ## Attribution: code ported from Files
 
 **The UI of FileHub is a port of [Files](https://github.com/files-community/Files), not merely
@@ -46,6 +48,49 @@ That file also lists every other third-party component.
 
 FileHub itself is released under the [MIT License](LICENSE).
 Thanks to the Files Community for a genuinely well-designed file manager.
+
+## Attribution: control styles ported from WinUI 3
+
+`src/WinUI3.Fluent/` is a **from-source port of the WinUI 3 default control styles**
+([microsoft/microsoft-ui-xaml](https://github.com/microsoft/microsoft-ui-xaml), MIT). The
+upstream style definitions ship as plain-text XAML, so every colour, corner radius, padding and
+state colour in that project was copied from
+`controls/dev/CommonStyles/*_themeresources.xaml` rather than eyeballed from screenshots.
+
+| WinUI 3 source (MIT) | Ported to in FileHub |
+| --- | --- |
+| `Common_themeresources_any.xaml` | `src/WinUI3.Fluent/Themes/Tokens.axaml` — light and dark colour palettes |
+| `CornerRadius_themeresources.xaml` | `Tokens.axaml` — `ControlCornerRadius` 4, `OverlayCornerRadius` 8 |
+| `Button_themeresources.xaml` | `Themes/Button.axaml` — 32px height, `11,5,11,6` padding, accent and subtle variants |
+| `ToggleButton_themeresources.xaml` | `Themes/ToggleButton.axaml` |
+| `CheckBox_themeresources.xaml` | `Themes/CheckBox.axaml` — 20px box, 8px label gap |
+| `RadioButton_themeresources.xaml` | `Themes/RadioButton.axaml` — accent disc plus on-accent dot |
+| `ListViewItem_themeresources.xaml` | `Themes/ListBoxItem.axaml` — hover surface and 3x16 selection pill |
+| `TextBox_themeresources.xaml` | `Themes/TextBox.axaml` — 32px, `10,5,6,6` padding, accent underline on focus |
+| `ToggleSwitch_themeresources.xaml` | `Themes/ToggleSwitch.axaml` — 40x20 track, 12px knob |
+| `ToolTip_themeresources.xaml`, `FlyoutPresenter_themeresources.xaml` | `Themes/Surfaces.axaml` |
+| `TabView` / `TabViewItem` | `Themes/TabStrip.axaml` + `Controls/WinTabStrip.cs` — 32px tab, `8,8,0,0` corners |
+
+### Control coverage
+
+| Control | Status |
+| --- | --- |
+| Button, ToggleButton, CheckBox, RadioButton, ToggleSwitch, TextBox, TextBlock | Ported |
+| ListBoxItem / ListViewItem | Ported |
+| ToolTip, FlyoutPresenter | Ported |
+| TabView (tab strip) | Ported, including the close button |
+| ScrollBar | Inherited — see below |
+| NavigationView, BreadcrumbBar, InfoBar, ProgressRing, MenuFlyout, ComboBox | Served by CodeHub-FluentUI |
+
+`ScrollBar` is the one deliberate omission. Avalonia's `ScrollBar` takes ownership of
+`PART_Track` in `OnApplyTemplate` and derives the thumb from `ViewportSize`; copying WinUI's
+template through verbatim collapses the thumb to a dot. A working Fluent scroll bar beats a
+faithful broken one.
+
+The port is deliberately honest about its limits: Acrylic and Mica are Windows compositor
+backdrops with no portable equivalent, and Segoe UI Variable is not licensed for redistribution.
+A WinUI 3 window and this port therefore differ in font rendering and translucency, not in
+control geometry. Full detail in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
 `CodeHub-FluentUI` is a separate dependency from
 [`Hub-code-develop/CodeHub-FluentUI`](https://github.com/Hub-code-develop/CodeHub-FluentUI)

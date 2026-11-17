@@ -175,20 +175,30 @@ public sealed class SidebarItem : Button
             Text = Detail,
             FontSize = 10,
             Opacity = 0.6,
-            HorizontalAlignment = HorizontalAlignment.Right,
+            HorizontalAlignment = HorizontalAlignment.Left,
             VerticalAlignment = VerticalAlignment.Center,
+            TextTrimming = TextTrimming.CharacterEllipsis,
             IsVisible = false
         };
 
-        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,Auto,*,Auto") };
+        // Drive rows carry a second line ("94.21 GB / 926.3 GB"), so they are taller and the
+        // capacity sits under the name instead of competing with it for horizontal space.
+        var stack = new StackPanel
+        {
+            Orientation = Orientation.Vertical,
+            VerticalAlignment = VerticalAlignment.Center,
+            Spacing = 0
+        };
+        stack.Children.Add(_text);
+        stack.Children.Add(_detail);
+
+        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,Auto,*") };
         Grid.SetColumn(_pill, 0);
         Grid.SetColumn(_icon, 1);
-        Grid.SetColumn(_text, 2);
-        Grid.SetColumn(_detail, 3);
+        Grid.SetColumn(stack, 2);
         grid.Children.Add(_pill);
         grid.Children.Add(_icon);
-        grid.Children.Add(_text);
-        grid.Children.Add(_detail);
+        grid.Children.Add(stack);
         Content = grid;
     }
 
@@ -224,7 +234,9 @@ public sealed class SidebarItem : Button
         if (change.Property == DetailProperty)
         {
             _detail.Text = Detail;
-            _detail.IsVisible = !string.IsNullOrEmpty(Detail);
+            var hasDetail = !string.IsNullOrEmpty(Detail);
+            _detail.IsVisible = hasDetail;
+            Height = hasDetail ? 40 : 32;
         }
         if (change.Property == IsSelectedProperty)
         {

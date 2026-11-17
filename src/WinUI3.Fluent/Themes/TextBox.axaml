@@ -1,0 +1,93 @@
+<!--
+  TextBox — ported from WinUI 3 controls/dev/CommonStyles/TextBox_themeresources.xaml
+  Copyright (c) Microsoft Corporation. MIT License. See THIRD-PARTY-NOTICES.md.
+
+  WinUI geometry:
+    MinHeight 32 · Padding 10,5,6,6 · BorderThickness 1 · CornerRadius 4
+    TextControlThemePadding 10,5,6,6 · TextControlBorderThemeThicknessFocused 1,1,1,2
+
+  The focused underline is a separate 2px accent band pinned to the bottom edge
+  (WinUI draws it as "BorderElement" + underline), so the side borders stay 1px.
+-->
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <Styles.Resources>
+    <ControlTheme x:Key="{x:Type TextBox}" TargetType="TextBox">
+      <Setter Property="Background" Value="{DynamicResource ControlFillColorDefaultBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ControlElevationBorderBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="{StaticResource TextBoxCornerRadius}" />
+      <Setter Property="Padding" Value="{StaticResource TextControlThemePadding}" />
+      <Setter Property="MinHeight" Value="{StaticResource WinUIControlHeight}" />
+      <Setter Property="FontFamily" Value="{StaticResource WinUIFontFamily}" />
+      <Setter Property="FontSize" Value="{StaticResource ControlContentThemeFontSize}" />
+      <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+      <Setter Property="CaretBrush" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+      <Setter Property="SelectionBrush" Value="{DynamicResource AccentFillColorDefaultBrush}" />
+      <Setter Property="SelectionForegroundBrush" Value="{DynamicResource TextOnAccentFillColorPrimaryBrush}" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <DataValidationErrors>
+            <Panel>
+              <Border Name="PART_BorderElement"
+                      Background="{TemplateBinding Background}"
+                      BorderBrush="{TemplateBinding BorderBrush}"
+                      BorderThickness="{TemplateBinding BorderThickness}"
+                      CornerRadius="{TemplateBinding CornerRadius}">
+                <Panel Margin="{TemplateBinding Padding}">
+                  <TextBlock Name="PART_Watermark"
+                             Text="{TemplateBinding Watermark}"
+                             Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                             VerticalAlignment="Center"
+                             IsHitTestVisible="False"
+                             IsVisible="{TemplateBinding Text, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
+                  <ScrollViewer Name="PART_ScrollViewer"
+                                HorizontalScrollBarVisibility="Hidden"
+                                VerticalScrollBarVisibility="Hidden">
+                    <TextPresenter Name="PART_TextPresenter"
+                                   Text="{TemplateBinding Text, Mode=TwoWay}"
+                                   CaretIndex="{TemplateBinding CaretIndex}"
+                                   CaretBrush="{TemplateBinding CaretBrush}"
+                                   SelectionStart="{TemplateBinding SelectionStart}"
+                                   SelectionEnd="{TemplateBinding SelectionEnd}"
+                                   SelectionBrush="{TemplateBinding SelectionBrush}"
+                                   SelectionForegroundBrush="{TemplateBinding SelectionForegroundBrush}"
+                                   PasswordChar="{TemplateBinding PasswordChar}"
+                                   RevealPassword="{TemplateBinding RevealPassword}"
+                                   TextAlignment="{TemplateBinding TextAlignment}"
+                                   TextWrapping="{TemplateBinding TextWrapping}"
+                                   VerticalAlignment="Center" />
+                  </ScrollViewer>
+                </Panel>
+              </Border>
+              <Border Name="PART_Underline"
+                      Height="2"
+                      Margin="0,0,0,-1"
+                      VerticalAlignment="Bottom"
+                      CornerRadius="0,0,4,4"
+                      Background="{DynamicResource AccentFillColorDefaultBrush}"
+                      IsVisible="False" />
+            </Panel>
+          </DataValidationErrors>
+        </ControlTemplate>
+      </Setter>
+
+      <Style Selector="^:pointerover /template/ Border#PART_BorderElement">
+        <Setter Property="Background" Value="{DynamicResource ControlFillColorSecondaryBrush}" />
+      </Style>
+      <Style Selector="^:focus /template/ Border#PART_BorderElement">
+        <Setter Property="Background" Value="{DynamicResource ControlFillColorInputActiveBrush}" />
+      </Style>
+      <Style Selector="^:focus /template/ Border#PART_Underline">
+        <Setter Property="IsVisible" Value="True" />
+      </Style>
+      <Style Selector="^:disabled /template/ Border#PART_BorderElement">
+        <Setter Property="Background" Value="{DynamicResource ControlFillColorDisabledBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource ControlStrokeColorDefaultBrush}" />
+      </Style>
+    </ControlTheme>
+  </Styles.Resources>
+
+</Styles>

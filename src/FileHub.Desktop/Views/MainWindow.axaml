@@ -1,6 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:ui="using:FluentAvalonia.UI.Controls"
+        xmlns:win="using:WinUI3.Fluent.Controls"
         xmlns:loc="using:FileHub.Desktop.Services"
         xmlns:c="using:FileHub.Desktop.Controls"
         x:Class="FileHub.Desktop.Views.MainWindow"
@@ -26,41 +27,41 @@
   -->
   <Grid RowDefinitions="Auto,Auto,*,Auto">
 
-    <!-- Row 0: Tab Bar (Files MainPage: tabbar:TabBar / TitlebarArea / TabView) -->
+    <!-- Row 0: Tab Bar (Files MainPage: tabbar:TabBar / TitlebarArea / TabView).
+         The strip is our own WinUI 3 TabView port (WinUI3.Fluent), not the FluentAvalonia
+         one: FA's add/close buttons are icon-font glyphs, and that font is not present on
+         macOS or Linux, so they rendered as empty boxes. -->
     <Border Grid.Row="0" Classes="tabBarSurface">
-      <ui:FATabView x:Name="TabView"
-                    Margin="0,10,0,0"
-                    Height="34"
-                    TabItemsSource="{Binding Tabs}"
-                    SelectedItem="{Binding SelectedTab, Mode=TwoWay}"
-                    AddTabButtonCommand="{Binding NewTabCommand}"
-                    IsAddTabButtonVisible="True"
-                    CloseButtonOverlayMode="Always"
-                    CanReorderTabs="False"
-                    CanDragTabs="False">
-        <ui:FATabView.TabStripFooter>
-          <StackPanel Orientation="Horizontal" Margin="8,0,8,0" Spacing="4">
-            <Button Classes="tabAction" Content="{Binding LanguageLabel}"
-                    ToolTip.Tip="{Binding LanguageTooltip}"
-                    Command="{Binding CycleLanguageCommand}" />
-            <Button Classes="tabAction" ToolTip.Tip="{x:Static loc:Strings.ToggleTheme}"
-                    Command="{Binding ToggleThemeCommand}">
-              <ui:FASymbolIcon Symbol="Settings" FontSize="14" />
-            </Button>
-          </StackPanel>
-        </ui:FATabView.TabStripFooter>
-        <ui:FATabView.TabItemTemplate>
-          <DataTemplate>
-            <!-- Header carries the tab title; the close button is the control's own,
-                 wired through TabView.TabCloseRequested in code-behind. -->
-            <ui:FATabViewItem Header="{Binding TabTitle}" IsClosable="True">
-              <ui:FATabViewItem.IconSource>
-                <ui:FASymbolIconSource Symbol="Folder" />
-              </ui:FATabViewItem.IconSource>
-            </ui:FATabViewItem>
-          </DataTemplate>
-        </ui:FATabView.TabItemTemplate>
-      </ui:FATabView>
+      <StackPanel Orientation="Horizontal" Margin="8,0,8,0" VerticalAlignment="Bottom">
+        <win:WinTabStrip x:Name="TabStrip"
+                         ItemsSource="{Binding Tabs}"
+                         SelectedItem="{Binding SelectedTab, Mode=TwoWay}">
+          <win:WinTabStrip.ItemTemplate>
+            <DataTemplate>
+              <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                <ui:FASymbolIcon Symbol="Folder" FontSize="14" VerticalAlignment="Center" />
+                <TextBlock Text="{Binding TabTitle}" FontSize="12" VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis" />
+              </StackPanel>
+            </DataTemplate>
+          </win:WinTabStrip.ItemTemplate>
+        </win:WinTabStrip>
+
+        <StackPanel Orientation="Horizontal" Spacing="2"
+                    VerticalAlignment="Bottom" Margin="4,0,0,4">
+          <Button Classes="tabAction" ToolTip.Tip="{x:Static loc:Strings.NewTab}"
+                  Command="{Binding NewTabCommand}">
+            <ui:FASymbolIcon Symbol="Add" FontSize="12" />
+          </Button>
+          <Button Classes="tabAction" Content="{Binding LanguageLabel}"
+                  ToolTip.Tip="{Binding LanguageTooltip}"
+                  Command="{Binding CycleLanguageCommand}" />
+          <Button Classes="tabAction" ToolTip.Tip="{x:Static loc:Strings.ToggleTheme}"
+                  Command="{Binding ToggleThemeCommand}">
+            <ui:FASymbolIcon Symbol="Settings" FontSize="14" />
+          </Button>
+        </StackPanel>
+      </StackPanel>
     </Border>
 
     <!-- Row 1: Address Bar (Files NavigationToolbar: Height=48, Padding=4, buttons 36x32).

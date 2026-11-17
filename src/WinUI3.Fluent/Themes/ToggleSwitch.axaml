@@ -1,0 +1,96 @@
+<!--
+  ToggleSwitch + ProgressBar — ported from WinUI 3 CommonStyles.
+  Copyright (c) Microsoft Corporation. MIT License. See THIRD-PARTY-NOTICES.md.
+
+  ToggleSwitch: 40x20 pill, 12px knob inset 4px, knob travels on a 167ms
+  thickness transition (WinUI uses ControlNormalAnimationDuration).
+  ProgressBar: 3px rail with accent indicator, CornerRadius 1.5 as upstream.
+-->
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <Styles.Resources>
+    <ControlTheme x:Key="{x:Type ToggleSwitch}" TargetType="ToggleSwitch">
+      <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+      <Setter Property="FontFamily" Value="{StaticResource WinUIFontFamily}" />
+      <Setter Property="FontSize" Value="{StaticResource ControlContentThemeFontSize}" />
+      <Setter Property="MinHeight" Value="32" />
+      <Setter Property="HorizontalAlignment" Value="Left" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center" Background="Transparent">
+            <Panel Width="40" Height="20">
+              <Border Name="PART_Pill"
+                      Width="40" Height="20"
+                      CornerRadius="10"
+                      BorderThickness="1"
+                      BorderBrush="{DynamicResource ControlStrongStrokeColorDefaultBrush}"
+                      Background="{DynamicResource ControlFillColorTransparentBrush}" />
+              <!-- Avalonia 的 ToggleSwitch 自己负责平移 PART_MovingKnobs，
+                   所以这里只提供容器，不手写 Margin 动画。 -->
+              <Panel Name="PART_MovingKnobs" Width="40" Height="20">
+                <Ellipse Name="PART_Knob"
+                         Width="12" Height="12"
+                         Margin="4,0,0,0"
+                         HorizontalAlignment="Left"
+                         VerticalAlignment="Center"
+                         Fill="{DynamicResource ControlStrongFillColorDefaultBrush}">
+                  <Ellipse.Transitions>
+                    <Transitions>
+                      <BrushTransition Property="Fill" Duration="0:0:0.167" />
+                    </Transitions>
+                  </Ellipse.Transitions>
+                </Ellipse>
+              </Panel>
+            </Panel>
+            <ContentPresenter Name="PART_ContentPresenter"
+                              Content="{TemplateBinding Content}"
+                              ContentTemplate="{TemplateBinding ContentTemplate}"
+                              VerticalContentAlignment="Center" />
+          </StackPanel>
+        </ControlTemplate>
+      </Setter>
+
+      <Style Selector="^:pointerover /template/ Border#PART_Pill">
+        <Setter Property="Background" Value="{DynamicResource ControlAltFillColorSecondaryBrush}" />
+      </Style>
+      <Style Selector="^:checked /template/ Border#PART_Pill">
+        <Setter Property="Background" Value="{DynamicResource AccentFillColorDefaultBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AccentFillColorDefaultBrush}" />
+      </Style>
+      <Style Selector="^:checked /template/ Ellipse#PART_Knob">
+        <Setter Property="Fill" Value="{DynamicResource TextOnAccentFillColorPrimaryBrush}" />
+      </Style>
+      <Style Selector="^:checked:pointerover /template/ Border#PART_Pill">
+        <Setter Property="Background" Value="{DynamicResource AccentFillColorSecondaryBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AccentFillColorSecondaryBrush}" />
+      </Style>
+    </ControlTheme>
+
+    <ControlTheme x:Key="{x:Type ProgressBar}" TargetType="ProgressBar">
+      <Setter Property="Background" Value="{DynamicResource ControlStrongFillColorDisabledBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource AccentFillColorDefaultBrush}" />
+      <Setter Property="MinHeight" Value="3" />
+      <Setter Property="Height" Value="3" />
+      <Setter Property="CornerRadius" Value="1.5" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Grid>
+            <Border Name="PART_Track"
+                    Background="{TemplateBinding Background}"
+                    CornerRadius="{TemplateBinding CornerRadius}" />
+            <Border Name="PART_Indicator"
+                    HorizontalAlignment="Left"
+                    Background="{TemplateBinding Foreground}"
+                    CornerRadius="{TemplateBinding CornerRadius}" />
+          </Grid>
+        </ControlTemplate>
+      </Setter>
+      <Style Selector="^:disabled /template/ Border#PART_Indicator">
+        <Setter Property="Background" Value="{DynamicResource AccentFillColorDisabledBrush}" />
+      </Style>
+    </ControlTheme>
+  </Styles.Resources>
+
+</Styles>

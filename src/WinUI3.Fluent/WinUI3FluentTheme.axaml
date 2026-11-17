@@ -1,0 +1,43 @@
+<!--
+  WinUI 3 for Avalonia — a from-source port of the WinUI 3 control styles.
+
+  Upstream: https://github.com/microsoft/microsoft-ui-xaml
+            controls/dev/CommonStyles/*.xaml
+  Copyright (c) Microsoft Corporation. Licensed under the MIT License.
+  See THIRD-PARTY-NOTICES.md and README.md for the file-by-file mapping.
+
+  Usage (App.axaml):
+
+    <Application.Resources>
+      <ResourceDictionary>
+        <ResourceDictionary.MergedDictionaries>
+          <ResourceInclude Source="avares://WinUI3.Fluent/Themes/Tokens.axaml" />
+        </ResourceDictionary.MergedDictionaries>
+      </ResourceDictionary>
+    </Application.Resources>
+
+    <Application.Styles>
+      <StyleInclude Source="avares://WinUI3.Fluent/WinUI3FluentTheme.axaml" />
+    </Application.Styles>
+-->
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <StyleInclude Source="avares://WinUI3.Fluent/Themes/TextBlock.axaml" />
+  <StyleInclude Source="avares://WinUI3.Fluent/Themes/Button.axaml" />
+  <StyleInclude Source="avares://WinUI3.Fluent/Themes/ToggleButton.axaml" />
+  <StyleInclude Source="avares://WinUI3.Fluent/Themes/CheckBox.axaml" />
+  <StyleInclude Source="avares://WinUI3.Fluent/Themes/RadioButton.axaml" />
+  <StyleInclude Source="avares://WinUI3.Fluent/Themes/ToggleSwitch.axaml" />
+  <StyleInclude Source="avares://WinUI3.Fluent/Themes/TextBox.axaml" />
+  <!--
+    ScrollBar 暂未启用：Avalonia 的 ScrollBar 由控件自身在 OnApplyTemplate 里
+    接管 PART_Track，模板里照搬 WinUI 结构时滑块比例拿不到 ViewportSize，
+    会退化成一个圆点。宁可保留上游 FluentAvalonia 的滚动条，也不交付一个坏掉的。
+    详见 README「Known limitations」。
+  -->
+  <StyleInclude Source="avares://WinUI3.Fluent/Themes/TabStrip.axaml" />
+  <StyleInclude Source="avares://WinUI3.Fluent/Themes/ListBoxItem.axaml" />
+  <StyleInclude Source="avares://WinUI3.Fluent/Themes/Surfaces.axaml" />
+
+</Styles>

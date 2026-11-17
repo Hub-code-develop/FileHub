@@ -4,10 +4,26 @@
              x:Class="FileHub.Desktop.App"
              RequestedThemeVariant="Default">
 
+    <!--
+      WinUI 3 设计令牌（颜色 / 圆角 / 字号 / 控件高度），从微软
+      microsoft-ui-xaml 仓库的 CommonStyles/*.xaml 逐值移植。
+      放在 Application.Resources 里，ThemeDictionaries 才会随浅色/深色切换刷新。
+    -->
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceInclude Source="avares://WinUI3.Fluent/Themes/Tokens.axaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Application.Resources>
+
     <Application.Styles>
         <!-- FluentUI-CodeHub（FluentAvalonia 的 CodeHub 分支）主题。
              PreferSystemTheme=False 是为了让手动的浅色/深色切换不被系统设置覆盖。 -->
         <sty:FluentAvaloniaTheme PreferSystemTheme="False" PreferUserAccentColor="True" />
+        <!-- WinUI 3 控件样式移植：Button / ListBoxItem / TextBlock。
+             放在 FluentAvalonia 之后，才能覆盖它自带的隐式 ControlTheme。 -->
+        <StyleInclude Source="avares://WinUI3.Fluent/WinUI3FluentTheme.axaml" />
         <StyleInclude Source="avares://FileHub/Styles/AppStyles.axaml" />
         <!-- Files App layout values (sizes, radii, spacing) ported to Avalonia. -->
         <StyleInclude Source="avares://FileHub/Styles/FileHubTheme.axaml" />
