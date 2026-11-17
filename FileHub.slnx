@@ -2,5 +2,6 @@
   <Folder Name="/src/">
     <Project Path="src/FileHub.Desktop/FileHub.Desktop.csproj" />
     <Project Path="src/FileHub.Files/FileHub.Files.csproj" />
+    <Project Path="src/WinUI3.Fluent/WinUI3.Fluent.csproj" />
   </Folder>
 </Solution>

@@ -10,6 +10,8 @@
 主说明文件是英文的 [README.md](README.md)，本文件是中文翻译。
 **文档默认英文；应用界面不会默认英文**，详见[界面语言](#界面语言)。
 
+![FileHub 主界面](docs/filehub-main.png)
+
 ## 版权与来源声明：移植自 Files 的代码
 
 **FileHub 的界面是把 [Files](https://github.com/files-community/Files) 的 XAML 布局移植过来的，
@@ -44,6 +46,30 @@ FileHub 本身采用 [MIT 许可证](LICENSE)。感谢 Files 社区做出了一�
 `CodeHub-FluentUI` 是来自
 [`Hub-code-develop/CodeHub-FluentUI`](https://github.com/Hub-code-develop/CodeHub-FluentUI)
 的独立依赖（MIT），离线包说明见 [local-feed/README.md](local-feed/README.md)。
+
+## 控件层：从 WinUI 3 源码移植
+
+`src/WinUI3.Fluent/` 是 **直接照 WinUI 3 默认控件样式源码移植**的（
+[microsoft/microsoft-ui-xaml](https://github.com/microsoft/microsoft-ui-xaml)，MIT）。
+WinUI 3 的样式是明文 XAML，所以颜色、圆角、内边距、各状态配色都是照抄
+`controls/dev/CommonStyles/*_themeresources.xaml`，不是照截图用眼睛调出来的。
+
+| 控件 | 状态 |
+| --- | --- |
+| Button、ToggleButton、CheckBox、RadioButton、ToggleSwitch、TextBox、TextBlock | 已移植 |
+| ListBoxItem / ListViewItem | 已移植 |
+| ToolTip、FlyoutPresenter | 已移植 |
+| TabView 标签栏（含关闭按钮） | 已移植（`WinTabStrip`） |
+| ScrollBar | 沿用库自带实现 |
+| NavigationView、BreadcrumbBar、InfoBar、ProgressRing、MenuFlyout、ComboBox | 由 CodeHub-FluentUI 提供 |
+
+`ScrollBar` 是唯一刻意不移植的：Avalonia 的 `ScrollBar` 在 `OnApplyTemplate` 里接管
+`PART_Track`，滑块比例来自 `ViewportSize`，照搬 WinUI 模板会让滑块退化成一个小圆点。
+宁可用能滚动的原生滚动条，也不交付一个长得像但坏掉的。
+
+无法做到一致的三处：Acrylic / Mica（Windows 合成器背景，无可移植对应物）、
+Segoe UI Variable（无再分发授权）、Composition 弹簧动画（用插值过渡近似）。
+逐文件映射表在 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。
 
 ## 界面语言
 

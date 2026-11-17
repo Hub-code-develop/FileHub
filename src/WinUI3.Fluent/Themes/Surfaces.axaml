@@ -1,0 +1,66 @@
+<!--
+  ToolTip + FlyoutPresenter — ported from WinUI 3 CommonStyles.
+  Copyright (c) Microsoft Corporation. MIT License. See THIRD-PARTY-NOTICES.md.
+
+  ToolTip:     font 12 · padding 9,6,9,8 · border 1px SurfaceStrokeColorFlyout
+  Flyout:      CornerRadius 8 (OverlayCornerRadius) · border 1px SurfaceStrokeColorFlyout
+
+  Upstream uses AcrylicInAppFillColorDefault for both surfaces. Acrylic needs a
+  compositor backdrop that Avalonia does not expose portably, so the solid
+  stand-in ControlSolidFillColorDefault is used instead. Documented in README.
+-->
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <Styles.Resources>
+    <ControlTheme x:Key="{x:Type ToolTip}" TargetType="ToolTip">
+      <Setter Property="Background" Value="{DynamicResource ControlSolidFillColorDefaultBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource SurfaceStrokeColorFlyoutBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="{StaticResource ControlCornerRadius}" />
+      <Setter Property="Padding" Value="9,6,9,8" />
+      <Setter Property="FontFamily" Value="{StaticResource WinUIFontFamily}" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border Background="{TemplateBinding Background}"
+                  BorderBrush="{TemplateBinding BorderBrush}"
+                  BorderThickness="{TemplateBinding BorderThickness}"
+                  CornerRadius="{TemplateBinding CornerRadius}"
+                  Padding="{TemplateBinding Padding}">
+            <ContentPresenter Name="PART_ContentPresenter"
+                              Content="{TemplateBinding Content}"
+                              ContentTemplate="{TemplateBinding ContentTemplate}" />
+          </Border>
+        </ControlTemplate>
+      </Setter>
+    </ControlTheme>
+
+    <ControlTheme x:Key="{x:Type FlyoutPresenter}" TargetType="FlyoutPresenter">
+      <Setter Property="Background" Value="{DynamicResource LayerFillColorDefaultBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource SurfaceStrokeColorFlyoutBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="{StaticResource OverlayCornerRadius}" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="FontFamily" Value="{StaticResource WinUIFontFamily}" />
+      <Setter Property="FontSize" Value="{StaticResource ControlContentThemeFontSize}" />
+      <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border Background="{TemplateBinding Background}"
+                  BorderBrush="{TemplateBinding BorderBrush}"
+                  BorderThickness="{TemplateBinding BorderThickness}"
+                  CornerRadius="{TemplateBinding CornerRadius}"
+                  Padding="{TemplateBinding Padding}"
+                  Margin="0,0,0,8">
+            <ContentPresenter Name="PART_ContentPresenter"
+                              Content="{TemplateBinding Content}"
+                              ContentTemplate="{TemplateBinding ContentTemplate}" />
+          </Border>
+        </ControlTemplate>
+      </Setter>
+    </ControlTheme>
+  </Styles.Resources>
+
+</Styles>

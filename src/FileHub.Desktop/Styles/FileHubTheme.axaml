@@ -18,7 +18,7 @@
   <Style Selector="Border.tabBarSurface">
     <Setter Property="Height" Value="44" />
     <Setter Property="Padding" Value="4,0,4,0" />
-    <Setter Property="Background" Value="#08000000" />
+    <Setter Property="Background" Value="{DynamicResource SubtleFillColorTransparentBrush}" />
   </Style>
 
   <Style Selector="Border.addressSurface">
@@ -29,19 +29,19 @@
   <Style Selector="Border.sidebarSurface">
     <Setter Property="Width" Value="230" />
     <Setter Property="Padding" Value="16,0,16,0" />
-    <Setter Property="Background" Value="#0A808080" />
+    <Setter Property="Background" Value="{DynamicResource LayerFillColorDefaultBrush}" />
     <Setter Property="BorderThickness" Value="0,0,1,0" />
-    <Setter Property="BorderBrush" Value="#18808080" />
+    <Setter Property="BorderBrush" Value="{DynamicResource DividerStrokeColorDefaultBrush}" />
   </Style>
 
   <Style Selector="Border.commandCard">
-    <Setter Property="CornerRadius" Value="8" />
+    <Setter Property="CornerRadius" Value="{StaticResource OverlayCornerRadius}" />
     <Setter Property="Padding" Value="8,4,8,4" />
     <Setter Property="Margin" Value="8,4,8,4" />
     <Setter Property="Height" Value="44" />
-    <Setter Property="Background" Value="#0D808080" />
+    <Setter Property="Background" Value="{DynamicResource CardBackgroundFillColorDefaultBrush}" />
     <Setter Property="BorderThickness" Value="1" />
-    <Setter Property="BorderBrush" Value="#14808080" />
+    <Setter Property="BorderBrush" Value="{DynamicResource CardStrokeColorDefaultBrush}" />
   </Style>
 
   <Style Selector="Border.omnibar">
@@ -49,22 +49,22 @@
     <Setter Property="CornerRadius" Value="6" />
     <Setter Property="Padding" Value="10,0,6,0" />
     <Setter Property="BorderThickness" Value="1" />
-    <Setter Property="BorderBrush" Value="#20808080" />
-    <Setter Property="Background" Value="#0C808080" />
+    <Setter Property="BorderBrush" Value="{DynamicResource ControlElevationBorderBrush}" />
+    <Setter Property="Background" Value="{DynamicResource ControlFillColorDefaultBrush}" />
   </Style>
 
   <Style Selector="Border.paneSurface">
-    <Setter Property="CornerRadius" Value="8" />
-    <Setter Property="Background" Value="#0D808080" />
+    <Setter Property="CornerRadius" Value="{StaticResource OverlayCornerRadius}" />
+    <Setter Property="Background" Value="{DynamicResource CardBackgroundFillColorDefaultBrush}" />
     <Setter Property="BorderThickness" Value="1" />
-    <Setter Property="BorderBrush" Value="#14808080" />
+    <Setter Property="BorderBrush" Value="{DynamicResource CardStrokeColorDefaultBrush}" />
   </Style>
 
   <Style Selector="Border.statusSurface">
     <Setter Property="MinHeight" Value="32" />
     <Setter Property="Padding" Value="8,0,8,0" />
     <Setter Property="BorderThickness" Value="0,1,0,0" />
-    <Setter Property="BorderBrush" Value="#18808080" />
+    <Setter Property="BorderBrush" Value="{DynamicResource DividerStrokeColorDefaultBrush}" />
   </Style>
 
   <!-- Sidebar: grouped headers and compact rows, like Files SidebarView -->
@@ -78,7 +78,7 @@
   <Style Selector="Border.sidebarDivider">
     <Setter Property="Height" Value="1" />
     <Setter Property="Margin" Value="4,6,4,6" />
-    <Setter Property="Background" Value="#20808080" />
+    <Setter Property="Background" Value="{DynamicResource DividerStrokeColorDefaultBrush}" />
   </Style>
 
   <!-- Files DetailsLayoutPage header: Height=40, left padding 24 -->
@@ -86,7 +86,7 @@
     <Setter Property="Height" Value="40" />
     <Setter Property="Padding" Value="10,0,12,0" />
     <Setter Property="BorderThickness" Value="0,0,0,1" />
-    <Setter Property="BorderBrush" Value="#18808080" />
+    <Setter Property="BorderBrush" Value="{DynamicResource DividerStrokeColorDefaultBrush}" />
   </Style>
 
   <Style Selector="Button.columnHeader">
@@ -182,7 +182,7 @@
     <Setter Property="Width" Value="1" />
     <Setter Property="Height" Value="18" />
     <Setter Property="Margin" Value="8,0,8,0" />
-    <Setter Property="Background" Value="#30808080" />
+    <Setter Property="Background" Value="{DynamicResource DividerStrokeColorDefaultBrush}" />
   </Style>
 
   <!-- Small square buttons in the tab strip / navigation toolbar -->

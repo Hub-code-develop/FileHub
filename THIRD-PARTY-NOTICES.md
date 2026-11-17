@@ -25,7 +25,7 @@ corner radii, spacing and command groupings were carried over:
 | `src/Files.App/Views/MainPage.xaml` | `src/FileHub.Desktop/Views/MainWindow.axaml` (root grid: tab bar / address bar / sidebar + content / status bar) |
 | `src/Files.App/UserControls/NavigationToolbar.xaml` | `MainWindow.axaml` row 1 (48px toolbar, 36x32 icon buttons, omnibar) |
 | `src/Files.App/UserControls/Toolbar.xaml` | `MainWindow.axaml` command card (rounded 8px command bar, label-right buttons, Layout / Sort / Details / Hidden groupings) |
-| `src/Files.App/UserControls/TabBar/TabBar.xaml` | `MainWindow.axaml` row 0 (`FATabView` strip, 34px height, footer actions) |
+| `src/Files.App/UserControls/TabBar/TabBar.xaml` | `MainWindow.axaml` row 0 (WinUI 3 tab strip `WinTabStrip`, 32px tabs, footer actions) |
 | `src/Files.App/UserControls/StatusBar.xaml` | `MainWindow.axaml` row 3 (32px status bar, 1x18 dividers) |
 | `src/Files.App/UserControls/Pane/InfoPane.xaml` | `MainWindow.axaml` InfoPane (300px pane, tab pills, 90px label column) |
 | `src/Files.App/Views/Layouts/DetailsLayoutPage.xaml` | `MainWindow.axaml` column header (40px) and 34/*/110/150/160 column grid |
@@ -73,6 +73,66 @@ The Files repository also ships a `LICENSE-MPL` file (Mozilla Public License 2.0
 repository it covers specific third-party components, not the application source as a whole.
 No MPL-covered file was used by this project, so no MPL obligations attach to FileHub. The
 file is mentioned here only for completeness.
+
+---
+
+## WinUI 3 (Microsoft.UI.Xaml)
+
+- **Project:** Windows UI Library (WinUI 3), part of the Windows App SDK
+- **Source:** https://github.com/microsoft/microsoft-ui-xaml (`main` branch, `controls/dev/CommonStyles/`)
+- **License:** MIT License
+- **Copyright:** Copyright (c) Microsoft Corporation
+- **Status:** **Derived work.** Default control styles were ported to Avalonia, see below.
+
+### What was ported
+
+`src/WinUI3.Fluent/` is a from-source port of the WinUI 3 default control styles. The upstream
+XAML was read directly from the repository above — no decompilation was involved, because the
+style definitions ship as plain-text XAML:
+
+| WinUI 3 source file | Ported into |
+| --- | --- |
+| `Common_themeresources_any.xaml` | `src/WinUI3.Fluent/Themes/Tokens.axaml` (Light and Dark colour palettes, every hex value copied verbatim) |
+| `CornerRadius_themeresources.xaml` | `Tokens.axaml` (`ControlCornerRadius` 4, `OverlayCornerRadius` 8) |
+| `Button_themeresources.xaml` | `Themes/Button.axaml` (padding `11,5,11,6`, 1px elevation gradient border, `AccentButtonStyle`, `SubtleButtonStyle`) |
+| `ToggleButton_themeresources.xaml` | `Themes/ToggleButton.axaml` (checked state fills with the accent colour) |
+| `CheckBox_themeresources.xaml` | `Themes/CheckBox.axaml` (20px box, 1px border, 8px label gap, check mark path) |
+| `RadioButton_themeresources.xaml` | `Themes/RadioButton.axaml` (20px circle, 10px on-accent dot when checked) |
+| `ListViewItem_themeresources.xaml` | `Themes/ListBoxItem.axaml` (hover surface, 3x16 accent selection pill) |
+| `ToolTip_themeresources.xaml` | `Themes/Surfaces.axaml` (12px text, padding `9,6,9,8`) |
+| `FlyoutPresenter_themeresources.xaml` | `Themes/Surfaces.axaml` (8px corner radius, 1px flyout stroke) |
+| `TabView/TabView_themeresources.xaml`, `TabView/TabViewItem_themeresources.xaml` | `Themes/TabStrip.axaml` + `Controls/WinTabStrip.cs` (32px tab, 8,8,0,0 corners, 100/240 min/max width, close button overlay) |
+| `TextBox_themeresources.xaml` | `Themes/TextBox.axaml` (32px height, `10,5,6,6` padding, 2px accent underline on focus) |
+| `ToggleSwitch_themeresources.xaml` | `Themes/ToggleSwitch.axaml` (40x20 track, 12px knob, 167 ms travel) |
+
+What came across: the exact colour ramps for light and dark, the type ramp, the control
+geometries (32px control height, 4px/8px corner radii, paddings, 40px list rows), the state
+colour mapping (normal / pointer-over / pressed / disabled / checked), the 83 ms background
+fade (`BrushTransition 0:0:0.083`), and the gradient `ControlElevationBorderBrush` that gives
+Fluent controls their lit top edge.
+
+What did not come across:
+
+- **Acrylic and Mica.** Both are DWM composition backdrops with no portable Avalonia
+  equivalent. Tooltips and flyouts fall back to the solid `ControlSolidFillColorDefault` /
+  `LayerFillColorDefault` surfaces.
+- **Segoe UI Variable.** Not licensed for redistribution. The font list falls through to
+  whatever the host provides, so text metrics differ by a pixel or two.
+- **`Windows.UI.Composition` animations.** Spring and implicit animations are approximated with
+  Avalonia transitions; easing curves are close but not identical.
+- Controls that depend on Windows-only infrastructure (AnimatedIcon, MediaPlayerElement,
+  WebView2, InkCanvas, ThemeShadow) are out of scope.
+- **ScrollBar is inherited, not ported.** Avalonia's `ScrollBar` takes over `PART_Track` in
+  `OnApplyTemplate` and computes the thumb from `ViewportSize`; a straight copy of WinUI's
+  template degrades the thumb to a dot. Rather than ship a broken bar, the FluentAvalonia
+  scroll bar stays in place. `Themes/ScrollBar.axaml` is therefore intentionally absent.
+- `NavigationView`, `BreadcrumbBar`, `InfoBar`, `ProgressRing`, `MenuFlyout` and `ComboBox` are
+  still served by CodeHub-FluentUI. Those are the largest templates in WinUI 3 (NavigationView
+  alone is several thousand lines) and they are visually already very close; see
+  "Control coverage" in README.md for the current status of each.
+
+The remaining visual difference against a real WinUI 3 window is therefore concentrated in the
+font, the translucent backdrops and sub-pixel text rendering — not in the control shapes.
 
 ---
 

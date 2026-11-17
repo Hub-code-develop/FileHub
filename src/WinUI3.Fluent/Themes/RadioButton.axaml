@@ -1,0 +1,63 @@
+<!--
+  RadioButton — ported from WinUI 3 controls/dev/CommonStyles/RadioButton_themeresources.xaml
+  Copyright (c) Microsoft Corporation. MIT License. See THIRD-PARTY-NOTICES.md.
+
+  WinUI 3 checked state (RadioButtonOuterEllipseCheckedFill -> AccentFillColorDefault):
+    the whole 20 px circle fills with the accent colour and a 10 px on-accent dot
+    sits in the middle. Unchecked uses ControlAltFillColorSecondary + strong stroke.
+-->
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <Styles.Resources>
+    <ControlTheme x:Key="{x:Type RadioButton}" TargetType="RadioButton">
+      <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+      <Setter Property="MinHeight" Value="32" />
+      <Setter Property="FontFamily" Value="{StaticResource WinUIFontFamily}" />
+      <Setter Property="FontSize" Value="{StaticResource ControlContentThemeFontSize}" />
+      <Setter Property="HorizontalAlignment" Value="Left" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Panel Background="Transparent">
+            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+              <Panel Width="20" Height="20">
+                <Ellipse Name="PART_Outer"
+                         Width="20" Height="20"
+                         StrokeThickness="1"
+                         Stroke="{DynamicResource ControlStrongStrokeColorDefaultBrush}"
+                         Fill="{DynamicResource ControlAltFillColorSecondaryBrush}" />
+                <Ellipse Name="PART_Inner"
+                         Width="10" Height="10"
+                         HorizontalAlignment="Center"
+                         VerticalAlignment="Center"
+                         Fill="{DynamicResource TextOnAccentFillColorPrimaryBrush}"
+                         IsVisible="False" />
+              </Panel>
+              <ContentPresenter Name="PART_ContentPresenter"
+                                Content="{TemplateBinding Content}"
+                                ContentTemplate="{TemplateBinding ContentTemplate}"
+                                VerticalContentAlignment="Center" />
+            </StackPanel>
+          </Panel>
+        </ControlTemplate>
+      </Setter>
+
+      <Style Selector="^:pointerover /template/ Ellipse#PART_Outer">
+        <Setter Property="Fill" Value="{DynamicResource ControlAltFillColorTertiaryBrush}" />
+      </Style>
+      <Style Selector="^:checked /template/ Ellipse#PART_Outer">
+        <Setter Property="Fill" Value="{DynamicResource AccentFillColorDefaultBrush}" />
+        <Setter Property="Stroke" Value="{DynamicResource AccentFillColorDefaultBrush}" />
+      </Style>
+      <Style Selector="^:checked /template/ Ellipse#PART_Inner">
+        <Setter Property="IsVisible" Value="True" />
+      </Style>
+      <Style Selector="^:checked:pointerover /template/ Ellipse#PART_Outer">
+        <Setter Property="Fill" Value="{DynamicResource AccentFillColorSecondaryBrush}" />
+        <Setter Property="Stroke" Value="{DynamicResource AccentFillColorSecondaryBrush}" />
+      </Style>
+    </ControlTheme>
+  </Styles.Resources>
+
+</Styles>

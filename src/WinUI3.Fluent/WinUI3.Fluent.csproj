@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>WinUI3.Fluent</RootNamespace>
+    <AssemblyName>WinUI3.Fluent</AssemblyName>
+    <!-- 全部是纯 XAML 资源，用反射绑定即可，不开编译绑定。 -->
+    <AvaloniaUseCompiledBindingsByDefault>false</AvaloniaUseCompiledBindingsByDefault>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="12.1.0" />
+  </ItemGroup>
+
+  <!--
+    与 FileHub.Desktop 相同的原因：CodeNet SDK 把 TargetsTriggeredByCompilation 注释掉了，
+    Avalonia 12 的 CompileAvaloniaXaml 不会自动跑，运行时就会报
+    "No precompiled XAML found"。这里在 CoreCompile 之后显式补一次。
+  -->
+  <Target Name="WinUI3FluentCompileAvaloniaXaml" AfterTargets="CoreCompile"
+          DependsOnTargets="CompileAvaloniaXaml"
+          Condition="'$(EnableAvaloniaXamlCompilation)' != 'false' and '$(DesignTimeBuild)' != 'true'" />
+
+</Project>

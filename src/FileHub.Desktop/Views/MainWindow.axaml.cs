@@ -4,12 +4,14 @@ using System.Linq;
 using System.Windows.Input;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using FileHub.Desktop.Controls;
 using FileHub.Desktop.Models;
 using FileHub.Desktop.Services;
 using FileHub.Desktop.ViewModels;
 using FileHub.Files.Models;
 using FluentAvalonia.UI.Controls;
+using WinUI3.Fluent.Controls;
 
 namespace FileHub.Desktop.Views;
 
@@ -195,11 +197,8 @@ public partial class MainWindow : Window
         SidebarToggleButton.Command = _shell.ToggleSidebarCommand;
         DetailsToggleButton.Command = _shell.ToggleDetailsPaneCommand;
 
-        // The tab strip's own x-to-close button.
-        TabView.TabCloseRequested += (_, args) =>
-        {
-            if (args.Item is MainViewModel tab) _shell.CloseTab(tab);
-        };
+        // The tab strip's own close button (WinUI3.Fluent WinTabStripItem.CloseRequested).
+        TabStrip.AddHandler(WinTabStripItem.CloseRequestedEvent, OnTabCloseRequested);
 
         Breadcrumb.ItemClicked += (_, args) =>
         {
@@ -219,6 +218,16 @@ public partial class MainWindow : Window
     private void SyncSelection(ListBox box)
         => Vm.SetSelection((box.SelectedItems ?? Array.Empty<object>())
             .OfType<FileEntryViewModel>().ToArray());
+
+    /// <summary>Tab close button; the item's DataContext is the tab it represents.</summary>
+    private void OnTabCloseRequested(object? sender, RoutedEventArgs args)
+    {
+        args.Handled = true;
+        if (args.Source is WinTabStripItem { DataContext: MainViewModel tab })
+        {
+            _shell.CloseTab(tab);
+        }
+    }
 
     private void OnDoubleTapped(object? sender, TappedEventArgs args)
     {
