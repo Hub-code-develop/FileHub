@@ -1,13 +1,19 @@
-# 本目录是仓库自带的离线 NuGet 源
+# Bundled offline NuGet feed
 
-`CodeHub-FluentUI.3.1.0-codehub.1.nupkg` 来自
+`CodeHub-FluentUI.3.1.0-codehub.1.nupkg` comes from
 [`Hub-code-develop/CodeHub-FluentUI`](https://github.com/Hub-code-develop/CodeHub-FluentUI)
-（FluentAvalonia 3.x 的 CodeHub 分支，**MIT** 许可证）。该版本尚未发布到 nuget.org，
-为了让 clone 之后可以直接 `dotnet restore` / `./build.sh`，把构建产物随仓库一起分发。
+(a CodeHub fork of FluentAvalonia 3.x, **MIT** licensed). That version is not published on
+nuget.org, so the package is committed here to make `dotnet restore` / `./build.sh` work
+immediately after cloning.
 
-- 目标框架：`net10.0`，依赖 Avalonia `12.1.0`
-- 根目录 `NuGet.Config` 通过相对路径 `local-feed` 引用本目录，无需任何本机配置
-- 如果之后该包发布到 nuget.org，删掉 `NuGet.Config` 里的 `codehub-local` 一行，
-  再删除本目录即可
-- 需要升级版本时：替换这里的 nupkg，并同步修改
-  `src/FileHub.Desktop/FileHub.Desktop.csproj` 里的 `PackageReference` 版本
+- Target framework: `net10.0`; depends on Avalonia `12.1.0`
+- The root `NuGet.Config` references this directory through the relative path `local-feed`;
+  no machine-specific configuration is needed
+- If the package is published on nuget.org later, remove the `codehub-local` source from
+  `NuGet.Config` and delete this directory
+- To upgrade: replace the nupkg here and update the `PackageReference` version in
+  `src/FileHub.Desktop/FileHub.Desktop.csproj`
+
+This documentation file is in English, which is the default language for documentation.
+The application UI follows the operating system language instead; see the
+[README](../README.md#ui-language).

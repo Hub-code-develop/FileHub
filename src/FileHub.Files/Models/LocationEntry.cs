@@ -6,12 +6,15 @@ public enum LocationKind
     Drive
 }
 
-/// <summary>左侧导航里的一个位置（快速访问或磁盘挂载点）。</summary>
+/// <summary>A location in the sidebar (quick access item or mounted drive).</summary>
 public sealed class LocationEntry
 {
     public required string Name { get; init; }
     public required string Path { get; init; }
     public required string IconKey { get; init; }
+
+    /// <summary>Localization key for Name; null for drives (whose name is already display-ready).</summary>
+    public string? NameKey { get; init; }
     public LocationKind Kind { get; init; }
 
     public string? Detail { get; init; }

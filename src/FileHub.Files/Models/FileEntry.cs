@@ -2,7 +2,7 @@ using FileHub.Files.Services;
 
 namespace FileHub.Files.Models;
 
-/// <summary>目录中的一个条目。所有展示用文本都在这里算好，UI 只负责绑定。</summary>
+/// <summary>An entry in a directory. Display text is computed here in a language-neutral form.</summary>
 public sealed class FileEntry
 {
     public string Name { get; init; } = string.Empty;
@@ -14,16 +14,17 @@ public sealed class FileEntry
 
     public string Extension => IsDirectory ? string.Empty : Path.GetExtension(Name);
 
+    // Neutral English default; FileEntryViewModel localizes this for display.
     public string Kind => IsDirectory
-        ? "文件夹"
+        ? "Folder"
         : string.IsNullOrWhiteSpace(Extension)
-            ? "文件"
-            : Extension.TrimStart('.').ToUpperInvariant() + " 文件";
+            ? "File"
+            : Extension.TrimStart('.').ToUpperInvariant() + " File";
 
-    public string SizeText => IsDirectory ? "—" : FileSystemService.FormatSize(Size);
+    public string SizeText => IsDirectory ? "-" : FileSystemService.FormatSize(Size);
     public string ModifiedText => LastWriteTime.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
 
-    /// <summary>用于按扩展名挑图标，属于纯数据，映射到具体图标由 UI 层负责。</summary>
+    /// <summary>Category used by the UI layer to pick an icon. Pure data, no UI dependency.</summary>
     public string Category
     {
         get

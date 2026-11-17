@@ -12,7 +12,7 @@ public static class RecycleBinService
     public static void MoveToTrash(string path)
     {
         if (!File.Exists(path) && !Directory.Exists(path))
-            throw new FileNotFoundException("项目已不存在", path);
+            throw new FileNotFoundException("The item no longer exists", path);
 
         if (OperatingSystem.IsWindows()) MoveToTrashWindows(path);
         else if (OperatingSystem.IsMacOS()) MoveToTrashMac(path);

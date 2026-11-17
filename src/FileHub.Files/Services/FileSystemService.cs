@@ -26,34 +26,42 @@ public static class FileSystemService
         var result = new List<LocationEntry>();
         var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
 
-        void AddQuick(string name, string? path, string icon)
+        void AddQuick(string nameKey, string? path, string icon)
         {
             if (!string.IsNullOrWhiteSpace(path) && Directory.Exists(path) &&
                 !result.Any(x => string.Equals(x.Path, path, StringComparison.OrdinalIgnoreCase)))
             {
-                result.Add(new LocationEntry { Name = name, Path = path, IconKey = icon, Kind = LocationKind.QuickAccess });
+                result.Add(new LocationEntry { Name = nameKey, NameKey = nameKey, Path = path, IconKey = icon, Kind = LocationKind.QuickAccess });
             }
         }
 
-        AddQuick("主目录", home, "Home");
-        AddQuick("桌面", Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "View");
-        AddQuick("下载", Path.Combine(home, "Downloads"), "Download");
-        AddQuick("文档", Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Document");
-        AddQuick("图片", Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), "Picture");
-        AddQuick("视频", Environment.GetFolderPath(Environment.SpecialFolder.MyVideos), "Video");
+        AddQuick("LocHome", home, "Home");
+        AddQuick("LocDesktop", Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "View");
+        AddQuick("LocDownloads", Path.Combine(home, "Downloads"), "Download");
+        AddQuick("LocDocuments", Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Document");
+        AddQuick("LocPictures", Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), "Picture");
+        AddQuick("LocVideos", Environment.GetFolderPath(Environment.SpecialFolder.MyVideos), "Video");
 
         foreach (var drive in GetDrives())
         {
             var name = drive.RootDirectory.FullName.TrimEnd(Path.DirectorySeparatorChar);
-            if (string.IsNullOrWhiteSpace(name)) name = "/";
+            // The macOS boot volume is "/" whose trimmed name is empty, and "/" alone is a poor
+            // sidebar label, so fall back to the conventional volume name there.
+            if (string.IsNullOrWhiteSpace(name)) name = OperatingSystem.IsMacOS() ? "Macintosh HD" : "/";
+
+            // macOS reports "/" (or "\" on Windows) as the VolumeLabel of a root volume, which
+            // would render as "/ (Macintosh HD)". Treat a bare separator as "no label".
+            var label = drive.VolumeLabel;
+            if (label is "/" or "\\" || string.IsNullOrWhiteSpace(label)) label = null;
+
             result.Add(new LocationEntry
             {
-                Name = string.IsNullOrWhiteSpace(drive.VolumeLabel) ? name : $"{drive.VolumeLabel} ({name})",
+                Name = label is null ? name : $"{label} ({name})",
                 Path = drive.RootDirectory.FullName,
                 IconKey = "HardDrive",
                 Kind = LocationKind.Drive,
                 Detail = drive.IsReady
-                    ? $"{FormatSize(drive.AvailableFreeSpace)} 可用 / {FormatSize(drive.TotalSize)}"
+                    ? $"{FormatSize(drive.AvailableFreeSpace)} / {FormatSize(drive.TotalSize)}"
                     : null
             });
         }
@@ -168,22 +176,22 @@ public static class FileSystemService
 
     public static string CreateFolder(string parent, string name)
     {
-        if (string.IsNullOrWhiteSpace(name)) throw new ArgumentException("名称不能为空", nameof(name));
-        if (name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0) throw new ArgumentException("名称包含非法字符", nameof(name));
+        if (string.IsNullOrWhiteSpace(name)) throw new ArgumentException("Name cannot be empty", nameof(name));
+        if (name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0) throw new ArgumentException("Name contains invalid characters", nameof(name));
         var target = Path.Combine(parent, name);
-        if (Directory.Exists(target) || File.Exists(target)) throw new IOException("同名项目已存在");
+        if (Directory.Exists(target) || File.Exists(target)) throw new IOException("An item with the same name already exists");
         Directory.CreateDirectory(target);
         return target;
     }
 
     public static string Rename(string source, string newName)
     {
-        if (string.IsNullOrWhiteSpace(newName)) throw new ArgumentException("名称不能为空", nameof(newName));
+        if (string.IsNullOrWhiteSpace(newName)) throw new ArgumentException("Name cannot be empty", nameof(newName));
         if (newName == Path.GetFileName(source)) return source;
-        if (newName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0) throw new ArgumentException("名称包含非法字符", nameof(newName));
-        var parent = Path.GetDirectoryName(source) ?? throw new IOException("无法定位父目录");
+        if (newName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0) throw new ArgumentException("Name contains invalid characters", nameof(newName));
+        var parent = Path.GetDirectoryName(source) ?? throw new IOException("Cannot locate the parent directory");
         var target = Path.Combine(parent, newName);
-        if (Directory.Exists(target) || File.Exists(target)) throw new IOException("同名项目已存在");
+        if (Directory.Exists(target) || File.Exists(target)) throw new IOException("An item with the same name already exists");
         if (Directory.Exists(source)) Directory.Move(source, target);
         else File.Move(source, target);
         return target;

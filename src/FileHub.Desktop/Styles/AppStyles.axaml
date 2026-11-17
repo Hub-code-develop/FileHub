@@ -1,7 +1,7 @@
 <Styles xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
-  <!-- 文件列表：整行可点、内容铺满，列头与行使用同一套列宽定义 -->
+  <!-- File list rows are fully clickable and stretch to the shared column widths. -->
   <Style Selector="ListBoxItem">
     <Setter Property="Padding" Value="6,3" />
     <Setter Property="MinHeight" Value="34" />
@@ -31,6 +31,67 @@
     <Setter Property="TextWrapping" Value="Wrap" />
     <Setter Property="MaxLines" Value="2" />
     <Setter Property="FontSize" Value="12" />
+  </Style>
+
+  <!-- Tab strip, following the Files App tab bar. -->
+  <Style Selector="Border.tabChip">
+    <Setter Property="Margin" Value="2,0" />
+    <Setter Property="CornerRadius" Value="6,6,0,0" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="BorderBrush" Value="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
+  </Style>
+
+  <Style Selector="Button.tabText">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Padding" Value="2,1" />
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="MinWidth" Value="56" />
+    <Setter Property="MaxWidth" Value="150" />
+  </Style>
+
+  <Style Selector="Button.tabClose">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Width" Value="20" />
+    <Setter Property="Height" Value="20" />
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+  </Style>
+
+  <Style Selector="Button.tabAction">
+    <Setter Property="Width" Value="32" />
+    <Setter Property="Height" Value="28" />
+    <Setter Property="Margin" Value="3,0,0,0" />
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+  </Style>
+
+  <!-- Details pane. -->
+  <Style Selector="TextBlock.paneHeading">
+    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+
+  <Style Selector="TextBlock.paneName">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+    <Setter Property="TextAlignment" Value="Center" />
+  </Style>
+
+  <Style Selector="TextBlock.paneLabel">
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="Opacity" Value="0.65" />
+  </Style>
+
+  <Style Selector="TextBlock.paneValue">
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="TextWrapping" Value="Wrap" />
   </Style>
 
 </Styles>

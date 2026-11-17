@@ -2,135 +2,234 @@
 
 [![Build](https://github.com/Hub-code-develop/FileHub/actions/workflows/build.yml/badge.svg)](https://github.com/Hub-code-develop/FileHub/actions/workflows/build.yml)
 
-一个用 **.NET 10 + Avalonia 12 + FluentUI-CodeHub（`CodeHub-FluentUI`）** 写的跨平台文件管理器。
-项目名、程序集名、命名空间与仓库名统一为 FileHub。
+[Chinese README (中文版说明)](README.zh-CN.md)
 
-## 技术栈
+A cross-platform file manager built with **.NET 10 + Avalonia 12 + FluentUI-CodeHub
+(`CodeHub-FluentUI`)**. Its user interface is **ported from**
+[Files App](https://github.com/files-community/Files), the WinUI 3 file manager for Windows.
 
-| 组件 | 版本 / 来源 |
+This English file is the primary README. The Chinese translation is
+[README.zh-CN.md](README.zh-CN.md). Documentation defaults to English; the application UI does
+not (see [UI language](#ui-language)).
+
+## Attribution: code ported from Files
+
+**The UI of FileHub is a port of [Files](https://github.com/files-community/Files), not merely
+an imitation.** Its XAML layout structure was carried over from that repository and re-expressed
+with Avalonia controls.
+
+| Files source (MIT) | Ported to in FileHub |
 | --- | --- |
-| .NET | net10.0（SDK 10.0.400） |
+| `src/Files.App/Views/MainPage.xaml` | `src/FileHub.Desktop/Views/MainWindow.axaml` root grid |
+| `src/Files.App/UserControls/NavigationToolbar.xaml` | address bar row (48px, 36x32 buttons) |
+| `src/Files.App/UserControls/Toolbar.xaml` | rounded command card (8px radius, label-right buttons) |
+| `src/Files.App/UserControls/TabBar/TabBar.xaml` | `FATabView` tab strip (34px, footer actions) |
+| `src/Files.App/UserControls/StatusBar.xaml` | status bar row (32px, 1x18 dividers) |
+| `src/Files.App/UserControls/Pane/InfoPane.xaml` | details pane (300px, tab pills) |
+| `src/Files.App/Views/Layouts/DetailsLayoutPage.xaml` | column header (40px) and 34/*/110/150/160 columns |
+| `src/Files.App/Styles/TabBarStyles.xaml` | `src/FileHub.Desktop/Styles/FileHubTheme.axaml` |
+
+What came across: the shell skeleton (tab strip, grouped sidebar with quick access and drives,
+navigation toolbar, command bar, file area with a toggleable details pane, status bar), the
+command groupings (Layout / Sort / Details pane / Hidden items), and the concrete layout
+numbers (row heights, column widths, corner radii, paddings, spacing).
+
+What did not come across: WinUI 3 does not run on Avalonia, so every control was mapped to a
+CodeHub-FluentUI or Avalonia equivalent, and Files-only infrastructure (Shell COM, `x:Bind`,
+`ThemeResource`, `NavigationView`) was replaced by FileHub view models. The Files-specific
+controls that have no equivalent in the library — `SidebarView`, `CommandBar`, `InfoPane`,
+`StatusBar` — were written from scratch in `src/FileHub.Desktop/Controls/FileHubControls.cs`.
+
+**Files is MIT licensed, and because its layout code was ported the original copyright and
+permission notice are reproduced in full in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).**
+That file also lists every other third-party component.
+
+FileHub itself is released under the [MIT License](LICENSE).
+Thanks to the Files Community for a genuinely well-designed file manager.
+
+`CodeHub-FluentUI` is a separate dependency from
+[`Hub-code-develop/CodeHub-FluentUI`](https://github.com/Hub-code-develop/CodeHub-FluentUI)
+(MIT); its offline package is described in [local-feed/README.md](local-feed/README.md).
+
+## UI language
+
+The application detects the **operating system language at startup**. English is never a
+hard-coded default for the UI. A Chinese system shows Chinese; an English system shows English.
+
+Detection order (first usable signal wins):
+
+| Platform | Signal |
+| --- | --- |
+| macOS | `defaults read -g AppleLanguages`, then `AppleLocale` |
+| Windows | `CultureInfo.InstalledUICulture` |
+| Linux / Unix | `LC_ALL`, then `LC_MESSAGES`, then `LANG` (`C`, `POSIX`, `C.UTF-8` are skipped because they carry no language) |
+| Any | `CultureInfo.CurrentUICulture` as a last resort |
+
+The macOS preference is queried first on purpose: a GUI app launched from Finder inherits no
+`LC_*` variables, so reading `AppleLanguages` is the only reliable way to get the user's real
+language. The tooltip on the language button shows which signal was used, for example
+`zh-Hans-CN / macOS AppleLanguages`.
+
+- `FILEHUB_LANG=en`, `FILEHUB_LANG=zh-CN` or `FILEHUB_LANG=auto` overrides detection for a
+  single run. `auto` restores OS detection.
+- The in-app language button cycles **Auto -> English -> Chinese -> Auto**. A manual choice is
+  only kept for the current session; the next launch follows the OS again.
+- English and Simplified Chinese are the two available translations. Any other locale falls back
+  to English only because no translation exists for it yet, not because English is preferred.
+- Only documentation defaults to English. Every user-visible string in the app has both English
+  and Chinese values in `Services/LocalizationService.cs`.
+
+## Tech stack
+
+| Component | Version / source |
+| --- | --- |
+| .NET | `net10.0` (SDK 10.0.400) |
 | Avalonia | 12.1.0 |
-| UI 样式库 | `CodeHub-FluentUI` `3.1.0-codehub.1`（仓库自带离线源 `local-feed/`） |
-| 主题 | `FluentAvaloniaTheme`（`FluentAvalonia.Styling`） |
+| UI style library | `CodeHub-FluentUI` `3.1.0-codehub.1` (bundled offline feed in `local-feed/`) |
+| Theme | `FluentAvaloniaTheme` (`FluentAvalonia.Styling`) |
 
-用到的 FluentUI-CodeHub 控件：`FANavigationView`（侧栏）、`FABreadcrumbBar`（路径）、`FAContentDialog`（新建/重命名/删除确认/属性）、`FAInfoBar`（操作反馈）、`FAProgressRing` + `FASkeleton`（加载态，后者是 CodeHub 分支特有控件）、`FAMenuFlyout` / `FAMenuFlyoutItem`（右键菜单）、`FASymbolIcon` / `FASymbolIconSource`（图标）。
+FluentUI-CodeHub widgets used: `FANavigationView` (sidebar), `FABreadcrumbBar` (path),
+`FAContentDialog` (new / rename / delete confirmation / properties), `FAInfoBar` (feedback),
+`FAProgressRing` and `FASkeleton` (loading state, the latter is specific to the CodeHub fork),
+`FAMenuFlyout` / `FAMenuFlyoutItem` (context menu), `FASymbolIcon` / `FASymbolIconSource` (icons).
 
-## 功能
+## Features
 
-- 侧栏按平台自动列出主目录 / 桌面 / 下载 / 文档 / 图片 / 视频 + 当前已挂载卷
-- 前进 / 后退 / 上一级 / 刷新，带导航历史
-- 面包屑路径 + 可编辑地址栏（支持 `~`）
-- 详细信息视图（名称/大小/类型/修改时间，点列头排序）与图标网格视图切换
-- 即时筛选 + 递归搜索（结果上限 300，带取消）
-- 文件操作：打开、在系统文件管理器中显示、新建文件夹、重命名、复制/剪切/粘贴、复制路径、属性
-- **删除一律移到回收站**（Windows Shell / macOS `~/.Trash` / Linux `gio trash`），绝不静默永久删除
-- 多选、隐藏文件开关、浅色/深色/跟随系统主题切换、状态栏统计
-- 快捷键齐全（见下表）
+- Sidebar lists platform quick access (Home, Desktop, Downloads, Documents, Pictures, Videos)
+  and mounted drives
+- Back / Forward / Up / Refresh with navigation history
+- Breadcrumb path plus an editable address bar (`~` supported)
+- Details view (Name / Size / Type / Date modified, click a column header to sort) and icon grid view
+- Live filtering plus recursive search (300 result limit, cancellable)
+- File operations: open, reveal in system file manager, new folder, rename, copy / cut / paste,
+  copy path, properties
+- **Delete always moves items to the recycle bin** (Windows Shell, macOS `~/.Trash`, Linux
+  `gio trash`). Nothing is silently deleted permanently
+- Multiple tabs, each with its own path and history
+- Multi-select, hidden items toggle, light / dark / system theme, status bar statistics
+- Full keyboard shortcuts
 
-| 快捷键 | 动作 | 快捷键 | 动作 |
+| Shortcut | Action | Shortcut | Action |
 | --- | --- | --- | --- |
-| `Alt+←/→` | 后退 / 前进 | `F2` | 重命名 |
-| `Backspace` | 上一级 | `F5` | 刷新 |
-| `Ctrl/Cmd+C/X/V` | 复制 / 剪切 / 粘贴 | `Delete` | 移到回收站 |
-| `Ctrl/Cmd+A` | 全选 | `Enter` | 打开选中项 |
-| `Ctrl/Cmd+F` | 聚焦搜索 | `Ctrl/Cmd+L` | 编辑路径 |
-| `Esc` | 清除搜索 / 退出路径编辑 | 双击 | 打开 |
+| `Alt+Left` / `Alt+Right` | Back / Forward | `F2` | Rename |
+| `Backspace` | Up one level | `F5` | Refresh |
+| `Ctrl/Cmd+C` / `X` / `V` | Copy / Cut / Paste | `Delete` | Move to recycle bin |
+| `Ctrl/Cmd+A` | Select all | `Enter` | Open selection |
+| `Ctrl/Cmd+F` | Focus search | `Ctrl/Cmd+L` | Edit path |
+| `Esc` | Clear search / leave path editing | Double-click | Open |
 
-## 构建与运行
+## Build and run
 
-依赖全部可还原：`CodeHub-FluentUI` 的 nupkg 已放在 `local-feed/`，
-根目录 `NuGet.Config` 用相对路径引用它，clone 后无需配置任何本机路径。
+Everything restores without configuration: the `CodeHub-FluentUI` nupkg is committed in
+`local-feed/` and `NuGet.Config` points at it with a relative path. No machine-specific path is
+needed after cloning.
 
 ```bash
 ./build.sh
-./build.sh -c Release          # 透传任意 dotnet build 参数
+./build.sh -c Release          # any dotnet build arguments are passed through
 dotnet run --project src/FileHub.Desktop/FileHub.Desktop.csproj
 ```
 
-`build.sh` 带资源护栏（`nice -n 20`、`-m:2`、`-nodeReuse:false`），并按下述优先级挑 SDK：
+`build.sh` applies resource guards (`nice -n 20`, `-m:2`, `-nodeReuse:false`) and picks an SDK in
+this order:
 
-1. 环境变量 `FILEHUB_DOTNET`
-2. `$HOME/dotnet11x64/dotnet`（若存在）
-3. PATH 里的 `dotnet`
+1. `FILEHUB_DOTNET` environment variable
+2. `$HOME/dotnet11x64/dotnet` (if present)
+3. `dotnet` on `PATH`
 
-即普通机器上直接用官方 .NET 10 SDK 就行；只有遇到下面这两个环境级问题时才需要指定 SDK。
+On a normal machine, the official .NET 10 SDK is enough. The two environment issues below are
+specific to the author's machine and explain the extra MSBuild target.
 
-### 为什么有 `FileHubCompileAvaloniaXaml` 这个 target
+### Why `FileHubCompileAvaloniaXaml` exists
 
-CodeNet **arm64** SDK（10.0.400）把 `Microsoft.CSharp.CurrentVersion.targets` 里
-`CallTarget Targets="$(TargetsTriggeredByCompilation)"` 整段注释掉了，而 Avalonia 12 的
-`CompileAvaloniaXaml` 正是靠这个钩子触发的。后果是：构建显示 0 错误，产物里却只有原始 XAML，
-运行时报 `No precompiled XAML found for FileHub.Desktop.App`。
+The CodeNet **arm64** .NET 10.0.400 SDK comments out
+`CallTarget Targets="$(TargetsTriggeredByCompilation)"` in
+`Microsoft.CSharp.CurrentVersion.targets`, which is the hook that runs Avalonia 12's
+`CompileAvaloniaXaml`. The result is a build with 0 errors whose output still contains raw XAML,
+so the app fails at runtime with `No precompiled XAML found for FileHub.Desktop.App`.
 
-`src/FileHub.Desktop/FileHub.Desktop.csproj` 里加了一个 `AfterTargets="CoreCompile"` 的显式调用，
-强制编译 XAML（不依赖 SDK 钩子，换任何 SDK 都生效）。另外 Avalonia 12.1 默认开启编译绑定，
-本项目用反射绑定，所以显式设了 `AvaloniaUseCompiledBindingsByDefault=false`。
-官方 SDK 与 CodeNet x64 SDK 自带该钩子，而 MSBuild 保证同一 Target 在一次构建中只执行一次，
-重复声明不会二次编译，CI 走官方 SDK 也安全。
+`src/FileHub.Desktop/FileHub.Desktop.csproj` calls the target explicitly with
+`AfterTargets="CoreCompile"`, so XAML is compiled with any SDK. Avalonia 12.1 enables compiled
+bindings by default; this project uses reflection bindings, so it sets
+`AvaloniaUseCompiledBindingsByDefault=false`. MSBuild runs a target only once per build, so the
+official SDK (which has the hook) does not compile XAML twice; CI uses the official SDK safely.
 
-⚠️ 已知环境限制：**arm64 CodeNet SDK 在执行 XAML 编译任务时会 SIGSEGV(139)**（signalfix 的老问题）。
-官方 arm64 SDK 或 x64 SDK 均可，作者机器上实测 x64 SDK 7s / 0 警告 0 错误。
+Known environment limitation: the **arm64 CodeNet SDK SIGSEGVs (139)** inside that XAML compiler
+task. The official arm64 SDK or the x64 SDK both work; the x64 SDK was measured at about 7 s with
+0 warnings and 0 errors.
 
-### 关于 `local-feed/`
+### Offline feed
 
-`CodeHub-FluentUI 3.1.0-codehub.1` 源自
-[`Hub-code-develop/CodeHub-FluentUI`](https://github.com/Hub-code-develop/CodeHub-FluentUI)（MIT），
-未发布到 nuget.org。为了让仓库自包含，把 1.1 MB 的 nupkg 一并提交。
-详见 `local-feed/README.md`；若该包日后上了 nuget.org，删掉 `NuGet.Config` 里的
-`codehub-local` 与这个目录即可。包依赖 Avalonia 12.1.0 / net10.0，版本不要随意改。
+`CodeHub-FluentUI 3.1.0-codehub.1` comes from
+[`Hub-code-develop/CodeHub-FluentUI`](https://github.com/Hub-code-develop/CodeHub-FluentUI)
+(MIT) and is not on nuget.org. Its 1.1 MB nupkg is committed so the repository is self-contained.
+See `local-feed/README.md` for upgrade instructions. The package requires Avalonia 12.1.0 /
+net10.0, so do not change those versions independently.
 
 ## GitHub Actions
 
-`.github/workflows/build.yml` 在 push 到 `main`、PR 和手动触发时跑三平台矩阵：
+`.github/workflows/build.yml` runs on pushes to `main`, pull requests and manual dispatch:
 
-| Runner | RID | 流程 |
+| Runner | RID | Steps |
 | --- | --- | --- |
-| `ubuntu-latest` | `linux-x64` | restore → Release build → RID restore → publish → XAML 门禁 → 上传 artifact |
-| `windows-latest` | `win-x64` | 同上 |
-| `macos-latest` | `osx-arm64` | 同上 |
+| `ubuntu-latest` | `linux-x64` | restore, Release build, RID restore, publish, XAML gate, upload artifact |
+| `windows-latest` | `win-x64` | same |
+| `macos-latest` | `osx-arm64` | same |
 
-- SDK 由 `actions/setup-dotnet@v4` 按 `global.json`（10.0.400）安装，不需要任何密钥
-- `dotnet restore --configfile NuGet.Config` 显式使用仓库自带的 `local-feed/`，私有源 / token 都不需要
-- 解决方案级 `dotnet build` 不接受 `-r`（NETSDK1134），所以 RID 只加在单项目 `dotnet publish` 上；
-  带 RID 的 framework-dependent publish 只带本平台 native 库，约 **31 MB**（不带 RID 会摊平成 564 MB，大半是 Windows 的 `.pdb`）
-- **XAML 门禁**：检查 `publish/FileHub.dll` 里必须含 `!XamlIlPopulate`，
-  专门防「构建显示 0 错误但 XAML 没预编译」这个坑再次溜过去
-- 每个平台上传 `FileHub-<rid>-net10.0` artifact（`publish/`，保留 14 天）
+- `actions/setup-dotnet@v4` installs the SDK from `global.json` (10.0.400); no secrets needed
+- `dotnet restore --configfile NuGet.Config` uses the bundled `local-feed/`; no private feed or token
+- Solution-level `dotnet build` rejects `-r` (NETSDK1134), so the RID is only applied to the
+  single-project publish. A framework-dependent RID publish is about **31 MB**; without a RID
+  it flattens to 564 MB, mostly Windows `.pdb` files
+- **XAML gate**: `publish/FileHub.dll` must contain `!XamlIlPopulate`, which catches the
+  "0 errors but no precompiled XAML" failure mode
+- Each platform uploads a `FileHub-<rid>-net10.0` artifact (retained for 14 days)
 
-## 结构
+## Structure
 
-```
+```text
 FileHub/
-├── .github/workflows/     build.yml（三平台 CI）
-├── FileHub.slnx           解决方案
+├── .github/workflows/     build.yml (three-platform CI)
+├── FileHub.slnx           solution
 ├── global.json            SDK 10.0.400
-├── NuGet.Config           nuget.org + 仓库内离线源
-├── local-feed/            CodeHub-FluentUI 的 nupkg（MIT）
-├── build.sh               带资源护栏的构建脚本
+├── NuGet.Config           nuget.org + bundled offline feed
+├── local-feed/            CodeHub-FluentUI nupkg (MIT)
+├── LICENSE                MIT
+├── build.sh               build script with resource guards
+├── README.md              this file (English, primary)
+├── README.zh-CN.md        Chinese README
 └── src/
-    ├── FileHub.Files/     纯逻辑，无 UI 依赖，可单测
+    ├── FileHub.Files/     logic only, no UI dependency, unit-testable
     │   ├── Models/        FileEntry / LocationEntry
     │   └── Services/      FileSystemService / RecycleBinService / PlatformService / FileClipboard
-    └── FileHub.Desktop/   Avalonia 应用
-        ├── App.axaml      主题入口
-        ├── Styles/        应用样式
-        ├── ViewModels/    MainViewModel + 命令 + 条目 VM
+    └── FileHub.Desktop/   Avalonia application
+        ├── App.axaml      theme entry point
+        ├── Styles/        application styles
+        ├── ViewModels/    ShellViewModel (tabs) / MainViewModel (one tab) / commands
         ├── Views/         MainWindow
-        └── Services/      DialogService（FAContentDialog 封装）
+        └── Services/      LocalizationService (en + zh-CN) / DialogService (FAContentDialog)
 ```
 
-## 验证情况
+## Verification
 
-- `build.sh`：0 警告 0 错误，XAML 已编译进 `FileHub.dll`（可见 `!XamlIlPopulate`）
-- 全量改名后重新做无窗口 headless 验证：`App.axaml` + `FluentAvaloniaTheme` +
-  `avares://FileHub/Styles/AppStyles.axaml` 加载成功；`MainWindow.axaml` 全部控件实例化成功；
-  主目录枚举 55 项 / 7 个位置 / 3 段面包屑；筛选 55→0→55 正常
-- 未做真实 GUI 窗口冒烟测试
+- `build.sh`: 0 warnings, 0 errors; XAML compiled into `FileHub.dll` (`!XamlIlPopulate` present)
+- Headless (no GUI window) verification: `App.axaml` + `FluentAvaloniaTheme` +
+  `avares://FileHub/Styles/AppStyles.axaml` load, every MainWindow control instantiates,
+  home directory enumerates 55 items / 7 locations / 3 breadcrumb segments, filtering
+  55 -> 0 -> 55 works
+- Language detection verified under four environment configurations (unset, `auto`, `en`,
+  `zh-CN`), including the three-state in-app language cycle
+- A fresh clone from GitHub restores and builds with no manual setup
 
-## 已知限制 / 后续可加
+## Known limitations
 
-- 单窗口，暂未做多标签页（库里有 `FATabView`，可以接）
-- 没有拖拽移动、缩略图预览、文件监视（目录变化需手动刷新）
-- 递归搜索固定 300 项上限，避免在大目录里失控
-- 复制/移动为应用内剪贴板，不写系统剪贴板（只复制路径会写）
+- No drag-and-drop move, thumbnail previews or file system watcher (refresh manually)
+- Recursive search has a fixed 300 item limit to keep large trees under control
+- Copy / move uses an in-app clipboard; only "copy path" writes to the system clipboard
+- Chinese variants (Traditional, Cantonese, ...) currently share the Simplified Chinese strings
+
+## License
+
+[MIT](LICENSE) - Copyright (c) 2026 Hub-code-develop. See
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) for the full Files App notice (the UI layout
+is ported from that project) and for every other third-party component.

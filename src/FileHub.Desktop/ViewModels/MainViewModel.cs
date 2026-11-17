@@ -1,13 +1,14 @@
 using System.Collections.ObjectModel;
 using System.Windows.Input;
 using FileHub.Desktop.Models;
+using FileHub.Desktop.Services;
 using FileHub.Files.Models;
 using FileHub.Files.Services;
 using FluentAvalonia.UI.Controls;
 
 namespace FileHub.Desktop.ViewModels;
 
-/// <summary>UI 侧能力注入，ViewModel 不直接依赖 Window / TopLevel。</summary>
+/// <summary>UI capabilities injected so the ViewModel never depends on Window / TopLevel.</summary>
 public sealed class UiServices
 {
     public Func<string, Task> OpenFileAsync { get; init; } = _ => Task.CompletedTask;
@@ -39,14 +40,14 @@ public sealed class MainViewModel : ViewModelBase
     private bool _isDetailsView = true;
     private bool _isEmpty;
     private bool _isSearchMode;
-    private string _statusText = "正在准备…";
+    private string _statusText = Loc.T("StatusPreparing");
     private string _selectionText = string.Empty;
     private string _platformText = string.Empty;
-    private string _themeLabel = "跟随系统";
+    private string _themeLabel = Loc.T("ThemeSystem");
     private string _themeMode = "system";
     private string _sortColumn = "Name";
     private bool _sortDescending;
-    private string _sortIndicator = "名称 ↑";
+    private string _sortIndicator = Loc.T("SortName") + Loc.T("SortAsc");
     private bool _canGoBack;
     private bool _canGoForward;
     private bool _canGoUp;
@@ -88,6 +89,8 @@ public sealed class MainViewModel : ViewModelBase
         DeepSearchCommand = Async(_ => DeepSearchAsync());
         ClearSearchCommand = new RelayCommand(_ => SearchQuery = string.Empty);
         DismissInfoCommand = new RelayCommand(_ => IsInfoOpen = false);
+        SelectTabCommand = new RelayCommand(_ => Shell?.Activate(this));
+        CloseTabCommand = new RelayCommand(_ => Shell?.CloseTab(this));
     }
 
     public ObservableCollection<FileEntryViewModel> Entries { get; } = [];
@@ -123,7 +126,35 @@ public sealed class MainViewModel : ViewModelBase
     public ICommand ClearSearchCommand { get; }
     public ICommand DismissInfoCommand { get; }
 
-    public string CurrentPath { get => _currentPath; private set => Set(ref _currentPath, value); }
+    /// <summary>Set by ShellViewModel when this tab becomes the active one.</summary>
+    public bool IsActive { get => _isActive; set => Set(ref _isActive, value); }
+    private bool _isActive;
+
+    public bool IsReady { get; private set; }
+    public ShellViewModel? Shell { get; set; }
+
+    public string TabTitle => string.IsNullOrWhiteSpace(CurrentPath)
+        ? Loc.T("TabHome")
+        : (Path.GetFileName(CurrentPath.TrimEnd(Path.DirectorySeparatorChar)) is { Length: > 0 } name
+            ? name : CurrentPath);
+
+    public ICommand SelectTabCommand { get; }
+    public ICommand CloseTabCommand { get; }
+
+    // Proxies so the content area (whose DataContext is the active tab) can still reach shell state.
+    public ICommand ToggleDetailsPaneCommand => Shell?.ToggleDetailsPaneCommand
+        ?? new RelayCommand(_ => { });
+    public bool IsDetailsPaneOpen => Shell?.IsDetailsPaneOpen ?? true;
+    public void RaiseDetailsPaneChanged() => OnPropertyChanged(nameof(IsDetailsPaneOpen));
+
+    public string CurrentPath
+    {
+        get => _currentPath;
+        private set
+        {
+            if (Set(ref _currentPath, value)) OnPropertyChanged(nameof(TabTitle));
+        }
+    }
 
     public string AddressText { get => _addressText; set => Set(ref _addressText, value); }
 
@@ -176,9 +207,10 @@ public sealed class MainViewModel : ViewModelBase
     public async Task InitializeAsync()
     {
         LoadLocations();
-        PlatformText = $"{PlatformService.PlatformName} · .NET 10 · Avalonia 12 · FluentUI-CodeHub";
+        PlatformText = $"{PlatformService.PlatformName} | {Loc.T("PlatformText")}";
         var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         await NavigateAsync(home, recordHistory: false);
+        IsReady = true;
     }
 
     public async Task NavigateAsync(string? path, bool recordHistory = true)
@@ -191,13 +223,13 @@ public sealed class MainViewModel : ViewModelBase
         }
         catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
         {
-            ShowInfo("路径无效", ex.Message, FAInfoBarSeverity.Warning);
+            ShowInfo(Loc.T("MsgInvalidPath"), ex.Message, FAInfoBarSeverity.Warning);
             return;
         }
 
         if (!Directory.Exists(full))
         {
-            ShowInfo("打不开这个位置", $"目录不存在或没有权限：{full}", FAInfoBarSeverity.Warning);
+            ShowInfo(Loc.T("MsgCannotOpenLocation"), Loc.F("MsgLocationDetail", full), FAInfoBarSeverity.Warning);
             return;
         }
 
@@ -241,9 +273,22 @@ public sealed class MainViewModel : ViewModelBase
         }
         foreach (var dir in chain)
         {
-            var label = string.IsNullOrEmpty(dir.Name) ? dir.FullName : dir.Name;
+            // The filesystem root has no parent. Its Name is the full path ("/" on macOS,
+            // "C:\" on Windows), so show a volume label instead — this is what Files App shows.
+            var label = dir.Parent is null ? RootLabel(dir) : dir.Name;
             Breadcrumbs.Add(new PathSegment { Name = label, FullPath = dir.FullName });
         }
+    }
+
+    private static string RootLabel(DirectoryInfo dir)
+    {
+        if (OperatingSystem.IsMacOS()) return "Macintosh HD";
+        if (OperatingSystem.IsWindows())
+        {
+            var letter = dir.FullName.TrimEnd(Path.DirectorySeparatorChar);
+            return string.IsNullOrEmpty(letter) ? "Local Disk" : letter;
+        }
+        return dir.FullName;
     }
 
     private async Task LoadAsync()
@@ -264,7 +309,7 @@ public sealed class MainViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            ShowInfo("读取目录失败", ex.Message, FAInfoBarSeverity.Error);
+            ShowInfo(Loc.T("MsgReadFailed"), ex.Message, FAInfoBarSeverity.Error);
         }
         finally
         {
@@ -297,10 +342,10 @@ public sealed class MainViewModel : ViewModelBase
         foreach (var item in list) Entries.Add(item);
         IsEmpty = list.Count == 0;
         StatusText = _isSearchMode
-            ? $"搜索结果 {list.Count} 项（上限 300）"
+            ? Loc.F("StatusSearchResults", list.Count)
             : query.Length > 0
-                ? $"筛选出 {list.Count} 项 / 共 {_loaded.Count} 项"
-                : $"{list.Count} 个项目";
+                ? Loc.F("StatusFiltered", list.Count, _loaded.Count)
+                : Loc.F("StatusItems", list.Count);
         SetSelection([]);
     }
 
@@ -309,7 +354,7 @@ public sealed class MainViewModel : ViewModelBase
         var query = SearchQuery.Trim();
         if (query.Length == 0)
         {
-            ShowInfo("搜索", "先输入要查找的名称", FAInfoBarSeverity.Informational);
+            ShowInfo(Loc.T("MsgSearch"), Loc.T("MsgSearchEmpty"), FAInfoBarSeverity.Informational);
             return;
         }
 
@@ -326,11 +371,11 @@ public sealed class MainViewModel : ViewModelBase
             _loaded = items.Select(x => new FileEntryViewModel(x)).ToList();
             ApplyFilterAndSort();
             Breadcrumbs.Clear();
-            Breadcrumbs.Add(new PathSegment { Name = $"搜索 “{query}”", FullPath = CurrentPath });
-            ShowInfo("搜索完成", $"在 {CurrentPath} 下找到 {_loaded.Count} 项", FAInfoBarSeverity.Success);
+            Breadcrumbs.Add(new PathSegment { Name = Loc.F("MsgSearchBreadcrumb", query), FullPath = CurrentPath });
+            ShowInfo(Loc.T("MsgSearchDone"), Loc.F("MsgSearchDoneBody", _loaded.Count, CurrentPath), FAInfoBarSeverity.Success);
         }
         catch (OperationCanceledException) { }
-        catch (Exception ex) { ShowInfo("搜索失败", ex.Message, FAInfoBarSeverity.Error); }
+        catch (Exception ex) { ShowInfo(Loc.T("MsgSearchFailed"), ex.Message, FAInfoBarSeverity.Error); }
         finally { if (!token.IsCancellationRequested) IsLoading = false; }
     }
 
@@ -379,44 +424,45 @@ public sealed class MainViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            ShowInfo("无法打开", ex.Message, FAInfoBarSeverity.Error);
+            ShowInfo(Loc.T("MsgCannotOpen"), ex.Message, FAInfoBarSeverity.Error);
         }
     }
 
     private async Task NewFolderAsync()
     {
-        var name = await _ui.PromptAsync("新建文件夹", $"将在 {CurrentPath} 创建", "新建文件夹", "创建");
+        var name = await _ui.PromptAsync(Loc.T("DlgNewFolderTitle"), Loc.F("DlgNewFolderMessage", CurrentPath), Loc.T("DlgNewFolderDefault"), Loc.T("DlgCreate"));
         if (string.IsNullOrWhiteSpace(name)) return;
         try
         {
             var created = FileSystemService.CreateFolder(CurrentPath, name.Trim());
             await LoadAsync();
-            ShowInfo("已创建文件夹", Path.GetFileName(created), FAInfoBarSeverity.Success);
+            ShowInfo(Loc.T("MsgCreatedFolder"), Path.GetFileName(created), FAInfoBarSeverity.Success);
         }
-        catch (Exception ex) { ShowInfo("创建失败", ex.Message, FAInfoBarSeverity.Error); }
+        catch (Exception ex) { ShowInfo(Loc.T("MsgCreateFailed"), ex.Message, FAInfoBarSeverity.Error); }
     }
 
     private async Task RenameAsync()
     {
         var target = PrimarySelection;
         if (target is null) return;
-        var name = await _ui.PromptAsync("重命名", $"当前名称：{target.Name}", target.Name, "重命名");
+        var name = await _ui.PromptAsync(Loc.T("DlgRenameTitle"), Loc.F("DlgRenameMessage", target.Name), target.Name, Loc.T("DlgRenameButton"));
         if (string.IsNullOrWhiteSpace(name)) return;
         try
         {
             FileSystemService.Rename(target.FullPath, name.Trim());
             await LoadAsync();
-            ShowInfo("重命名完成", name.Trim(), FAInfoBarSeverity.Success);
+            ShowInfo(Loc.T("MsgRenameDone"), name.Trim(), FAInfoBarSeverity.Success);
         }
-        catch (Exception ex) { ShowInfo("重命名失败", ex.Message, FAInfoBarSeverity.Error); }
+        catch (Exception ex) { ShowInfo(Loc.T("MsgRenameFailed"), ex.Message, FAInfoBarSeverity.Error); }
     }
 
     private async Task DeleteAsync()
     {
         var targets = SelectedEntries.Select(x => x.FullPath).ToArray();
         if (targets.Length == 0) return;
-        var ok = await _ui.ConfirmAsync("移到回收站",
-            $"确定要把这 {targets.Length} 个项目移到回收站吗？\n\n{targets[0]}{(targets.Length > 1 ? " …" : "")}");
+        var ok = await _ui.ConfirmAsync(Loc.T("DlgDeleteTitle"),
+            Loc.F("DlgDeleteMessage", targets.Length,
+                Path.GetFileName(targets[0]) + (targets.Length > 1 ? " ..." : "")));
         if (!ok) return;
 
         var done = 0;
@@ -427,8 +473,8 @@ public sealed class MainViewModel : ViewModelBase
             catch (Exception ex) { errors.Add($"{Path.GetFileName(path)}: {ex.Message}"); }
         }
         await LoadAsync();
-        ShowInfo(done > 0 ? "已移到回收站" : "删除失败",
-            errors.Count == 0 ? $"{done} 个项目" : string.Join("\n", errors.Take(3)),
+        ShowInfo(done > 0 ? Loc.T("MsgMovedToTrash") : Loc.T("MsgDeleteFailed"),
+            errors.Count == 0 ? Loc.F("StatusItems", done) : string.Join("\n", errors.Take(3)),
             errors.Count == 0 ? FAInfoBarSeverity.Success : FAInfoBarSeverity.Warning);
     }
 
@@ -436,8 +482,8 @@ public sealed class MainViewModel : ViewModelBase
     {
         if (SelectedEntries.Count == 0) return;
         _clipboard.Set(operation, SelectedEntries.Select(x => x.FullPath), CurrentPath);
-        ShowInfo(operation == ClipboardOperation.Copy ? "已复制" : "已剪切",
-            $"{SelectedEntries.Count} 个项目 · 到目标文件夹后按粘贴",
+        ShowInfo(operation == ClipboardOperation.Copy ? Loc.T("MsgCopied") : Loc.T("MsgCut"),
+            Loc.F("MsgClipboardHint", SelectedEntries.Count),
             FAInfoBarSeverity.Informational);
     }
 
@@ -455,24 +501,25 @@ public sealed class MainViewModel : ViewModelBase
             });
             _clipboard.Clear();
             await LoadAsync();
-            ShowInfo("粘贴完成", $"{paths.Length} 个项目已{(operation == ClipboardOperation.Copy ? "复制" : "移动")}到当前目录",
+            ShowInfo(Loc.T("MsgPasteDone"), Loc.F("MsgPasteBody", paths.Length,
+                operation == ClipboardOperation.Copy ? Loc.T("MsgCopiedWord") : Loc.T("MsgMovedWord")),
                 FAInfoBarSeverity.Success);
         }
-        catch (Exception ex) { ShowInfo("粘贴失败", ex.Message, FAInfoBarSeverity.Error); }
+        catch (Exception ex) { ShowInfo(Loc.T("MsgPasteFailed"), ex.Message, FAInfoBarSeverity.Error); }
     }
 
     private async Task CopyPathAsync()
     {
         if (PrimarySelection is null) return;
         await _ui.CopyTextAsync(PrimarySelection.FullPath);
-        ShowInfo("路径已复制", PrimarySelection.FullPath, FAInfoBarSeverity.Success);
+        ShowInfo(Loc.T("MsgPathCopied"), PrimarySelection.FullPath, FAInfoBarSeverity.Success);
     }
 
     private void RevealSelected()
     {
         if (PrimarySelection is null) return;
         try { _ui.Reveal(PrimarySelection.FullPath); }
-        catch (Exception ex) { ShowInfo("无法显示", ex.Message, FAInfoBarSeverity.Error); }
+        catch (Exception ex) { ShowInfo(Loc.T("MsgCannotReveal"), ex.Message, FAInfoBarSeverity.Error); }
     }
 
     private async Task PropertiesAsync()
@@ -480,30 +527,30 @@ public sealed class MainViewModel : ViewModelBase
         var item = PrimarySelection;
         if (item is null) return;
         var info = item.IsDirectory
-            ? $"类型：文件夹\n路径：{item.FullPath}\n修改时间：{item.ModifiedText}\n包含：{CountChildren(item.FullPath)} 个项目"
-            : $"类型：{item.Kind}\n路径：{item.FullPath}\n大小：{item.SizeText}（{item.Model.Size} 字节）\n修改时间：{item.ModifiedText}";
-        await _ui.ShowInfoAsync("属性", info);
+            ? Loc.F("PropFolder", item.FullPath, item.ModifiedText, CountChildren(item.FullPath))
+            : Loc.F("PropFile", item.Kind, item.FullPath, item.SizeText, item.Model.Size, item.ModifiedText);
+        await _ui.ShowInfoAsync(Loc.T("DlgPropertiesTitle"), info);
     }
 
     private static string CountChildren(string path)
     {
         try { return Directory.EnumerateFileSystemEntries(path).Take(1000).Count().ToString(); }
-        catch { return "未知"; }
+        catch { return Loc.T("Unknown"); }
     }
 
     private void SetSort(string column)
     {
         if (_sortColumn == column) _sortDescending = !_sortDescending;
         else { _sortColumn = column; _sortDescending = false; }
-        var label = column switch { "Size" => "大小", "Modified" => "修改时间", "Kind" => "类型", _ => "名称" };
-        SortIndicator = $"{label} {(_sortDescending ? "↓" : "↑")}";
+        var label = column switch { "Size" => Loc.T("SortSize"), "Modified" => Loc.T("SortModified"), "Kind" => Loc.T("SortKind"), _ => Loc.T("SortName") };
+        SortIndicator = label + (_sortDescending ? Loc.T("SortDesc") : Loc.T("SortAsc"));
         ApplyFilterAndSort();
     }
 
     private void ToggleTheme()
     {
         _themeMode = _themeMode switch { "system" => "light", "light" => "dark", _ => "system" };
-        ThemeLabel = _themeMode switch { "light" => "浅色", "dark" => "深色", _ => "跟随系统" };
+        ThemeLabel = _themeMode switch { "light" => Loc.T("ThemeLight"), "dark" => Loc.T("ThemeDark"), _ => Loc.T("ThemeSystem") };
         _ui.SetTheme(_themeMode);
     }
 
@@ -515,7 +562,7 @@ public sealed class MainViewModel : ViewModelBase
         HasSelection = SelectedEntries.Count > 0;
         var bytes = SelectedEntries.Where(x => !x.IsDirectory).Sum(x => x.Model.Size);
         SelectionText = HasSelection
-            ? $"已选 {SelectedEntries.Count} 项 · {FileSystemService.FormatSize(bytes)}"
+            ? Loc.F("SelectionText", SelectedEntries.Count, FileSystemService.FormatSize(bytes))
             : string.Empty;
     }
 
@@ -528,5 +575,5 @@ public sealed class MainViewModel : ViewModelBase
     }
 
     private AsyncRelayCommand Async(Func<object?, Task> execute)
-        => new(execute) { ErrorHandler = ex => ShowInfo("操作失败", ex.Message, FAInfoBarSeverity.Error) };
+        => new(execute) { ErrorHandler = ex => ShowInfo(Loc.T("MsgOperationFailed"), ex.Message, FAInfoBarSeverity.Error) };
 }

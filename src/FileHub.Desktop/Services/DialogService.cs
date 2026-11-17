@@ -5,7 +5,7 @@ using FluentAvalonia.UI.Controls;
 
 namespace FileHub.Desktop.Services;
 
-/// <summary>统一用 FluentUI-CodeHub 的 FAContentDialog 做输入 / 确认 / 信息弹窗。</summary>
+/// <summary>All dialogs go through FluentUI-CodeHub FAContentDialog.</summary>
 public sealed class DialogService
 {
     private readonly Window _window;
@@ -17,7 +17,7 @@ public sealed class DialogService
         var box = new TextBox
         {
             Text = initial,
-            PlaceholderText = "输入名称",
+            PlaceholderText = Loc.T("DlgPlaceholder"),
             MinWidth = 340,
             Margin = new Avalonia.Thickness(0, 4, 0, 0)
         };
@@ -30,7 +30,7 @@ public sealed class DialogService
             Title = title,
             Content = panel,
             PrimaryButtonText = primary,
-            CloseButtonText = "取消",
+            CloseButtonText = Loc.T("DlgCancel"),
             DefaultButton = FAContentDialogButton.Primary
         };
 
@@ -44,8 +44,8 @@ public sealed class DialogService
         {
             Title = title,
             Content = new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap, MinWidth = 340 },
-            PrimaryButtonText = "确定",
-            CloseButtonText = "取消",
+            PrimaryButtonText = Loc.T("DlgOK"),
+            CloseButtonText = Loc.T("DlgCancel"),
             DefaultButton = FAContentDialogButton.Close
         };
         return await dialog.ShowAsync(_window) == FAContentDialogResult.Primary;
@@ -57,7 +57,7 @@ public sealed class DialogService
         {
             Title = title,
             Content = new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap, MinWidth = 340 },
-            CloseButtonText = "关闭",
+            CloseButtonText = Loc.T("DlgClose"),
             DefaultButton = FAContentDialogButton.Close
         };
         await dialog.ShowAsync(_window);

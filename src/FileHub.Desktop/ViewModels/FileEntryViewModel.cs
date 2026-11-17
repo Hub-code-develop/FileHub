@@ -1,3 +1,4 @@
+using FileHub.Desktop.Services;
 using FileHub.Files.Models;
 using FluentAvalonia.UI.Controls;
 
@@ -16,12 +17,16 @@ public sealed class FileEntryViewModel
     public string Name => Model.Name;
     public string FullPath => Model.FullPath;
     public string SizeText => Model.SizeText;
-    public string Kind => Model.Kind;
+    public string Kind => Model.IsDirectory
+        ? Loc.T("KindFolder")
+        : string.IsNullOrWhiteSpace(Model.Extension)
+            ? Loc.T("KindFile")
+            : Loc.F("KindExtension", Model.Extension.TrimStart('.').ToUpperInvariant());
     public string ModifiedText => Model.ModifiedText;
     public bool IsDirectory => Model.IsDirectory;
     public string Category => Model.Category;
 
-    /// <summary>直接给 FASymbolIcon.Symbol 绑定的枚举值，避免 XAML 里做字符串转换。</summary>
+    /// <summary>Bound directly to FASymbolIcon.Symbol so XAML needs no converter.</summary>
     public FASymbol Symbol { get; }
 
     private static FASymbol PickSymbol(string category) => category switch

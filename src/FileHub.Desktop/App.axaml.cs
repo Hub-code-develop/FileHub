@@ -19,7 +19,7 @@ public partial class App : Application
         base.OnFrameworkInitializationCompleted();
     }
 
-    /// <summary>system / light / dark 三态切换。</summary>
+    /// <summary>Switch between system / light / dark themes.</summary>
     public void SetTheme(string mode)
     {
         RequestedThemeVariant = mode switch
@@ -28,5 +28,20 @@ public partial class App : Application
             "dark" => ThemeVariant.Dark,
             _ => ThemeVariant.Default
         };
+    }
+
+    /// <summary>
+    /// Rebuild the main window so x:Static localized strings are re-evaluated.
+    /// ShellViewModel is a singleton, so every open tab survives the rebuild.
+    /// </summary>
+    public void RestartMainWindow()
+    {
+        if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+        {
+            var previous = desktop.MainWindow;
+            desktop.MainWindow = new MainWindow();
+            desktop.MainWindow.Show();
+            previous?.Close();
+        }
     }
 }
