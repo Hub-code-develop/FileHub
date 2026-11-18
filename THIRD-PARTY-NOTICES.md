@@ -3,6 +3,19 @@
 FileHub contains material derived from third-party open-source projects. This file records
 every such project, what was used, and the license terms that apply.
 
+## Redistribution / derived-work statement
+
+FileHub is a **derived work** of the projects listed below. Its file-browsing interface,
+command structure and control styles were ported from the Files App and WinUI 3 projects.
+Both upstreams are MIT-licensed: the MIT License explicitly permits use, copying,
+modification, merging, publication, **redistribution**, sublicensing and sale, provided the
+original copyright notice and permission notice are included in all copies or substantial
+portions of the work. Those notices are reproduced verbatim below (see "MIT License (Files)"
+and "MIT License (Microsoft)"). This file, together with `LICENSE`, must accompany any copy
+or substantial portion of FileHub that is redistributed, in source or binary form. FileHub's
+own changes are released under the MIT License in `LICENSE`; that license does not and cannot
+override the upstream copyrights recorded here.
+
 ---
 
 ## Files (Files App)
@@ -23,19 +36,25 @@ corner radii, spacing and command groupings were carried over:
 | Files source file | Ported into |
 | --- | --- |
 | `src/Files.App/Views/MainPage.xaml` | `src/FileHub.Desktop/Views/MainWindow.axaml` (root grid: tab bar / address bar / sidebar + content / status bar) |
-| `src/Files.App/UserControls/NavigationToolbar.xaml` | `MainWindow.axaml` row 1 (48px toolbar, 36x32 icon buttons, omnibar) |
-| `src/Files.App/UserControls/Toolbar.xaml` | `Views/Controls/FilesToolbar.axaml` (8px card, two command bars: context commands left, view commands right, label-right AppBarButtons) |
+| `src/Files.App/UserControls/NavigationToolbar.xaml` | `Views/Controls/FilesNavigationToolbar.axaml(.cs)` (48px toolbar, 36x32 icon buttons, omnibar, exposed nav buttons) |
+| `src/Files.App/UserControls/Toolbar.xaml` | `Views/Controls/FilesToolbar.axaml(.cs)` (8px card, two command bars: context commands left, view commands right, label-right AppBarButtons; buttons created from the command registry) |
 | `src/Files.App/UserControls/TabBar/TabBar.xaml` | `MainWindow.axaml` row 0 (WinUI 3 tab strip `WinTabStrip`, 32px tabs, footer actions) |
-| `src/Files.App/UserControls/StatusBar.xaml` | `MainWindow.axaml` row 3 (32px status bar, 1x18 dividers) |
-| `src/Files.App/UserControls/Pane/InfoPane.xaml` | `MainWindow.axaml` InfoPane (300px pane, tab pills, 90px label column) |
-| `src/Files.App/Views/Layouts/DetailsLayoutPage.xaml` | `MainWindow.axaml` column header (40px) and 34/*/110/150/160 column grid |
+| `src/Files.App/UserControls/StatusBar.xaml` | `Views/Controls/FilesStatusBar.axaml(.cs)` (32px status bar, 1x18 dividers, item count / selection count / size, view actions) |
+| `src/Files.App/UserControls/Pane/InfoPane.xaml` | `Views/Controls/FilesInfoPane.axaml(.cs)` (300px pane, tab pills, 90px label column, 2*/3* preview/properties rows) |
+| `src/Files.App.Controls/Sidebar/SidebarView.xaml` | `Views/Controls/FilesSidebar.axaml(.cs)` (header / menu items / footer rows, resizer) |
+| `src/Files.App/Views/Layouts/DetailsLayoutPage.xaml` | `Views/Controls/DetailsLayoutPage.axaml(.cs)` (40px column header, 34/*/110/150/160 column grid, compact rows, loading skeleton) |
+| `src/Files.App/Actions/IAction.cs`, `src/Files.App/Actions/BaseUIAction.cs` | `src/FileHub.Desktop/Actions/` (`IAction` → `IRichCommand`, `BaseUIAction` → `RichCommand`) |
+| `src/Files.App/Data/Commands/Manager/CommandManager.cs` | `Actions/CommandManager.cs` (`CommandCodes` identity enum, command registry indexed by code/hotkey, context/primary/secondary groups) |
 | `src/Files.App/Styles/TabBarStyles.xaml` | `src/FileHub.Desktop/Styles/FileHubTheme.axaml` |
 
 The port is not a copy-paste: WinUI 3 XAML does not run on Avalonia. WinUI controls were mapped
 to CodeHub-FluentUI and Avalonia equivalents, and Files-only concepts (Shell COM, `x:Bind`,
-`ThemeResource`, `NavigationView`) were replaced by FileHub view models. Files-specific
-controls that have no library equivalent — `SidebarView`, `CommandBar`, `InfoPane`,
-`StatusBar` — were re-implemented in `src/FileHub.Desktop/Controls/FileHubControls.cs`.
+`ThemeResource`, WinRT storage, `ItemsRepeater`) were replaced by FileHub view models and the
+cross-platform `FileSystemService`. Files-specific controls with no library equivalent were
+re-implemented under `Views/Controls/`. Files' command set depends on WinRT/Win32 code that
+cannot execute on macOS or Linux; its *structure* (identifier enum, registry, command objects
+carrying label/glyph/hotkey/executable state) was ported, while the command bodies call
+FileHub's cross-platform services.
 
 Because the layout structure was ported rather than independently designed, the original
 copyright notice and permission notice are reproduced in full below, as the MIT License
@@ -134,6 +153,36 @@ What did not come across:
 
 The remaining visual difference against a real WinUI 3 window is therefore concentrated in the
 font, the translucent backdrops and sub-pixel text rendering — not in the control shapes.
+
+---
+
+## MIT License (Microsoft)
+
+The WinUI 3 styles reproduced in `src/WinUI3.Fluent/` are covered by:
+
+```
+MIT License
+
+Copyright (c) Microsoft Corporation.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
 
 ---
 

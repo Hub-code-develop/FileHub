@@ -5,6 +5,7 @@ using System.Windows.Input;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using FileHub.Desktop.Actions;
 using FileHub.Desktop.Controls;
 using FileHub.Desktop.Models;
 using FileHub.Desktop.Services;
@@ -23,6 +24,18 @@ public partial class MainWindow : Window
     private MainViewModel? _boundTab;
     private bool _initialized;
 
+    // The four Files App UserControls own their named elements; keep the old short names
+    // here so the wiring code matches Files' own code-behind style.
+    private FABreadcrumbBar Breadcrumb => NavToolbar.Breadcrumb;
+    private TextBox AddressBox => NavToolbar.AddressBox;
+    private TextBox SearchBox => NavToolbar.SearchBox;
+    private ListBox FileList => LayoutPage.FileList;
+    private ListBox GridList => LayoutPage.GridList;
+    private ItemsControl QuickItems => Sidebar.QuickItems;
+    private ItemsControl DriveItems => Sidebar.DriveItems;
+    private ToolbarIconButton SidebarToggleButton => NavToolbar.SidebarToggleButton;
+    private Button DetailsToggleButton => StatusBar.DetailsToggleButton;
+
     public MainWindow()
     {
         InitializeComponent();
@@ -30,6 +43,7 @@ public partial class MainWindow : Window
         _shell = ShellViewModel.Current;
         DataContext = _shell;
         _shell.EnsureFirstTab();
+        Toolbar.Commands = _shell.Commands;
 
         // Content area follows the active tab. Done in code because binding DataContext to a
         // property of the inherited DataContext did not resolve reliably in Avalonia 12, and a
@@ -66,8 +80,9 @@ public partial class MainWindow : Window
         // a XAML "ActiveTab.X" path on the window-level DataContext) keeps every nested binding
         // resolving, and makes a tab switch re-point all of them in one place.
         InnerContent.DataContext = _boundTab;
-        AddressBarRoot.DataContext = _boundTab;
-        StatusBarRoot.DataContext = _boundTab;
+        NavToolbar.DataContext = _boundTab;
+        StatusBar.DataContext = _boundTab;
+        Sidebar.SettingsItem.Command = _boundTab.ToggleThemeCommand;
         Breadcrumb.ItemsSource = _boundTab.Breadcrumbs;
         SyncAddressMode();
 
@@ -159,35 +174,24 @@ public partial class MainWindow : Window
         GridList.ContextFlyout = CreateContextMenu();
     }
 
+    /// <summary>
+    /// Files builds context menus from its CommandManager; do the same so the menu and the
+    /// toolbar always expose the same command identities. Commands are resolved lazily by
+    /// CommandManager, so they always target the active tab.
+    /// </summary>
     private FAMenuFlyout CreateContextMenu()
     {
         var flyout = new FAMenuFlyout();
-
-        // Commands are resolved at execution time so the menu always targets the active tab.
-        void Add(string key, FASymbol symbol, Func<ICommand> command)
+        foreach (var command in _shell.Commands.ContextCommands)
         {
             flyout.Items.Add(new FAMenuFlyoutItem
             {
-                Text = Loc.T(key),
-                IconSource = new FASymbolIconSource { Symbol = symbol, FontSize = 16 },
-                Command = new RelayCommand(p => command().Execute(p))
+                Text = command.Label,
+                IconSource = new FASymbolIconSource { Symbol = command.Symbol, FontSize = 16 },
+                Command = command,
+                CommandParameter = command.Parameter
             });
         }
-
-        Add("CtxOpen", FASymbol.OpenFile, () => Vm.OpenSelectedCommand);
-        Add("CtxReveal", FASymbol.OpenFolder, () => Vm.RevealCommand);
-        flyout.Items.Add(new FAMenuFlyoutSeparator());
-        Add("CtxCopy", FASymbol.Copy, () => Vm.CopyCommand);
-        Add("CtxCut", FASymbol.Cut, () => Vm.CutCommand);
-        Add("CtxPaste", FASymbol.Paste, () => Vm.PasteCommand);
-        Add("CtxCopyPath", FASymbol.Link, () => Vm.CopyPathCommand);
-        flyout.Items.Add(new FAMenuFlyoutSeparator());
-        Add("CtxNewFolder", FASymbol.Add, () => Vm.NewFolderCommand);
-        Add("CtxRename", FASymbol.Edit, () => Vm.RenameCommand);
-        Add("CtxDelete", FASymbol.Delete, () => Vm.DeleteCommand);
-        flyout.Items.Add(new FAMenuFlyoutSeparator());
-        Add("CtxSelectAll", FASymbol.Accept, () => Vm.SelectAllCommand);
-        Add("CtxProperties", FASymbol.ContactInfo, () => Vm.PropertiesCommand);
         return flyout;
     }
 
@@ -267,38 +271,43 @@ public partial class MainWindow : Window
         // Do not steal shortcuts while typing in a text box.
         if (args.Source is TextBox) return;
 
+        // Hotkeys are resolved through the same CommandManager the toolbar and context menu
+        // use, mirroring Files App's CommandManager[HotKey] lookup.
         var ctrl = args.KeyModifiers.HasFlag(KeyModifiers.Control) ||
                    args.KeyModifiers.HasFlag(KeyModifiers.Meta);
         var alt = args.KeyModifiers.HasFlag(KeyModifiers.Alt);
+        var shift = args.KeyModifiers.HasFlag(KeyModifiers.Shift);
 
-        if (alt && args.Key == Key.Left) { Vm.GoBackCommand.Execute(null); args.Handled = true; return; }
-        if (alt && args.Key == Key.Right) { Vm.GoForwardCommand.Execute(null); args.Handled = true; return; }
+        string? hotKey = null;
+        if (alt && args.Key == Key.Left) hotKey = "Alt+Left";
+        else if (alt && args.Key == Key.Right) hotKey = "Alt+Right";
+        else if (alt && args.Key == Key.Up) hotKey = "Alt+Up";
+        else if (ctrl && shift && args.Key == Key.N) hotKey = "Ctrl+Shift+N";
+        else if (ctrl && shift && args.Key == Key.C) hotKey = "Ctrl+Shift+C";
+        else if (ctrl && shift && args.Key == Key.H) hotKey = "Ctrl+Shift+H";
+        else if (ctrl && args.Key == Key.C) hotKey = "Ctrl+C";
+        else if (ctrl && args.Key == Key.X) hotKey = "Ctrl+X";
+        else if (ctrl && args.Key == Key.V) hotKey = "Ctrl+V";
+        else if (ctrl && args.Key == Key.A) hotKey = "Ctrl+A";
+        else if (ctrl && args.Key == Key.F) { SearchBox.Focus(); args.Handled = true; return; }
+        else if (ctrl && args.Key == Key.L) hotKey = "Ctrl+L";
+        else if (ctrl && args.Key == Key.T) hotKey = "Ctrl+T";
 
-        if (ctrl)
+        if (hotKey is not null && _shell.Commands[hotKey] is { } command &&
+            command != Actions.CommandManager.None)
         {
-            switch (args.Key)
-            {
-                case Key.C: Vm.CopyCommand.Execute(null); args.Handled = true; return;
-                case Key.X: Vm.CutCommand.Execute(null); args.Handled = true; return;
-                case Key.V: Vm.PasteCommand.Execute(null); args.Handled = true; return;
-                case Key.A: Vm.SelectAllCommand.Execute(null); args.Handled = true; return;
-                case Key.F: SearchBox.Focus(); args.Handled = true; return;
-                case Key.L:
-                    Vm.IsAddressEditing = true;
-                    AddressBox.Focus();
-                    AddressBox.SelectAll();
-                    args.Handled = true;
-                    return;
-            }
+            command.Execute(null);
+            args.Handled = true;
+            return;
         }
 
         switch (args.Key)
         {
-            case Key.F2: Vm.RenameCommand.Execute(null); args.Handled = true; break;
-            case Key.F5: Vm.RefreshCommand.Execute(null); args.Handled = true; break;
-            case Key.Delete: Vm.DeleteCommand.Execute(null); args.Handled = true; break;
-            case Key.Back: Vm.GoUpCommand.Execute(null); args.Handled = true; break;
-            case Key.Enter: Vm.OpenSelectedCommand.Execute(null); args.Handled = true; break;
+            case Key.F2: _shell.Commands.Execute(CommandCodes.Rename); args.Handled = true; break;
+            case Key.F5: _shell.Commands.Execute(CommandCodes.Refresh); args.Handled = true; break;
+            case Key.Delete: _shell.Commands.Execute(CommandCodes.Delete); args.Handled = true; break;
+            case Key.Back: _shell.Commands.Execute(CommandCodes.GoUp); args.Handled = true; break;
+            case Key.Enter: _shell.Commands.Execute(CommandCodes.OpenSelected); args.Handled = true; break;
             case Key.Escape: Vm.ClearSearchCommand.Execute(null); args.Handled = true; break;
         }
     }

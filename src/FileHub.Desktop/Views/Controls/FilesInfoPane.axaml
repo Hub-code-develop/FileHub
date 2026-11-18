@@ -1,0 +1,79 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="using:FluentAvalonia.UI.Controls"
+             xmlns:loc="using:FileHub.Desktop.Services"
+             x:Class="FileHub.Desktop.Views.Controls.FilesInfoPane">
+
+  <!--
+    Ported from Files App src/Files.App/UserControls/Pane/InfoPane.xaml
+    (Copyright (c) Files Community, MIT License; see THIRD-PARTY-NOTICES.md).
+    Files uses CornerRadius=8 with rows Auto / 2* (preview) / 3* (properties),
+    a 4px preview surface and a 3px selection pill in the header. Drive-space
+    controls from the original are omitted because they need WinRT StorageFile.
+  -->
+  <Border Classes="paneSurface" Width="300" Margin="8,4,12,8"
+          IsVisible="{Binding IsDetailsPaneOpen}">
+    <Grid RowDefinitions="Auto,Auto,2*,3*">
+
+      <Grid Grid.Row="0" ColumnDefinitions="Auto,Auto,*" Margin="8,8,8,4">
+        <Button Grid.Column="0" Classes="paneTab"
+                Content="{x:Static loc:Strings.LblDetails}" />
+        <Border Grid.Column="0" Classes="paneTabPill" VerticalAlignment="Bottom"
+                HorizontalAlignment="Center" Margin="0,0,0,2" />
+        <Button Grid.Column="1" Classes="paneTab"
+                Content="{x:Static loc:Strings.LblPreview}" />
+      </Grid>
+      <Border Grid.Row="1" Height="1" Margin="8,0,8,8"
+              Background="{DynamicResource DividerStrokeColorDefaultBrush}" />
+
+      <!-- Preview row: Files' RootPreviewGrid (icon placeholder for non-media files). -->
+      <Grid Grid.Row="2" Margin="14,0,14,8">
+        <Border Classes="paneSurface" Height="150" VerticalAlignment="Center"
+                IsVisible="{Binding HasSelection}">
+          <ui:FASymbolIcon Symbol="{Binding PrimarySelection.Symbol}" FontSize="64"
+                           HorizontalAlignment="Center" VerticalAlignment="Center" />
+        </Border>
+        <TextBlock Text="{x:Static loc:Strings.NoSelection}" Margin="14" Opacity="0.6"
+                   TextWrapping="Wrap" IsVisible="{Binding !HasSelection}" />
+      </Grid>
+
+      <!-- Properties row: Files' DetailsListHeader + property groups. -->
+      <ScrollViewer Grid.Row="3">
+        <StackPanel Margin="14,0,14,12" Spacing="10" IsVisible="{Binding HasSelection}">
+          <TextBlock Classes="paneHeading" Text="{x:Static loc:Strings.LblDetails}" />
+          <TextBlock Classes="paneName" Text="{Binding PrimarySelection.Name}" />
+
+          <Grid ColumnDefinitions="90,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto">
+            <TextBlock Grid.Row="0" Grid.Column="0" Classes="paneLabel"
+                       Text="{x:Static loc:Strings.PaneName}" />
+            <TextBlock Grid.Row="0" Grid.Column="1" Classes="paneValue"
+                       Text="{Binding PrimarySelection.Name}" />
+            <TextBlock Grid.Row="1" Grid.Column="0" Classes="paneLabel"
+                       Text="{x:Static loc:Strings.PaneType}" />
+            <TextBlock Grid.Row="1" Grid.Column="1" Classes="paneValue"
+                       Text="{Binding PrimarySelection.Kind}" />
+            <TextBlock Grid.Row="2" Grid.Column="0" Classes="paneLabel"
+                       Text="{x:Static loc:Strings.PaneSize}" />
+            <TextBlock Grid.Row="2" Grid.Column="1" Classes="paneValue"
+                       Text="{Binding PrimarySelection.SizeText}" />
+            <TextBlock Grid.Row="3" Grid.Column="0" Classes="paneLabel"
+                       Text="{x:Static loc:Strings.PaneModified}" />
+            <TextBlock Grid.Row="3" Grid.Column="1" Classes="paneValue"
+                       Text="{Binding PrimarySelection.ModifiedText}" />
+            <TextBlock Grid.Row="4" Grid.Column="0" Classes="paneLabel"
+                       Text="{x:Static loc:Strings.PanePath}" />
+            <TextBlock Grid.Row="4" Grid.Column="1" Classes="paneValue"
+                       Text="{Binding PrimarySelection.FullPath}" TextWrapping="Wrap" />
+          </Grid>
+
+          <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
+            <Button Content="{x:Static loc:Strings.LblOpen}" FontSize="12"
+                    Command="{Binding OpenSelectedCommand}" />
+            <Button Content="{x:Static loc:Strings.LblProperties}" FontSize="12"
+                    Command="{Binding PropertiesCommand}" />
+          </StackPanel>
+        </StackPanel>
+      </ScrollViewer>
+    </Grid>
+  </Border>
+</UserControl>

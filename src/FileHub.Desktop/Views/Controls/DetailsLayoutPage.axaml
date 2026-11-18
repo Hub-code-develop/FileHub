@@ -1,0 +1,99 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="using:FluentAvalonia.UI.Controls"
+             xmlns:loc="using:FileHub.Desktop.Services"
+             x:Class="FileHub.Desktop.Views.Controls.DetailsLayoutPage"
+             x:Name="PageRoot">
+
+  <!--
+    Ported from Files App src/Files.App/Views/Layouts/DetailsLayoutPage.xaml
+    (Copyright (c) Files Community, MIT License; see THIRD-PARTY-NOTICES.md).
+    Files uses a ListView with a DataGridHeader in its Header; Avalonia has no
+    DataGridHeader, so the header is a fixed-width Grid sharing the row columns.
+    Header height 40, header padding 12,8,12,0, 0.5px divider and the compact
+    32px rows all follow the original template values.
+  -->
+  <Grid RowDefinitions="Auto,*">
+
+    <Border Grid.Row="0" Classes="columnHeaderSurface">
+      <Grid>
+        <Grid ColumnDefinitions="34,*,110,150,160">
+          <Button Grid.Column="1" Classes="columnHeader"
+                Content="{x:Static loc:Strings.ColName}"
+                Command="{Binding SetSortCommand}" CommandParameter="Name" />
+        <Button Grid.Column="2" Classes="columnHeader"
+                Content="{x:Static loc:Strings.ColSize}"
+                Command="{Binding SetSortCommand}" CommandParameter="Size" />
+        <Button Grid.Column="3" Classes="columnHeader"
+                Content="{x:Static loc:Strings.ColKind}"
+                Command="{Binding SetSortCommand}" CommandParameter="Kind" />
+        <Button Grid.Column="4" Classes="columnHeader"
+                Content="{x:Static loc:Strings.ColModified}"
+                Command="{Binding SetSortCommand}" CommandParameter="Modified" />
+      </Grid>
+      <Border Height="1" VerticalAlignment="Bottom" Margin="12,0,12,0"
+              Background="{DynamicResource DividerStrokeColorDefaultBrush}" Opacity="0.7" />
+      </Grid>
+    </Border>
+
+    <Grid Grid.Row="1">
+      <ListBox x:Name="_fileList" ItemsSource="{Binding Entries}" SelectionMode="Multiple"
+               IsVisible="{Binding IsDetailsView}" Background="Transparent"
+               BorderThickness="0" Padding="10,2">
+        <ListBox.ItemTemplate>
+          <DataTemplate>
+            <Grid ColumnDefinitions="34,*,110,150,160" VerticalAlignment="Center">
+              <ui:FASymbolIcon Grid.Column="0" Symbol="{Binding Symbol}" FontSize="20"
+                               HorizontalAlignment="Center" VerticalAlignment="Center" />
+              <TextBlock Grid.Column="1" Text="{Binding Name}" VerticalAlignment="Center"
+                         TextTrimming="CharacterEllipsis" Margin="10,0,0,0" />
+              <TextBlock Grid.Column="2" Text="{Binding SizeText}" VerticalAlignment="Center"
+                         Margin="12,0,0,0" FontSize="12" Opacity="0.8" />
+              <TextBlock Grid.Column="3" Text="{Binding Kind}" VerticalAlignment="Center"
+                         TextTrimming="CharacterEllipsis" Margin="12,0,0,0"
+                         FontSize="12" Opacity="0.8" />
+              <TextBlock Grid.Column="4" Text="{Binding ModifiedText}" VerticalAlignment="Center"
+                         Margin="12,0,0,0" FontSize="12" Opacity="0.8" />
+            </Grid>
+          </DataTemplate>
+        </ListBox.ItemTemplate>
+      </ListBox>
+
+      <ListBox x:Name="_gridList" ItemsSource="{Binding Entries}" SelectionMode="Multiple"
+               IsVisible="{Binding IsGridView}" Background="Transparent"
+               BorderThickness="0" Padding="12">
+        <ListBox.ItemsPanel>
+          <ItemsPanelTemplate>
+            <WrapPanel Orientation="Horizontal" />
+          </ItemsPanelTemplate>
+        </ListBox.ItemsPanel>
+        <ListBox.ItemTemplate>
+          <DataTemplate>
+            <Border Classes="gridTile">
+              <StackPanel Spacing="8">
+                <ui:FASymbolIcon Symbol="{Binding Symbol}" FontSize="44"
+                                 HorizontalAlignment="Center" />
+                <TextBlock Classes="gridTileName" Text="{Binding Name}"
+                           HorizontalAlignment="Center" />
+              </StackPanel>
+            </Border>
+          </DataTemplate>
+        </ListBox.ItemTemplate>
+      </ListBox>
+
+      <TextBlock Text="{x:Static loc:Strings.EmptyFolder}" FontSize="14" Opacity="0.6"
+                 HorizontalAlignment="Center" VerticalAlignment="Center"
+                 IsVisible="{Binding IsEmpty}" IsHitTestVisible="False" />
+
+      <ui:FAProgressRing Width="40" Height="40" IsActive="{Binding IsLoading}"
+                         IsVisible="{Binding IsLoading}"
+                         HorizontalAlignment="Center" VerticalAlignment="Center" />
+
+      <ui:FASkeleton Height="44" Margin="12,10" VerticalAlignment="Top"
+                     IsLoading="{Binding IsLoading}" IsActive="{Binding IsLoading}"
+                     IsVisible="{Binding IsLoading}">
+        <Border Height="44" Background="#12808080" CornerRadius="4" />
+      </ui:FASkeleton>
+    </Grid>
+  </Grid>
+</UserControl>

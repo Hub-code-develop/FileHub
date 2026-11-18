@@ -1,0 +1,32 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:loc="using:FileHub.Desktop.Services"
+             xmlns:c="using:FileHub.Desktop.Controls"
+             x:Class="FileHub.Desktop.Views.Controls.FilesSidebar">
+
+  <!--
+    Ported from Files App src/Files.App.Controls/Sidebar/SidebarView.xaml
+    (Copyright (c) Files Community, MIT License; see THIRD-PARTY-NOTICES.md).
+    Files' SidebarView is a three-row grid: Header (Auto) / MenuItems (*) / Footer (Auto),
+    plus a resizer. The two section headers are kept here as in Files' sidebar content,
+    and the resizer lives in MainWindow (GridSplitter) because it resizes the outer column.
+  -->
+  <Border Classes="sidebarSurface" IsVisible="{Binding IsSidebarOpen}">
+    <Grid RowDefinitions="*,Auto">
+      <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="0,8,0,0">
+          <TextBlock Classes="sidebarHeader" Text="{x:Static loc:Strings.QuickAccess}" />
+          <ItemsControl x:Name="_quickItems" />
+          <TextBlock Classes="sidebarHeader" Text="{x:Static loc:Strings.Drives}" />
+          <ItemsControl x:Name="_driveItems" />
+        </StackPanel>
+      </ScrollViewer>
+      <StackPanel Grid.Row="1" Margin="0,4,0,10">
+        <Border Classes="sidebarDivider" />
+        <c:SidebarItem x:Name="_settingsItem" Symbol="Settings"
+                       Text="{x:Static loc:Strings.LblSettings}"
+                       ToolTip.Tip="{x:Static loc:Strings.ToggleTheme}" />
+      </StackPanel>
+    </Grid>
+  </Border>
+</UserControl>
