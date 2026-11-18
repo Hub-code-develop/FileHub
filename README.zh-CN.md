@@ -21,7 +21,7 @@
 | --- | --- |
 | `src/Files.App/Views/MainPage.xaml` | `src/FileHub.Desktop/Views/MainWindow.axaml` 根 Grid |
 | `src/Files.App/UserControls/NavigationToolbar.xaml` | 地址栏一行（高 48，按钮 36x32） |
-| `src/Files.App/UserControls/Toolbar.xaml` | 圆角命令卡片（圆角 8，文字在右的按钮） |
+| `src/Files.App/UserControls/Toolbar.xaml` | `Views/Controls/FilesToolbar.axaml`（8px 卡片，左侧上下文命令、右侧视图命令） |
 | `src/Files.App/UserControls/TabBar/TabBar.xaml` | `FATabView` 标签栏（高 34，尾部操作区） |
 | `src/Files.App/UserControls/StatusBar.xaml` | 状态栏一行（高 32，1x18 分隔线） |
 | `src/Files.App/UserControls/Pane/InfoPane.xaml` | 详细信息窗格（宽 300，标签胶囊） |
@@ -60,6 +60,7 @@ WinUI 3 的样式是明文 XAML，所以颜色、圆角、内边距、各状态�
 | ListBoxItem / ListViewItem | 已移植 |
 | ToolTip、FlyoutPresenter | 已移植 |
 | TabView 标签栏（含关闭按钮） | 已移植（`WinTabStrip`） |
+| AppBarButton（命令栏按钮） | 已移植（`WinAppBarButton`） |
 | ScrollBar | 沿用库自带实现 |
 | NavigationView、BreadcrumbBar、InfoBar、ProgressRing、MenuFlyout、ComboBox | 由 CodeHub-FluentUI 提供 |
 

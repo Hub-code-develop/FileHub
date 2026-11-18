@@ -37,6 +37,7 @@
     详见 README「Known limitations」。
   -->
   <StyleInclude Source="avares://WinUI3.Fluent/Themes/TabStrip.axaml" />
+  <StyleInclude Source="avares://WinUI3.Fluent/Themes/AppBarButton.axaml" />
   <StyleInclude Source="avares://WinUI3.Fluent/Themes/ListBoxItem.axaml" />
   <StyleInclude Source="avares://WinUI3.Fluent/Themes/Surfaces.axaml" />
 

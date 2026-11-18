@@ -51,69 +51,6 @@ public sealed class ToolbarIconButton : Button
 }
 
 /// <summary>
-/// Files App AppBarButton with DefaultLabelPosition="Right": a 16px symbol followed by
-/// a text label, inside the rounded command bar card.
-/// Equivalent to src/Files.App/UserControls/Toolbar.xaml.
-/// </summary>
-public sealed class CommandBarButton : Button
-{
-    public static readonly StyledProperty<FASymbol> SymbolProperty =
-        AvaloniaProperty.Register<CommandBarButton, FASymbol>(nameof(Symbol), FASymbol.Add);
-
-    public static readonly StyledProperty<string> LabelProperty =
-        AvaloniaProperty.Register<CommandBarButton, string>(nameof(Label), string.Empty);
-
-    private readonly FASymbolIcon _icon;
-    private readonly TextBlock _label;
-
-    public CommandBarButton()
-    {
-        MinWidth = 40;
-        Height = 34;
-        Padding = new Thickness(10, 0, 12, 0);
-        CornerRadius = new CornerRadius(4);
-        Background = Brushes.Transparent;
-        BorderThickness = new Thickness(0);
-        HorizontalContentAlignment = HorizontalAlignment.Stretch;
-        VerticalContentAlignment = VerticalAlignment.Center;
-
-        _icon = new FASymbolIcon { Symbol = Symbol, FontSize = 16, VerticalAlignment = VerticalAlignment.Center };
-        _label = new TextBlock
-        {
-            Text = Label,
-            FontSize = 12,
-            VerticalAlignment = VerticalAlignment.Center,
-            TextTrimming = TextTrimming.CharacterEllipsis
-        };
-        Content = new StackPanel
-        {
-            Orientation = Orientation.Horizontal,
-            Spacing = 8,
-            Children = { _icon, _label }
-        };
-    }
-
-    public FASymbol Symbol
-    {
-        get => GetValue(SymbolProperty);
-        set => SetValue(SymbolProperty, value);
-    }
-
-    public string Label
-    {
-        get => GetValue(LabelProperty);
-        set => SetValue(LabelProperty, value);
-    }
-
-    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
-    {
-        base.OnPropertyChanged(change);
-        if (change.Property == SymbolProperty) _icon.Symbol = Symbol;
-        if (change.Property == LabelProperty) _label.Text = Label;
-    }
-}
-
-/// <summary>
 /// Files App SidebarItem: 32px row, 16px symbol, rounded corners and a 3x16
 /// selection pill. Equivalent to Files.App.Controls.SidebarItem in
 /// src/Files.App/Views/MainPage.xaml (SidebarView.Footer / SidebarContent).

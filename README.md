@@ -24,7 +24,7 @@ with Avalonia controls.
 | --- | --- |
 | `src/Files.App/Views/MainPage.xaml` | `src/FileHub.Desktop/Views/MainWindow.axaml` root grid |
 | `src/Files.App/UserControls/NavigationToolbar.xaml` | address bar row (48px, 36x32 buttons) |
-| `src/Files.App/UserControls/Toolbar.xaml` | rounded command card (8px radius, label-right buttons) |
+| `src/Files.App/UserControls/Toolbar.xaml` | `Views/Controls/FilesToolbar.axaml` — 8px card, context commands left, view commands right |
 | `src/Files.App/UserControls/TabBar/TabBar.xaml` | `FATabView` tab strip (34px, footer actions) |
 | `src/Files.App/UserControls/StatusBar.xaml` | status bar row (32px, 1x18 dividers) |
 | `src/Files.App/UserControls/Pane/InfoPane.xaml` | details pane (300px, tab pills) |
@@ -70,12 +70,14 @@ state colour in that project was copied from
 | `ToggleSwitch_themeresources.xaml` | `Themes/ToggleSwitch.axaml` — 40x20 track, 12px knob |
 | `ToolTip_themeresources.xaml`, `FlyoutPresenter_themeresources.xaml` | `Themes/Surfaces.axaml` |
 | `TabView` / `TabViewItem` | `Themes/TabStrip.axaml` + `Controls/WinTabStrip.cs` — 32px tab, `8,8,0,0` corners |
+| `AppBarButton` / `CommandBar` | `Themes/AppBarButton.axaml` + `Controls/WinAppBarButton.cs` — 48px row, `2,6` inner inset, 12px label |
 
 ### Control coverage
 
 | Control | Status |
 | --- | --- |
 | Button, ToggleButton, CheckBox, RadioButton, ToggleSwitch, TextBox, TextBlock | Ported |
+| AppBarButton (command bar buttons) | Ported |
 | ListBoxItem / ListViewItem | Ported |
 | ToolTip, FlyoutPresenter | Ported |
 | TabView (tab strip) | Ported, including the close button |

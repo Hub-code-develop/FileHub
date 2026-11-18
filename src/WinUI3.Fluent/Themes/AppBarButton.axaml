@@ -1,0 +1,137 @@
+<!--
+  AppBarButton — ported from WinUI 3.
+
+  Source: microsoft/microsoft-ui-xaml
+          controls/dev/CommonStyles/AppBarButton_themeresources.xaml  (DefaultAppBarButtonStyle)
+          controls/dev/CommonStyles/CommandBar_themeresources.xaml    (AppBarThemeMinHeight 64,
+                                                                       AppBarThemeCompactHeight 48)
+  Copyright (c) Microsoft Corporation. Licensed under the MIT License.
+  See THIRD-PARTY-NOTICES.md.
+
+  Geometry kept verbatim:
+    row 48 (label right / icon only) or 64 (label bottom)
+    inner border margin 2,6,2,6  ->  the 40 px hover pill
+    icon 16x16 · label 12 px · label margin 8,0,12,0 when the label sits on the right
+    background fade 83 ms (BrushTransition 0:0:0.083)
+-->
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:c="using:WinUI3.Fluent.Controls">
+
+  <Styles.Resources>
+
+    <ControlTheme x:Key="{x:Type c:WinAppBarButton}" TargetType="c:WinAppBarButton">
+      <Setter Property="Background" Value="{DynamicResource SubtleFillColorTransparentBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ControlFillColorTransparentBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+      <Setter Property="CornerRadius" Value="{StaticResource ControlCornerRadius}" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Height" Value="48" />
+      <Setter Property="MinHeight" Value="48" />
+      <Setter Property="MinWidth" Value="40" />
+      <Setter Property="FontFamily" Value="{StaticResource WinUIFontFamily}" />
+      <Setter Property="FontSize" Value="{StaticResource ControlContentThemeFontSize}" />
+      <Setter Property="HorizontalAlignment" Value="Left" />
+      <Setter Property="VerticalAlignment" Value="Top" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="VerticalContentAlignment" Value="Stretch" />
+
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Grid Background="Transparent"
+                MinWidth="{TemplateBinding MinWidth}"
+                MaxWidth="{TemplateBinding MaxWidth}">
+
+            <!-- WinUI: the interactive surface is the inner border, inset by 2,6. -->
+            <Border Name="PART_InnerBorder"
+                    Margin="2,6,2,6"
+                    Background="{TemplateBinding Background}"
+                    BorderBrush="{TemplateBinding BorderBrush}"
+                    BorderThickness="{TemplateBinding BorderThickness}"
+                    CornerRadius="{TemplateBinding CornerRadius}">
+              <Border.Transitions>
+                <Transitions>
+                  <BrushTransition Property="Background" Duration="0:0:0.083" />
+                </Transitions>
+              </Border.Transitions>
+            </Border>
+
+            <Grid Name="PART_ContentRoot"
+                  MinHeight="48"
+                  ColumnDefinitions="Auto,Auto,*"
+                  RowDefinitions="Auto,Auto">
+
+              <Viewbox Name="PART_IconBox"
+                       Grid.Row="0" Grid.Column="0"
+                       Height="16" Width="16"
+                       Margin="12,0,0,0"
+                       VerticalAlignment="Center"
+                       HorizontalAlignment="Left">
+                <ContentPresenter Name="PART_Icon"
+                                  Content="{TemplateBinding Icon}"
+                                  Foreground="{TemplateBinding Foreground}" />
+              </Viewbox>
+
+              <TextBlock Name="PART_Label"
+                         Grid.Row="0" Grid.Column="1"
+                         Text="{TemplateBinding Label}"
+                         Foreground="{TemplateBinding Foreground}"
+                         FontSize="12"
+                         FontFamily="{TemplateBinding FontFamily}"
+                         TextAlignment="Left"
+                         TextWrapping="Wrap"
+                         Margin="8,0,12,0"
+                         VerticalAlignment="Center" />
+            </Grid>
+          </Grid>
+        </ControlTemplate>
+      </Setter>
+
+      <!-- Label = Collapsed: icon only, 40 px wide, icon centred. -->
+      <Style Selector="^:label-collapsed /template/ Viewbox#PART_IconBox">
+        <Setter Property="Margin" Value="0" />
+        <Setter Property="HorizontalAlignment" Value="Center" />
+      </Style>
+      <Style Selector="^:label-collapsed /template/ TextBlock#PART_Label">
+        <Setter Property="IsVisible" Value="False" />
+      </Style>
+
+      <!-- Label = Bottom: 64 px tall, icon above a centred, wrapped label. -->
+      <Style Selector="^:label-bottom">
+        <Setter Property="Height" Value="64" />
+        <Setter Property="MinHeight" Value="64" />
+      </Style>
+      <Style Selector="^:label-bottom /template/ Grid#PART_ContentRoot">
+        <Setter Property="MinHeight" Value="64" />
+      </Style>
+      <Style Selector="^:label-bottom /template/ Viewbox#PART_IconBox">
+        <Setter Property="Grid.Row" Value="0" />
+        <Setter Property="Margin" Value="12,16,0,10" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+      </Style>
+      <Style Selector="^:label-bottom /template/ TextBlock#PART_Label">
+        <Setter Property="Grid.Row" Value="1" />
+        <Setter Property="Grid.Column" Value="0" />
+        <Setter Property="Grid.ColumnSpan" Value="3" />
+        <Setter Property="TextAlignment" Value="Center" />
+        <Setter Property="Margin" Value="2,0,2,8" />
+      </Style>
+
+      <Style Selector="^:pointerover /template/ Border#PART_InnerBorder">
+        <Setter Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}" />
+      </Style>
+      <Style Selector="^:pressed /template/ Border#PART_InnerBorder">
+        <Setter Property="Background" Value="{DynamicResource SubtleFillColorTertiaryBrush}" />
+      </Style>
+      <Style Selector="^:disabled /template/ Border#PART_InnerBorder">
+        <Setter Property="Background" Value="{DynamicResource SubtleFillColorTransparentBrush}" />
+      </Style>
+      <Style Selector="^:disabled">
+        <Setter Property="Foreground" Value="{DynamicResource TextFillColorDisabledBrush}" />
+      </Style>
+    </ControlTheme>
+
+  </Styles.Resources>
+
+</Styles>

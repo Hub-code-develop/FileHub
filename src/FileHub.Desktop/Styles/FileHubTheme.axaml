@@ -34,16 +34,6 @@
     <Setter Property="BorderBrush" Value="{DynamicResource DividerStrokeColorDefaultBrush}" />
   </Style>
 
-  <Style Selector="Border.commandCard">
-    <Setter Property="CornerRadius" Value="{StaticResource OverlayCornerRadius}" />
-    <Setter Property="Padding" Value="8,4,8,4" />
-    <Setter Property="Margin" Value="8,4,8,4" />
-    <Setter Property="Height" Value="44" />
-    <Setter Property="Background" Value="{DynamicResource CardBackgroundFillColorDefaultBrush}" />
-    <Setter Property="BorderThickness" Value="1" />
-    <Setter Property="BorderBrush" Value="{DynamicResource CardStrokeColorDefaultBrush}" />
-  </Style>
-
   <Style Selector="Border.omnibar">
     <Setter Property="Height" Value="32" />
     <Setter Property="CornerRadius" Value="6" />
