@@ -23,12 +23,14 @@ with Avalonia controls.
 | Files source (MIT) | Ported to in FileHub |
 | --- | --- |
 | `src/Files.App/Views/MainPage.xaml` | `src/FileHub.Desktop/Views/MainWindow.axaml` root grid |
-| `src/Files.App/UserControls/NavigationToolbar.xaml` | address bar row (48px, 36x32 buttons) |
-| `src/Files.App/UserControls/Toolbar.xaml` | `Views/Controls/FilesToolbar.axaml` — 8px card, context commands left, view commands right |
-| `src/Files.App/UserControls/TabBar/TabBar.xaml` | `FATabView` tab strip (34px, footer actions) |
-| `src/Files.App/UserControls/StatusBar.xaml` | status bar row (32px, 1x18 dividers) |
-| `src/Files.App/UserControls/Pane/InfoPane.xaml` | details pane (300px, tab pills) |
-| `src/Files.App/Views/Layouts/DetailsLayoutPage.xaml` | column header (40px) and 34/*/110/150/160 columns |
+| `src/Files.App.Controls/Sidebar/SidebarView.xaml` | `Views/Controls/FilesSidebar.axaml(.cs)` — header / items / footer |
+| `src/Files.App/UserControls/NavigationToolbar.xaml` | `Views/Controls/FilesNavigationToolbar.axaml(.cs)` — 48px, 36x32 buttons |
+| `src/Files.App/UserControls/Toolbar.xaml` | `Views/Controls/FilesToolbar.axaml(.cs)` — 8px card, buttons built from the command registry |
+| `src/Files.App/UserControls/TabBar/TabBar.xaml` | `WinTabStrip` tab strip (32px tabs, footer actions) |
+| `src/Files.App/UserControls/StatusBar.xaml` | `Views/Controls/FilesStatusBar.axaml(.cs)` — 32px, 1x18 dividers |
+| `src/Files.App/UserControls/Pane/InfoPane.xaml` | `Views/Controls/FilesInfoPane.axaml(.cs)` — 300px pane, tab pills |
+| `src/Files.App/Views/Layouts/DetailsLayoutPage.xaml` | `Views/Controls/DetailsLayoutPage.axaml(.cs)` — 40px header, 34/*/110/150/160 columns |
+| `src/Files.App/Actions/IAction.cs`, `BaseUIAction.cs`, `Data/Commands/Manager/CommandManager.cs` | `src/FileHub.Desktop/Actions/` — `CommandCodes`, `IRichCommand`, `RichCommand`, `CommandManager` |
 | `src/Files.App/Styles/TabBarStyles.xaml` | `src/FileHub.Desktop/Styles/FileHubTheme.axaml` |
 
 What came across: the shell skeleton (tab strip, grouped sidebar with quick access and drives,
@@ -38,9 +40,10 @@ numbers (row heights, column widths, corner radii, paddings, spacing).
 
 What did not come across: WinUI 3 does not run on Avalonia, so every control was mapped to a
 CodeHub-FluentUI or Avalonia equivalent, and Files-only infrastructure (Shell COM, `x:Bind`,
-`ThemeResource`, `NavigationView`) was replaced by FileHub view models. The Files-specific
-controls that have no equivalent in the library — `SidebarView`, `CommandBar`, `InfoPane`,
-`StatusBar` — were written from scratch in `src/FileHub.Desktop/Controls/FileHubControls.cs`.
+`ThemeResource`, WinRT storage, `ItemsRepeater`) was replaced by FileHub view models and the
+cross-platform `FileSystemService`. Files' command bodies depend on WinRT/Win32 and cannot run
+on macOS or Linux; the command *structure* (identifier enum, registry, rich command objects)
+was ported, while the bodies call FileHub's cross-platform services.
 
 **Files is MIT licensed, and because its layout code was ported the original copyright and
 permission notice are reproduced in full in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).**
@@ -277,6 +280,8 @@ FileHub/
 
 ## License
 
-[MIT](LICENSE) - Copyright (c) 2026 Hub-code-develop. See
-[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) for the full Files App notice (the UI layout
-is ported from that project) and for every other third-party component.
+[MIT](LICENSE) - Copyright (c) 2026 Hub-code-develop. FileHub is a derived work: its
+file-browsing UI and command structure were ported from Files App and WinUI 3 (both MIT).
+When redistributing FileHub, in source or binary form, include
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) alongside `LICENSE`; the upstream copyright
+and permission notices are reproduced there verbatim as the MIT License requires.

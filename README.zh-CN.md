@@ -20,12 +20,14 @@
 | Files 源文件（MIT） | 移植到 FileHub 的位置 |
 | --- | --- |
 | `src/Files.App/Views/MainPage.xaml` | `src/FileHub.Desktop/Views/MainWindow.axaml` 根 Grid |
-| `src/Files.App/UserControls/NavigationToolbar.xaml` | 地址栏一行（高 48，按钮 36x32） |
-| `src/Files.App/UserControls/Toolbar.xaml` | `Views/Controls/FilesToolbar.axaml`（8px 卡片，左侧上下文命令、右侧视图命令） |
-| `src/Files.App/UserControls/TabBar/TabBar.xaml` | `FATabView` 标签栏（高 34，尾部操作区） |
-| `src/Files.App/UserControls/StatusBar.xaml` | 状态栏一行（高 32，1x18 分隔线） |
-| `src/Files.App/UserControls/Pane/InfoPane.xaml` | 详细信息窗格（宽 300，标签胶囊） |
-| `src/Files.App/Views/Layouts/DetailsLayoutPage.xaml` | 列头（高 40）与 34/*/110/150/160 列宽 |
+| `src/Files.App.Controls/Sidebar/SidebarView.xaml` | `Views/Controls/FilesSidebar.axaml(.cs)`（头部 / 菜单项 / 页脚三行） |
+| `src/Files.App/UserControls/NavigationToolbar.xaml` | `Views/Controls/FilesNavigationToolbar.axaml(.cs)`（高 48，按钮 36x32） |
+| `src/Files.App/UserControls/Toolbar.xaml` | `Views/Controls/FilesToolbar.axaml(.cs)`（8px 卡片，按钮由命令集动态生成） |
+| `src/Files.App/UserControls/TabBar/TabBar.xaml` | `WinTabStrip` 标签栏（标签高 32，尾部操作区） |
+| `src/Files.App/UserControls/StatusBar.xaml` | `Views/Controls/FilesStatusBar.axaml(.cs)`（高 32，1x18 分隔线） |
+| `src/Files.App/UserControls/Pane/InfoPane.xaml` | `Views/Controls/FilesInfoPane.axaml(.cs)`（宽 300，标签胶囊） |
+| `src/Files.App/Views/Layouts/DetailsLayoutPage.xaml` | `Views/Controls/DetailsLayoutPage.axaml(.cs)`（列头高 40，34/*/110/150/160 列宽） |
+| `src/Files.App/Actions/IAction.cs`、`BaseUIAction.cs`、`Data/Commands/Manager/CommandManager.cs` | `src/FileHub.Desktop/Actions/`（`CommandCodes`、`IRichCommand`、`RichCommand`、`CommandManager`） |
 | `src/Files.App/Styles/TabBarStyles.xaml` | `src/FileHub.Desktop/Styles/FileHubTheme.axaml` |
 
 移植过来的内容：整体骨架（顶部标签栏、侧栏分组含快速访问与驱动器、导航工具栏、命令栏、
@@ -34,12 +36,15 @@
 
 没有移植的内容：WinUI 3 的 XAML 无法在 Avalonia 上运行，所以每个控件都映射到了
 CodeHub-FluentUI 或 Avalonia 的等价控件，Files 专属的基础设施（Shell COM、`x:Bind`、
-`ThemeResource`、`NavigationView`）换成了 FileHub 的 ViewModel。库里没有对应物的
-Files 控件——`SidebarView`、`CommandBar`、`InfoPane`、`StatusBar`——在
-`src/FileHub.Desktop/Controls/FileHubControls.cs` 里从零实现。
+`ThemeResource`、WinRT 存储、`ItemsRepeater`）换成了 FileHub 的 ViewModel 与跨平台
+`FileSystemService`。Files 的命令体依赖 WinRT/Win32，无法在 macOS/Linux 上运行；
+我们移植的是命令的**结构**（标识符枚举、注册表、携带标签/图标/快捷键/可执行状态的命令对象），
+命令体改为调用 FileHub 的跨平台服务。
 
-**Files 采用 MIT 许可证，由于移植了它的布局代码，其原始版权声明与许可声明已完整保留在
-[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) 中。** 该文件同时列出全部其它第三方组件。
+**Files 采用 MIT 许可证，允许再分发（redistribution）。由于移植了它的布局与命令结构代码，
+其原始版权声明与许可声明已完整保留在
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) 中。** 再分发 FileHub（源码或二进制）时，
+必须随附该文件与 `LICENSE`。该文件同时列出全部其它第三方组件。
 
 FileHub 本身采用 [MIT 许可证](LICENSE)。感谢 Files 社区做出了一个设计确实出色的文件管理器。
 

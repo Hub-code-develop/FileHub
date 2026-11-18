@@ -19,11 +19,13 @@
       BreadcrumbBar     -> ui:FABreadcrumbBar
       InfoBar           -> ui:FAInfoBar
       MenuFlyout        -> ui:FAMenuFlyout (created in code-behind)
-      SidebarView       -> Border + c:SidebarItem (implemented in FileHubControls.cs)
+      SidebarView       -> t:FilesSidebar
+      NavigationToolbar -> t:FilesNavigationToolbar
+      DetailsLayoutPage -> t:DetailsLayoutPage
+      InfoPane          -> t:FilesInfoPane
       CommandBar        -> t:FilesToolbar (a port of Files' UserControls/Toolbar.xaml) over
                            win:WinAppBarButton (ported from WinUI 3's AppBarButton)
-      InfoPane          -> Border.paneSurface (implemented here)
-      StatusBar         -> Border.statusSurface (implemented here)
+      StatusBar         -> t:FilesStatusBar
     Files-only services (Shell COM, WinUI navigation, x:Bind, ThemeResource) are replaced by
     Cobalt-style view models; the Grid rows/columns, sizes, radii and spacing follow Files.
   -->
@@ -66,90 +68,14 @@
       </StackPanel>
     </Border>
 
-    <!-- Row 1: Address Bar (Files NavigationToolbar: Height=48, Padding=4, buttons 36x32).
-         DataContext is set to the active tab from code-behind; the shell-level sidebar button
-         gets its command assigned there too. -->
-    <Border Grid.Row="1" Classes="addressSurface">
-      <Grid x:Name="AddressBarRoot" ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,*,Auto,Auto">
-        <c:ToolbarIconButton Grid.Column="0" x:Name="SidebarToggleButton" Symbol="ViewAll"
-                             ToolTip.Tip="{x:Static loc:Strings.LblToggleSidebar}" />
-        <c:ToolbarIconButton Grid.Column="1" Symbol="Back"
-                             ToolTip.Tip="{x:Static loc:Strings.Back}"
-                             Command="{Binding GoBackCommand}"
-                             IsEnabled="{Binding CanGoBack}" />
-        <c:ToolbarIconButton Grid.Column="2" Symbol="ChevronRight"
-                             ToolTip.Tip="{x:Static loc:Strings.Forward}"
-                             Command="{Binding GoForwardCommand}"
-                             IsEnabled="{Binding CanGoForward}" />
-        <c:ToolbarIconButton Grid.Column="3" Symbol="Up"
-                             ToolTip.Tip="{x:Static loc:Strings.Up}"
-                             Command="{Binding GoUpCommand}"
-                             IsEnabled="{Binding CanGoUp}" />
-        <c:ToolbarIconButton Grid.Column="4" Symbol="Refresh"
-                             ToolTip.Tip="{x:Static loc:Strings.Refresh}"
-                             Command="{Binding RefreshCommand}" />
-
-        <!-- Omnibar: breadcrumb path / editable path / search, like Files -->
-        <Border Grid.Column="5" Classes="omnibar" Margin="4,0,4,0">
-          <Grid ColumnDefinitions="Auto,*,Auto">
-            <Button Grid.Column="0" Classes="tabAction"
-                    ToolTip.Tip="{x:Static loc:Strings.EditAddress}"
-                    Command="{Binding EditAddressCommand}">
-              <ui:FASymbolIcon Symbol="Edit" FontSize="13" />
-            </Button>
-            <!-- Breadcrumb / editable path visibility is driven from code-behind (SyncAddressMode):
-                 an inverted-path binding on IsVisible did not resolve here, which left both
-                 elements visible and the text box covering the breadcrumb. -->
-            <ui:FABreadcrumbBar x:Name="Breadcrumb" Grid.Column="1" Margin="6,0"
-                                VerticalAlignment="Center" />
-            <TextBox x:Name="AddressBox" Grid.Column="1" Margin="6,0"
-                     Text="{Binding AddressText, Mode=TwoWay}"
-                     PlaceholderText="{x:Static loc:Strings.AddressPlaceholder}"
-                     BorderThickness="0" Background="Transparent"
-                     VerticalAlignment="Center" FontSize="12"
-                     IsVisible="False" />
-            <Button Grid.Column="2" Classes="tabAction"
-                    ToolTip.Tip="{x:Static loc:Strings.DeepSearch}"
-                    Command="{Binding DeepSearchCommand}">
-              <ui:FASymbolIcon Symbol="Find" FontSize="13" />
-            </Button>
-          </Grid>
-        </Border>
-
-        <TextBox x:Name="SearchBox" Grid.Column="6" Width="210" Height="32" FontSize="12"
-                 Margin="4,0,4,0" VerticalAlignment="Center"
-                 Text="{Binding SearchQuery, Mode=TwoWay}"
-                 PlaceholderText="{x:Static loc:Strings.SearchPlaceholder}" />
-        <Button Grid.Column="7" Classes="tabAction"
-                ToolTip.Tip="{x:Static loc:Strings.LblStatusCenter}">
-          <ui:FASymbolIcon Symbol="ContactInfo" FontSize="14" />
-        </Button>
-      </Grid>
-    </Border>
+    <!-- Row 1: Files App NavigationToolbar.xaml (Height 48, 36x32 nav buttons, Omnibar). -->
+    <t:FilesNavigationToolbar x:Name="NavToolbar" Grid.Row="1" />
 
     <!-- Row 2: SidebarView + InnerContent (Files MainPage Grid.Row=2) -->
     <Grid Grid.Row="2" ColumnDefinitions="Auto,Auto,*">
 
-      <!-- Sidebar: Files SidebarView.SidebarContent / Footer -->
-      <Border Grid.Column="0" Classes="sidebarSurface" IsVisible="{Binding IsSidebarOpen}">
-        <Grid RowDefinitions="*,Auto">
-          <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto">
-            <StackPanel Margin="0,8,0,0">
-              <TextBlock Classes="sidebarHeader" Text="{x:Static loc:Strings.QuickAccess}" />
-              <ItemsControl x:Name="QuickItems" />
-              <TextBlock Classes="sidebarHeader" Text="{x:Static loc:Strings.Drives}" />
-              <ItemsControl x:Name="DriveItems" />
-            </StackPanel>
-          </ScrollViewer>
-          <StackPanel Grid.Row="1" Margin="0,4,0,10">
-            <Border Classes="sidebarDivider" />
-            <c:SidebarItem x:Name="SettingsItem" Symbol="Settings"
-                           Text="{x:Static loc:Strings.LblSettings}"
-                           ToolTip.Tip="{x:Static loc:Strings.ToggleTheme}"
-                           Command="{Binding ActiveTab.ToggleThemeCommand}" />
-          </StackPanel>
-        </Grid>
-      </Border>
+      <!-- Sidebar: Files App SidebarView.xaml, ported as Views/Controls/FilesSidebar.axaml. -->
+      <t:FilesSidebar x:Name="Sidebar" Grid.Column="0" />
 
       <GridSplitter Grid.Column="1" Width="3" Background="Transparent"
                     ResizeDirection="Columns" IsVisible="{Binding IsSidebarOpen}" />
@@ -163,7 +89,7 @@
 
         <!-- Row 0: Toolbar / CommandBar — Files App's UserControls/Toolbar.xaml, ported as
              Views/Controls/FilesToolbar.axaml (two CommandBars in an 8px card). -->
-        <t:FilesToolbar Grid.Row="0" Margin="8,4,8,4" />
+        <t:FilesToolbar x:Name="Toolbar" Grid.Row="0" Margin="8,4,8,4" />
 
         <!-- Row 1: InfoBar (Files: Margin 0,0,0,4) -->
         <ui:FAInfoBar Grid.Row="1" Margin="12,0,12,4"
@@ -174,180 +100,18 @@
                       Message="{Binding InfoMessage}"
                       Severity="{Binding InfoSeverity}" />
 
-        <!-- Row 2: Page content + GridSplitter + InfoPane -->
+        <!-- Row 2: Files DetailsLayoutPage + InfoPaneSizer + InfoPane -->
         <Grid Grid.Row="2" ColumnDefinitions="*,Auto,Auto">
-          <Grid Grid.Column="0" RowDefinitions="Auto,*">
-            <!-- Files DetailsLayoutPage column header: Height=40 -->
-            <Border Grid.Row="0" Classes="columnHeaderSurface"
-                    IsVisible="{Binding IsDetailsView}">
-              <Grid ColumnDefinitions="34,*,110,150,160">
-                <Button Grid.Column="1" Classes="columnHeader"
-                        Content="{x:Static loc:Strings.ColName}"
-                        Command="{Binding SetSortCommand}" CommandParameter="Name" />
-                <Button Grid.Column="2" Classes="columnHeader"
-                        Content="{x:Static loc:Strings.ColSize}"
-                        Command="{Binding SetSortCommand}" CommandParameter="Size" />
-                <Button Grid.Column="3" Classes="columnHeader"
-                        Content="{x:Static loc:Strings.ColKind}"
-                        Command="{Binding SetSortCommand}" CommandParameter="Kind" />
-                <Button Grid.Column="4" Classes="columnHeader"
-                        Content="{x:Static loc:Strings.ColModified}"
-                        Command="{Binding SetSortCommand}" CommandParameter="Modified" />
-              </Grid>
-            </Border>
-
-            <Grid Grid.Row="1">
-            <ListBox x:Name="FileList" ItemsSource="{Binding Entries}" SelectionMode="Multiple"
-                     IsVisible="{Binding IsDetailsView}" Background="Transparent"
-                     BorderThickness="0" Padding="10,2">
-              <ListBox.ItemTemplate>
-                <DataTemplate>
-                  <Grid ColumnDefinitions="34,*,110,150,160" VerticalAlignment="Center">
-                    <ui:FASymbolIcon Grid.Column="0" Symbol="{Binding Symbol}" FontSize="20"
-                                     HorizontalAlignment="Center" VerticalAlignment="Center" />
-                    <TextBlock Grid.Column="1" Text="{Binding Name}" VerticalAlignment="Center"
-                               TextTrimming="CharacterEllipsis" Margin="10,0,0,0" />
-                    <TextBlock Grid.Column="2" Text="{Binding SizeText}" VerticalAlignment="Center"
-                               Margin="12,0,0,0" FontSize="12" Opacity="0.8" />
-                    <TextBlock Grid.Column="3" Text="{Binding Kind}" VerticalAlignment="Center"
-                               TextTrimming="CharacterEllipsis" Margin="12,0,0,0"
-                               FontSize="12" Opacity="0.8" />
-                    <TextBlock Grid.Column="4" Text="{Binding ModifiedText}" VerticalAlignment="Center"
-                               Margin="12,0,0,0" FontSize="12" Opacity="0.8" />
-                  </Grid>
-                </DataTemplate>
-              </ListBox.ItemTemplate>
-            </ListBox>
-
-            <ListBox x:Name="GridList" ItemsSource="{Binding Entries}" SelectionMode="Multiple"
-                     IsVisible="{Binding IsGridView}" Background="Transparent"
-                     BorderThickness="0" Padding="12">
-              <ListBox.ItemsPanel>
-                <ItemsPanelTemplate>
-                  <WrapPanel Orientation="Horizontal" />
-                </ItemsPanelTemplate>
-              </ListBox.ItemsPanel>
-              <ListBox.ItemTemplate>
-                <DataTemplate>
-                  <Border Classes="gridTile">
-                    <StackPanel Spacing="8">
-                      <ui:FASymbolIcon Symbol="{Binding Symbol}" FontSize="44"
-                                       HorizontalAlignment="Center" />
-                      <TextBlock Classes="gridTileName" Text="{Binding Name}"
-                                 HorizontalAlignment="Center" />
-                    </StackPanel>
-                  </Border>
-                </DataTemplate>
-              </ListBox.ItemTemplate>
-            </ListBox>
-
-            <TextBlock Text="{x:Static loc:Strings.EmptyFolder}" FontSize="14" Opacity="0.6"
-                       HorizontalAlignment="Center" VerticalAlignment="Center"
-                       IsVisible="{Binding IsEmpty}" IsHitTestVisible="False" />
-
-            <ui:FAProgressRing Width="40" Height="40" IsActive="{Binding IsLoading}"
-                               IsVisible="{Binding IsLoading}"
-                               HorizontalAlignment="Center" VerticalAlignment="Center" />
-
-            <ui:FASkeleton Height="44" Margin="12,10" VerticalAlignment="Top"
-                           IsLoading="{Binding IsLoading}" IsActive="{Binding IsLoading}"
-                           IsVisible="{Binding IsLoading}">
-              <Border Height="44" Background="#12808080" CornerRadius="4" />
-            </ui:FASkeleton>
-            </Grid>
-          </Grid>
-
-          <!-- InfoPane splitter (Files InfoPaneSizer) -->
+          <t:DetailsLayoutPage x:Name="LayoutPage" Grid.Column="0" />
           <GridSplitter Grid.Column="1" Width="3" Background="Transparent"
-                        ResizeDirection="Columns" IsVisible="{Binding IsDetailsPaneOpen}" />
-
-          <!-- InfoPane (Files UserControls/Pane/InfoPane.xaml) -->
-          <Border Grid.Column="2" Classes="paneSurface" Width="300" Margin="8,4,12,8"
-                  IsVisible="{Binding IsDetailsPaneOpen}">
-            <Grid RowDefinitions="Auto,Auto,*,Auto">
-              <Grid Grid.Row="0" ColumnDefinitions="Auto,Auto,*" Margin="8,8,8,4">
-                <Button Grid.Column="0" Classes="paneTab"
-                        Content="{x:Static loc:Strings.LblDetails}" />
-                <Border Grid.Column="0" Classes="paneTabPill" Background="#FF0078D4"
-                        VerticalAlignment="Bottom" HorizontalAlignment="Center"
-                        Margin="0,0,0,2" />
-                <Button Grid.Column="1" Classes="paneTab"
-                        Content="{x:Static loc:Strings.LblPreview}" />
-              </Grid>
-              <Border Grid.Row="1" Height="1" Margin="8,0,8,8" Background="#20808080" />
-
-              <ScrollViewer Grid.Row="2">
-                <StackPanel Margin="14,0,14,8" Spacing="10" IsVisible="{Binding HasSelection}">
-                  <Border Classes="paneSurface" Height="150">
-                    <ui:FASymbolIcon Symbol="{Binding PrimarySelection.Symbol}" FontSize="64"
-                                     HorizontalAlignment="Center" VerticalAlignment="Center" />
-                  </Border>
-                  <TextBlock Classes="paneName" Text="{Binding PrimarySelection.Name}" />
-                  <Grid ColumnDefinitions="90,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto">
-                    <TextBlock Grid.Row="0" Grid.Column="0" Classes="paneLabel"
-                               Text="{x:Static loc:Strings.PaneName}" />
-                    <TextBlock Grid.Row="0" Grid.Column="1" Classes="paneValue"
-                               Text="{Binding PrimarySelection.Name}" />
-                    <TextBlock Grid.Row="1" Grid.Column="0" Classes="paneLabel"
-                               Text="{x:Static loc:Strings.PaneType}" />
-                    <TextBlock Grid.Row="1" Grid.Column="1" Classes="paneValue"
-                               Text="{Binding PrimarySelection.Kind}" />
-                    <TextBlock Grid.Row="2" Grid.Column="0" Classes="paneLabel"
-                               Text="{x:Static loc:Strings.PaneSize}" />
-                    <TextBlock Grid.Row="2" Grid.Column="1" Classes="paneValue"
-                               Text="{Binding PrimarySelection.SizeText}" />
-                    <TextBlock Grid.Row="3" Grid.Column="0" Classes="paneLabel"
-                               Text="{x:Static loc:Strings.PaneModified}" />
-                    <TextBlock Grid.Row="3" Grid.Column="1" Classes="paneValue"
-                               Text="{Binding PrimarySelection.ModifiedText}" />
-                    <TextBlock Grid.Row="4" Grid.Column="0" Classes="paneLabel"
-                               Text="{x:Static loc:Strings.PanePath}" />
-                    <TextBlock Grid.Row="4" Grid.Column="1" Classes="paneValue"
-                               Text="{Binding PrimarySelection.FullPath}" TextWrapping="Wrap" />
-                  </Grid>
-                </StackPanel>
-              </ScrollViewer>
-
-              <TextBlock Grid.Row="2" Margin="14" Opacity="0.6" TextWrapping="Wrap"
-                         Text="{x:Static loc:Strings.NoSelection}"
-                         IsVisible="{Binding !HasSelection}" />
-
-              <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="8"
-                          Margin="14,8,14,12" IsVisible="{Binding HasSelection}">
-                <Button Content="{x:Static loc:Strings.LblOpen}" FontSize="12"
-                        Command="{Binding OpenSelectedCommand}" />
-                <Button Content="{x:Static loc:Strings.LblProperties}" FontSize="12"
-                        Command="{Binding PropertiesCommand}" />
-              </StackPanel>
-            </Grid>
-          </Border>
+                        ResizeDirection="Columns"
+                        IsVisible="{Binding IsDetailsPaneOpen}" />
+          <t:FilesInfoPane Grid.Column="2" />
         </Grid>
       </Grid>
     </Grid>
 
-    <!-- Row 3: StatusBar (Files: MinHeight=32, Padding=8,0, dividers 1x18).
-         DataContext is set to the active tab from code-behind; the details-pane button is a
-         shell-level command and is wired there too. -->
-    <Border Grid.Row="3" Classes="statusSurface">
-      <Grid x:Name="StatusBarRoot" ColumnDefinitions="*,Auto,Auto,Auto,Auto,Auto,Auto">
-        <TextBlock Grid.Column="0" Classes="statusText"
-                   Text="{Binding StatusText}" />
-        <Border Grid.Column="1" Classes="statusDivider" />
-        <TextBlock Grid.Column="2" Classes="statusText"
-                   Text="{Binding SelectionText}" />
-        <Border Grid.Column="3" Classes="statusDivider" />
-        <TextBlock Grid.Column="4" Classes="statusText" FontSize="11" Opacity="0.6"
-                   Text="{Binding PlatformText}" />
-        <Button Grid.Column="5" Classes="statusButton"
-                ToolTip.Tip="{x:Static loc:Strings.ToggleView}"
-                Command="{Binding ToggleViewCommand}">
-          <ui:FASymbolIcon Symbol="ViewAll" FontSize="14" />
-        </Button>
-        <Button Grid.Column="6" x:Name="DetailsToggleButton" Classes="statusButton"
-                ToolTip.Tip="{x:Static loc:Strings.ToggleDetailsPane}">
-          <ui:FASymbolIcon Symbol="ContactInfo" FontSize="14" />
-        </Button>
-      </Grid>
-    </Border>
+    <!-- Row 3: Files App StatusBar.xaml (MinHeight 32, 1x18 dividers). -->
+    <t:FilesStatusBar x:Name="StatusBar" Grid.Row="3" />
   </Grid>
 </Window>

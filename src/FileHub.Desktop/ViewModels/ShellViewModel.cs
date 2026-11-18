@@ -7,6 +7,7 @@ using System.Windows.Input;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
+using FileHub.Desktop.Actions;
 using FileHub.Desktop.Services;
 using FileHub.Desktop.Views;
 using FileHub.Files.Services;
@@ -43,9 +44,17 @@ public sealed class ShellViewModel : ViewModelBase
             OnPropertyChanged(nameof(LanguageTooltip));
             (Application.Current as App)?.RestartMainWindow();
         });
+
+        Commands = new CommandManager(this);
     }
 
     public ObservableCollection<MainViewModel> Tabs { get; } = [];
+
+    /// <summary>
+    /// Files App's CommandManager equivalent: one registry shared by the toolbar,
+    /// context menus and keyboard shortcuts. Commands resolve the active tab lazily.
+    /// </summary>
+    public CommandManager Commands { get; }
 
     public MainViewModel ActiveTab { get => _activeTab; private set => Set(ref _activeTab, value); }
 

@@ -1,0 +1,68 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="using:FluentAvalonia.UI.Controls"
+             xmlns:loc="using:FileHub.Desktop.Services"
+             xmlns:c="using:FileHub.Desktop.Controls"
+             x:Class="FileHub.Desktop.Views.Controls.FilesNavigationToolbar">
+
+  <!--
+    Ported from Files App src/Files.App/UserControls/NavigationToolbar.xaml
+    (Copyright (c) Files Community, MIT License; see THIRD-PARTY-NOTICES.md).
+    Files' bar is Height=48 with 36x32 navigation buttons and a three-mode Omnibar
+    (path / command palette / search). The command-palette mode needs Files'
+    command infrastructure and is omitted; path and search modes are kept.
+  -->
+  <Border Classes="addressSurface">
+    <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,*,Auto,Auto">
+      <c:ToolbarIconButton Grid.Column="0" x:Name="_sidebarToggle" Symbol="ViewAll"
+                           ToolTip.Tip="{x:Static loc:Strings.LblToggleSidebar}" />
+      <c:ToolbarIconButton Grid.Column="1" Symbol="Back"
+                           ToolTip.Tip="{x:Static loc:Strings.Back}"
+                           Command="{Binding GoBackCommand}"
+                           IsEnabled="{Binding CanGoBack}" />
+      <c:ToolbarIconButton Grid.Column="2" Symbol="ChevronRight"
+                           ToolTip.Tip="{x:Static loc:Strings.Forward}"
+                           Command="{Binding GoForwardCommand}"
+                           IsEnabled="{Binding CanGoForward}" />
+      <c:ToolbarIconButton Grid.Column="3" Symbol="Up"
+                           ToolTip.Tip="{x:Static loc:Strings.Up}"
+                           Command="{Binding GoUpCommand}"
+                           IsEnabled="{Binding CanGoUp}" />
+      <c:ToolbarIconButton Grid.Column="4" Symbol="Refresh"
+                           ToolTip.Tip="{x:Static loc:Strings.Refresh}"
+                           Command="{Binding RefreshCommand}" />
+
+      <!-- Omnibar / Files' OmnibarPathMode -->
+      <Border Grid.Column="5" Classes="omnibar" Margin="4,0,4,0">
+        <Grid ColumnDefinitions="Auto,*,Auto">
+          <Button Grid.Column="0" Classes="tabAction"
+                  ToolTip.Tip="{x:Static loc:Strings.EditAddress}"
+                  Command="{Binding EditAddressCommand}">
+            <ui:FASymbolIcon Symbol="Edit" FontSize="13" />
+          </Button>
+          <ui:FABreadcrumbBar Grid.Column="1" x:Name="_breadcrumb" Margin="6,0"
+                              VerticalAlignment="Center" />
+          <TextBox Grid.Column="1" x:Name="_addressBox" Margin="6,0"
+                   Text="{Binding AddressText, Mode=TwoWay}"
+                   PlaceholderText="{x:Static loc:Strings.AddressPlaceholder}"
+                   BorderThickness="0" Background="Transparent"
+                   VerticalAlignment="Center" FontSize="12" IsVisible="False" />
+          <Button Grid.Column="2" Classes="tabAction"
+                  ToolTip.Tip="{x:Static loc:Strings.DeepSearch}"
+                  Command="{Binding DeepSearchCommand}">
+            <ui:FASymbolIcon Symbol="Find" FontSize="13" />
+          </Button>
+        </Grid>
+      </Border>
+
+      <TextBox Grid.Column="6" x:Name="_searchBox" Width="210" Height="32" FontSize="12"
+               Margin="4,0,4,0" VerticalAlignment="Center"
+               Text="{Binding SearchQuery, Mode=TwoWay}"
+               PlaceholderText="{x:Static loc:Strings.SearchPlaceholder}" />
+      <Button Grid.Column="7" Classes="tabAction"
+              ToolTip.Tip="{x:Static loc:Strings.LblStatusCenter}">
+        <ui:FASymbolIcon Symbol="ContactInfo" FontSize="14" />
+      </Button>
+    </Grid>
+  </Border>
+</UserControl>
