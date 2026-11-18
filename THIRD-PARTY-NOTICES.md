@@ -24,7 +24,7 @@ corner radii, spacing and command groupings were carried over:
 | --- | --- |
 | `src/Files.App/Views/MainPage.xaml` | `src/FileHub.Desktop/Views/MainWindow.axaml` (root grid: tab bar / address bar / sidebar + content / status bar) |
 | `src/Files.App/UserControls/NavigationToolbar.xaml` | `MainWindow.axaml` row 1 (48px toolbar, 36x32 icon buttons, omnibar) |
-| `src/Files.App/UserControls/Toolbar.xaml` | `MainWindow.axaml` command card (rounded 8px command bar, label-right buttons, Layout / Sort / Details / Hidden groupings) |
+| `src/Files.App/UserControls/Toolbar.xaml` | `Views/Controls/FilesToolbar.axaml` (8px card, two command bars: context commands left, view commands right, label-right AppBarButtons) |
 | `src/Files.App/UserControls/TabBar/TabBar.xaml` | `MainWindow.axaml` row 0 (WinUI 3 tab strip `WinTabStrip`, 32px tabs, footer actions) |
 | `src/Files.App/UserControls/StatusBar.xaml` | `MainWindow.axaml` row 3 (32px status bar, 1x18 dividers) |
 | `src/Files.App/UserControls/Pane/InfoPane.xaml` | `MainWindow.axaml` InfoPane (300px pane, tab pills, 90px label column) |
@@ -101,6 +101,7 @@ style definitions ship as plain-text XAML:
 | `ListViewItem_themeresources.xaml` | `Themes/ListBoxItem.axaml` (hover surface, 3x16 accent selection pill) |
 | `ToolTip_themeresources.xaml` | `Themes/Surfaces.axaml` (12px text, padding `9,6,9,8`) |
 | `FlyoutPresenter_themeresources.xaml` | `Themes/Surfaces.axaml` (8px corner radius, 1px flyout stroke) |
+| `AppBarButton_themeresources.xaml` | `Themes/AppBarButton.axaml` + `Controls/WinAppBarButton.cs` (48px row, 2,6 inner-border inset, 16px icon, 12px label, right/collapsed/bottom label positions) |
 | `TabView/TabView_themeresources.xaml`, `TabView/TabViewItem_themeresources.xaml` | `Themes/TabStrip.axaml` + `Controls/WinTabStrip.cs` (32px tab, 8,8,0,0 corners, 100/240 min/max width, close button overlay) |
 | `TextBox_themeresources.xaml` | `Themes/TextBox.axaml` (32px height, `10,5,6,6` padding, 2px accent underline on focus) |
 | `ToggleSwitch_themeresources.xaml` | `Themes/ToggleSwitch.axaml` (40x20 track, 12px knob, 167 ms travel) |

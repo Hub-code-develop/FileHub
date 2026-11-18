@@ -1,0 +1,123 @@
+<!--
+  Files Toolbar — ported from Files App src/Files.App/UserControls/Toolbar.xaml
+  (Copyright (c) 2018 - present Files Community, MIT License; see THIRD-PARTY-NOTICES.md).
+
+  Files' Toolbar is a two-column card: a left-aligned CommandBar holding the context
+  commands (Cut / Copy / Paste / Rename / Delete / ...), and a right-aligned CommandBar
+  holding the view commands (Filter / Arrangement / Layout / Preview pane), all of them
+  AppBarButtons with DefaultLabelPosition="Right".
+
+  WinUI -> Avalonia mapping:
+    CommandBar      -> StackPanel with the CommandBar's 4,0,0,0 padding and 48px row
+    AppBarButton    -> win:WinAppBarButton (ported from AppBarButton_themeresources.xaml)
+    Border 8px card -> kept verbatim: CornerRadius=8, BorderThickness=1,
+                       CardStrokeColorDefaultBrush, BackgroundSizing=InnerBorderEdge
+
+  Files populates the left CommandBar from its CommandManager in code-behind; FileHub has a
+  fixed command set, so the buttons are declared here instead.
+-->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:win="using:WinUI3.Fluent.Controls"
+             xmlns:ui="using:FluentAvalonia.UI.Controls"
+             xmlns:loc="using:FileHub.Desktop.Services"
+             x:Class="FileHub.Desktop.Views.Controls.FilesToolbar">
+
+  <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+          BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+          BorderThickness="1"
+          CornerRadius="{StaticResource OverlayCornerRadius}">
+    <Grid ColumnDefinitions="*,Auto">
+
+      <!-- Context commands (Files: ContextCommandBar) -->
+      <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="4,0,0,0">
+        <win:WinAppBarButton Label="{x:Static loc:Strings.LblNew}"
+                             Command="{Binding NewFolderCommand}"
+                             ToolTip.Tip="{x:Static loc:Strings.NewFolder}">
+          <win:WinAppBarButton.Icon>
+            <ui:FASymbolIcon Symbol="Add" FontSize="16" />
+          </win:WinAppBarButton.Icon>
+        </win:WinAppBarButton>
+
+        <win:WinAppBarButton Label="{x:Static loc:Strings.LblCut}"
+                             Command="{Binding CutCommand}"
+                             ToolTip.Tip="{x:Static loc:Strings.Cut}">
+          <win:WinAppBarButton.Icon>
+            <ui:FASymbolIcon Symbol="Cut" FontSize="16" />
+          </win:WinAppBarButton.Icon>
+        </win:WinAppBarButton>
+
+        <win:WinAppBarButton Label="{x:Static loc:Strings.LblCopy}"
+                             Command="{Binding CopyCommand}"
+                             ToolTip.Tip="{x:Static loc:Strings.Copy}">
+          <win:WinAppBarButton.Icon>
+            <ui:FASymbolIcon Symbol="Copy" FontSize="16" />
+          </win:WinAppBarButton.Icon>
+        </win:WinAppBarButton>
+
+        <win:WinAppBarButton Label="{x:Static loc:Strings.LblPaste}"
+                             Command="{Binding PasteCommand}"
+                             ToolTip.Tip="{x:Static loc:Strings.Paste}">
+          <win:WinAppBarButton.Icon>
+            <ui:FASymbolIcon Symbol="Paste" FontSize="16" />
+          </win:WinAppBarButton.Icon>
+        </win:WinAppBarButton>
+
+        <win:WinAppBarButton Label="{x:Static loc:Strings.LblRename}"
+                             Command="{Binding RenameCommand}"
+                             ToolTip.Tip="{x:Static loc:Strings.Rename}">
+          <win:WinAppBarButton.Icon>
+            <ui:FASymbolIcon Symbol="Edit" FontSize="16" />
+          </win:WinAppBarButton.Icon>
+        </win:WinAppBarButton>
+
+        <win:WinAppBarButton Label="{x:Static loc:Strings.LblDelete}"
+                             Command="{Binding DeleteCommand}"
+                             ToolTip.Tip="{x:Static loc:Strings.Delete}">
+          <win:WinAppBarButton.Icon>
+            <ui:FASymbolIcon Symbol="Delete" FontSize="16" />
+          </win:WinAppBarButton.Icon>
+        </win:WinAppBarButton>
+      </StackPanel>
+
+      <!-- Base commands (Files: BaseCommandBar, right aligned, labels collapsed) -->
+      <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="0,0,4,0">
+        <win:WinAppBarButton LabelPosition="Collapsed"
+                             Label="{x:Static loc:Strings.LblHidden}"
+                             Command="{Binding ToggleHiddenCommand}"
+                             ToolTip.Tip="{x:Static loc:Strings.ToggleHidden}">
+          <win:WinAppBarButton.Icon>
+            <ui:FASymbolIcon Symbol="View" FontSize="16" />
+          </win:WinAppBarButton.Icon>
+        </win:WinAppBarButton>
+
+        <win:WinAppBarButton LabelPosition="Collapsed"
+                             Label="{x:Static loc:Strings.LblSort}"
+                             Command="{Binding SetSortCommand}" CommandParameter="Name"
+                             ToolTip.Tip="{x:Static loc:Strings.Sort}">
+          <win:WinAppBarButton.Icon>
+            <ui:FASymbolIcon Symbol="Sort" FontSize="16" />
+          </win:WinAppBarButton.Icon>
+        </win:WinAppBarButton>
+
+        <win:WinAppBarButton LabelPosition="Collapsed"
+                             Label="{x:Static loc:Strings.LblLayout}"
+                             Command="{Binding ToggleViewCommand}"
+                             ToolTip.Tip="{x:Static loc:Strings.ToggleView}">
+          <win:WinAppBarButton.Icon>
+            <ui:FASymbolIcon Symbol="ViewAll" FontSize="16" />
+          </win:WinAppBarButton.Icon>
+        </win:WinAppBarButton>
+
+        <win:WinAppBarButton LabelPosition="Collapsed"
+                             Label="{x:Static loc:Strings.LblDetails}"
+                             Command="{Binding ToggleDetailsPaneCommand}"
+                             ToolTip.Tip="{x:Static loc:Strings.ToggleDetailsPane}">
+          <win:WinAppBarButton.Icon>
+            <ui:FASymbolIcon Symbol="ContactInfo" FontSize="16" />
+          </win:WinAppBarButton.Icon>
+        </win:WinAppBarButton>
+      </StackPanel>
+    </Grid>
+  </Border>
+</UserControl>

@@ -4,6 +4,7 @@
         xmlns:win="using:WinUI3.Fluent.Controls"
         xmlns:loc="using:FileHub.Desktop.Services"
         xmlns:c="using:FileHub.Desktop.Controls"
+        xmlns:t="using:FileHub.Desktop.Views.Controls"
         x:Class="FileHub.Desktop.Views.MainWindow"
         Width="1360" Height="860"
         MinWidth="900" MinHeight="540"
@@ -19,7 +20,8 @@
       InfoBar           -> ui:FAInfoBar
       MenuFlyout        -> ui:FAMenuFlyout (created in code-behind)
       SidebarView       -> Border + c:SidebarItem (implemented in FileHubControls.cs)
-      CommandBar        -> Border.commandCard + c:CommandBarButton (implemented here)
+      CommandBar        -> t:FilesToolbar (a port of Files' UserControls/Toolbar.xaml) over
+                           win:WinAppBarButton (ported from WinUI 3's AppBarButton)
       InfoPane          -> Border.paneSurface (implemented here)
       StatusBar         -> Border.statusSurface (implemented here)
     Files-only services (Shell COM, WinUI navigation, x:Bind, ThemeResource) are replaced by
@@ -159,49 +161,9 @@
       <Grid x:Name="InnerContent" Grid.Column="2"
             RowDefinitions="Auto,Auto,*,Auto" Margin="0,0,0,8">
 
-        <!-- Row 0: Toolbar / CommandBar (Files: CornerRadius=8, DefaultLabelPosition=Right) -->
-        <Border Grid.Row="0" Classes="commandCard">
-          <Grid ColumnDefinitions="*,Auto">
-            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="2">
-              <c:CommandBarButton Symbol="Add" Label="{x:Static loc:Strings.LblNew}"
-                                  ToolTip.Tip="{x:Static loc:Strings.NewFolder}"
-                                  Command="{Binding NewFolderCommand}" />
-              <c:CommandBarButton Symbol="Cut" Label="{x:Static loc:Strings.LblCut}"
-                                  ToolTip.Tip="{x:Static loc:Strings.Cut}"
-                                  Command="{Binding CutCommand}" />
-              <c:CommandBarButton Symbol="Copy" Label="{x:Static loc:Strings.LblCopy}"
-                                  ToolTip.Tip="{x:Static loc:Strings.Copy}"
-                                  Command="{Binding CopyCommand}" />
-              <c:CommandBarButton Symbol="Paste" Label="{x:Static loc:Strings.LblPaste}"
-                                  ToolTip.Tip="{x:Static loc:Strings.Paste}"
-                                  Command="{Binding PasteCommand}" />
-              <c:CommandBarButton Symbol="Edit" Label="{x:Static loc:Strings.LblRename}"
-                                  ToolTip.Tip="{x:Static loc:Strings.Rename}"
-                                  Command="{Binding RenameCommand}" />
-              <c:CommandBarButton Symbol="Delete" Label="{x:Static loc:Strings.LblDelete}"
-                                  ToolTip.Tip="{x:Static loc:Strings.Delete}"
-                                  Command="{Binding DeleteCommand}" />
-              <Border Classes="statusDivider" />
-              <c:CommandBarButton Symbol="View" Label="{x:Static loc:Strings.LblHidden}"
-                                  ToolTip.Tip="{x:Static loc:Strings.ToggleHidden}"
-                                  Command="{Binding ToggleHiddenCommand}" />
-            </StackPanel>
-
-            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="2">
-              <TextBlock Text="{Binding SortIndicator}" Classes="statusText"
-                         Opacity="0.7" Margin="0,0,8,0" />
-              <c:CommandBarButton Symbol="Sort" Label="{x:Static loc:Strings.LblSort}"
-                                  ToolTip.Tip="{x:Static loc:Strings.Sort}"
-                                  Command="{Binding SetSortCommand}" CommandParameter="Name" />
-              <c:CommandBarButton Symbol="ViewAll" Label="{x:Static loc:Strings.LblLayout}"
-                                  ToolTip.Tip="{x:Static loc:Strings.ToggleView}"
-                                  Command="{Binding ToggleViewCommand}" />
-              <c:CommandBarButton Symbol="ContactInfo" Label="{x:Static loc:Strings.LblDetails}"
-                                  ToolTip.Tip="{x:Static loc:Strings.ToggleDetailsPane}"
-                                  Command="{Binding ToggleDetailsPaneCommand}" />
-            </StackPanel>
-          </Grid>
-        </Border>
+        <!-- Row 0: Toolbar / CommandBar — Files App's UserControls/Toolbar.xaml, ported as
+             Views/Controls/FilesToolbar.axaml (two CommandBars in an 8px card). -->
+        <t:FilesToolbar Grid.Row="0" Margin="8,4,8,4" />
 
         <!-- Row 1: InfoBar (Files: Margin 0,0,0,4) -->
         <ui:FAInfoBar Grid.Row="1" Margin="12,0,12,4"
