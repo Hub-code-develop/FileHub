@@ -150,6 +150,10 @@ FluentUI-CodeHub widgets used: `FANavigationView` (sidebar), `FABreadcrumbBar` (
 - Back / Forward / Up / Refresh with navigation history
 - Breadcrumb path plus an editable address bar (`~` supported)
 - Details view (Name / Size / Type / Date modified, click a column header to sort) and icon grid view
+- **Image thumbnails and file previews**: JPG / PNG / GIF / BMP / WebP / TIFF show a decoded
+  thumbnail in both views; selecting a file shows a large image preview or a text prefix in the
+  details pane. The pane's **Details** / **Preview** tabs switch between properties and the
+  full preview. Unsupported formats fall back to a category icon.
 - Live filtering plus recursive search (300 result limit, cancellable)
 - File operations: open, reveal in system file manager, new folder, rename, copy / cut / paste,
   copy path, properties
@@ -251,13 +255,13 @@ FileHub/
 └── src/
     ├── FileHub.Files/     logic only, no UI dependency, unit-testable
     │   ├── Models/        FileEntry / LocationEntry
-    │   └── Services/      FileSystemService / RecycleBinService / PlatformService / FileClipboard
+    │   └── Services/      FileSystemService / RecycleBinService / PlatformService / FileClipboard / PreviewService
     └── FileHub.Desktop/   Avalonia application
         ├── App.axaml      theme entry point
         ├── Styles/        application styles
         ├── ViewModels/    ShellViewModel (tabs) / MainViewModel (one tab) / commands
         ├── Views/         MainWindow
-        └── Services/      LocalizationService (en + zh-CN) / DialogService (FAContentDialog)
+        └── Services/      LocalizationService (en + zh-CN) / DialogService (FAContentDialog) / ThumbnailService
 ```
 
 ## Verification
@@ -269,12 +273,17 @@ FileHub/
   55 -> 0 -> 55 works
 - Language detection verified under four environment configurations (unset, `auto`, `en`,
   `zh-CN`), including the three-state in-app language cycle
+- Preview verification (headless Skia): Pictures folder decodes 7/7 image thumbnails; selecting
+  an image produces a 512px pane bitmap in both Details and Preview tabs; selecting `README.md`
+  produces a 4004-character text preview starting with `# FileHub`
 - A fresh clone from GitHub restores and builds with no manual setup
 
 ## Known limitations
 
-- No drag-and-drop move, thumbnail previews or file system watcher (refresh manually)
+- No drag-and-drop move or file system watcher (refresh manually)
 - Recursive search has a fixed 300 item limit to keep large trees under control
+- Thumbnails cover common bitmap formats via Avalonia's Skia decoder; SVG, HEIC and video
+  thumbnails need platform codecs and currently use the category icon instead
 - Copy / move uses an in-app clipboard; only "copy path" writes to the system clipboard
 - Chinese variants (Traditional, Cantonese, ...) currently share the Simplified Chinese strings
 

@@ -43,6 +43,7 @@ corner radii, spacing and command groupings were carried over:
 | `src/Files.App/UserControls/Pane/InfoPane.xaml` | `Views/Controls/FilesInfoPane.axaml(.cs)` (300px pane, tab pills, 90px label column, 2*/3* preview/properties rows) |
 | `src/Files.App.Controls/Sidebar/SidebarView.xaml` | `Views/Controls/FilesSidebar.axaml(.cs)` (header / menu items / footer rows, resizer) |
 | `src/Files.App/Views/Layouts/DetailsLayoutPage.xaml` | `Views/Controls/DetailsLayoutPage.axaml(.cs)` (40px column header, 34/*/110/150/160 column grid, compact rows, loading skeleton) |
+| `src/Files.App/UserControls/Pane/InfoPane.xaml` (Details / Preview tabs) | `Views/Controls/FilesInfoPane.axaml(.cs)` — the tab-pill header and preview/property split were carried over; FileHub reimplemented the preview content because Files uses WinRT thumbnails |
 | `src/Files.App/Actions/IAction.cs`, `src/Files.App/Actions/BaseUIAction.cs` | `src/FileHub.Desktop/Actions/` (`IAction` → `IRichCommand`, `BaseUIAction` → `RichCommand`) |
 | `src/Files.App/Data/Commands/Manager/CommandManager.cs` | `Actions/CommandManager.cs` (`CommandCodes` identity enum, command registry indexed by code/hotkey, context/primary/secondary groups) |
 | `src/Files.App/Styles/TabBarStyles.xaml` | `src/FileHub.Desktop/Styles/FileHubTheme.axaml` |
@@ -59,6 +60,17 @@ FileHub's cross-platform services.
 Because the layout structure was ported rather than independently designed, the original
 copyright notice and permission notice are reproduced in full below, as the MIT License
 requires for substantial portions of the work.
+
+### Thumbnails and previews: structure ported, mechanism reimplemented
+
+Files App generates thumbnails through WinRT (`StorageFile.GetThumbnailAsync`, the
+`Files.App.FileSystem` thumbnail helpers and platform caches). Those APIs are Windows-only, so
+FileHub reimplemented the *behaviour* with its own cross-platform code: `PreviewService` probes
+the file extension in the logic-only `FileHub.Files` project, and `ThumbnailService` on the
+desktop side decodes bitmaps off the UI thread with Avalonia's Skia-backed
+`Bitmap.DecodeToWidth` and keeps a bounded cache. The list / grid image wells and the details
+pane's two-tab layout follow the Files port listed above. No Files thumbnail source code was
+translated, and no upstream binary assets are bundled.
 
 ### MIT License (Files)
 
