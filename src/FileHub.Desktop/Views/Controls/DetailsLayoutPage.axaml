@@ -43,8 +43,14 @@
         <ListBox.ItemTemplate>
           <DataTemplate>
             <Grid ColumnDefinitions="34,*,110,150,160" VerticalAlignment="Center">
-              <ui:FASymbolIcon Grid.Column="0" Symbol="{Binding Symbol}" FontSize="20"
-                               HorizontalAlignment="Center" VerticalAlignment="Center" />
+              <Grid Grid.Column="0" Width="24" Height="24" HorizontalAlignment="Center"
+                    VerticalAlignment="Center">
+                <Image Source="{Binding Thumbnail}" Stretch="UniformToFill"
+                       IsVisible="{Binding HasThumbnail}" />
+                <ui:FASymbolIcon Symbol="{Binding Symbol}" FontSize="20"
+                                 HorizontalAlignment="Center" VerticalAlignment="Center"
+                                 IsVisible="{Binding !HasThumbnail}" />
+              </Grid>
               <TextBlock Grid.Column="1" Text="{Binding Name}" VerticalAlignment="Center"
                          TextTrimming="CharacterEllipsis" Margin="10,0,0,0" />
               <TextBlock Grid.Column="2" Text="{Binding SizeText}" VerticalAlignment="Center"
@@ -71,8 +77,13 @@
           <DataTemplate>
             <Border Classes="gridTile">
               <StackPanel Spacing="8">
-                <ui:FASymbolIcon Symbol="{Binding Symbol}" FontSize="44"
-                                 HorizontalAlignment="Center" />
+                <Grid Width="72" Height="60">
+                  <Image Source="{Binding Thumbnail}" Stretch="Uniform"
+                         IsVisible="{Binding HasThumbnail}" />
+                  <ui:FASymbolIcon Symbol="{Binding Symbol}" FontSize="44"
+                                   HorizontalAlignment="Center"
+                                   IsVisible="{Binding !HasThumbnail}" />
+                </Grid>
                 <TextBlock Classes="gridTileName" Text="{Binding Name}"
                            HorizontalAlignment="Center" />
               </StackPanel>

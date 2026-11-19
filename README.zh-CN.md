@@ -121,6 +121,9 @@ macOS 优先读系统语言偏好是故意的：从 Finder 启动的 GUI 应用�
 - 前进 / 后退 / 上一级 / 刷新，带导航历史
 - 面包屑路径 + 可编辑地址栏（支持 `~`）
 - 详细信息视图（名称 / 大小 / 类型 / 修改时间，点列头排序）与图标网格视图切换
+- **图片缩略图与文件预览**：JPG / PNG / GIF / BMP / WebP / TIFF 在两种视图里都显示真实缩略图；
+  选中文件后详情面板会显示大图预览或文本开头。面板的 **详细信息 / 预览** 两个标签可在属性与预览间切换。
+  不支持的格式回退到分类图标。
 - 即时筛选 + 递归搜索（结果上限 300，可取消）
 - 文件操作：打开、在系统文件管理器中显示、新建文件夹、重命名、复制 / 剪切 / 粘贴、复制路径、属性
 - **删除一律移到回收站**（Windows Shell / macOS `~/.Trash` / Linux `gio trash`），绝不静默永久删除
@@ -214,13 +217,13 @@ FileHub/
 └── src/
     ├── FileHub.Files/     纯逻辑，无 UI 依赖，可单测
     │   ├── Models/        FileEntry / LocationEntry
-    │   └── Services/      FileSystemService / RecycleBinService / PlatformService / FileClipboard
+    │   └── Services/      FileSystemService / RecycleBinService / PlatformService / FileClipboard / PreviewService
     └── FileHub.Desktop/   Avalonia 应用
         ├── App.axaml      主题入口
         ├── Styles/        应用样式
         ├── ViewModels/    ShellViewModel（标签）/ MainViewModel（单个标签）/ 命令
         ├── Views/         MainWindow
-        └── Services/      LocalizationService（英中双语）/ DialogService（FAContentDialog 封装）
+        └── Services/      LocalizationService（英中双语）/ DialogService（FAContentDialog 封装）/ ThumbnailService
 ```
 
 ## 验证情况
@@ -234,8 +237,9 @@ FileHub/
 
 ## 已知限制 / 后续可加
 
-- 没有拖拽移动、缩略图预览、文件监视（目录变化需手动刷新）
+- 没有拖拽移动、文件监视（目录变化需手动刷新）
 - 递归搜索固定 300 项上限，避免在大目录里失控
+- 缩略图覆盖 Avalonia 的 Skia 解码器支持的常见位图格式；SVG、HEIC、视频缩略图需要平台编解码器，目前回退到分类图标
 - 复制 / 移动为应用内剪贴板，不写系统剪贴板（只有复制路径会写）
 - 繁体中文、粤语等中文变体目前共用简体中文文案
 

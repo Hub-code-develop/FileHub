@@ -29,6 +29,7 @@ public sealed class MainViewModel : ViewModelBase
     private readonly List<string> _back = [];
     private readonly List<string> _forward = [];
     private CancellationTokenSource? _loadCts;
+    private CancellationTokenSource? _selectionPreviewCts;
     private List<FileEntryViewModel> _loaded = [];
 
     private string _currentPath = string.Empty;
@@ -89,6 +90,8 @@ public sealed class MainViewModel : ViewModelBase
         DeepSearchCommand = Async(_ => DeepSearchAsync());
         ClearSearchCommand = new RelayCommand(_ => SearchQuery = string.Empty);
         DismissInfoCommand = new RelayCommand(_ => IsInfoOpen = false);
+        SelectDetailsTabCommand = new RelayCommand(_ => IsPreviewTab = false);
+        SelectPreviewTabCommand = new RelayCommand(_ => IsPreviewTab = true);
         SelectTabCommand = new RelayCommand(_ => Shell?.Activate(this));
         CloseTabCommand = new RelayCommand(_ => Shell?.CloseTab(this));
     }
@@ -125,6 +128,8 @@ public sealed class MainViewModel : ViewModelBase
     public ICommand DeepSearchCommand { get; }
     public ICommand ClearSearchCommand { get; }
     public ICommand DismissInfoCommand { get; }
+    public ICommand SelectDetailsTabCommand { get; }
+    public ICommand SelectPreviewTabCommand { get; }
 
     /// <summary>Set by ShellViewModel when this tab becomes the active one.</summary>
     public bool IsActive { get => _isActive; set => Set(ref _isActive, value); }
@@ -192,6 +197,8 @@ public sealed class MainViewModel : ViewModelBase
     public bool CanGoForward { get => _canGoForward; private set => Set(ref _canGoForward, value); }
     public bool CanGoUp { get => _canGoUp; private set => Set(ref _canGoUp, value); }
     public bool IsInfoOpen { get => _isInfoOpen; set => Set(ref _isInfoOpen, value); }
+    public bool IsPreviewTab { get => _isPreviewTab; private set => Set(ref _isPreviewTab, value); }
+    private bool _isPreviewTab;
     public string InfoTitle { get => _infoTitle; private set => Set(ref _infoTitle, value); }
     public string InfoMessage { get => _infoMessage; private set => Set(ref _infoMessage, value); }
     public FAInfoBarSeverity InfoSeverity { get => _infoSeverity; private set => Set(ref _infoSeverity, value); }
@@ -347,6 +354,21 @@ public sealed class MainViewModel : ViewModelBase
                 ? Loc.F("StatusFiltered", list.Count, _loaded.Count)
                 : Loc.F("StatusItems", list.Count);
         SetSelection([]);
+        RequestListPreviews();
+    }
+
+    /// <summary>
+    /// Files App generates thumbnails for visible items lazily. Avalonia's ListBox virtualises,
+    /// so requesting for every image would decode files the user never scrolls to. A bounded
+    /// first page keeps the common case (a folder of photos) responsive; the pane request on
+    /// selection covers everything else on demand.
+    /// </summary>
+    private void RequestListPreviews()
+    {
+        var token = _loadCts?.Token ?? default;
+        var images = Entries.Where(x => x.PreviewKind == PreviewKind.Image).Take(80);
+        foreach (var entry in images)
+            _ = entry.EnsurePreviewAsync(ThumbnailService.ListWidth, token);
     }
 
     private async Task DeepSearchAsync()
@@ -450,6 +472,7 @@ public sealed class MainViewModel : ViewModelBase
         try
         {
             FileSystemService.Rename(target.FullPath, name.Trim());
+            ThumbnailService.Instance.Invalidate(target.FullPath);
             await LoadAsync();
             ShowInfo(Loc.T("MsgRenameDone"), name.Trim(), FAInfoBarSeverity.Success);
         }
@@ -469,7 +492,12 @@ public sealed class MainViewModel : ViewModelBase
         var errors = new List<string>();
         foreach (var path in targets)
         {
-            try { RecycleBinService.MoveToTrash(path); done++; }
+            try
+            {
+                ThumbnailService.Instance.Invalidate(path);
+                RecycleBinService.MoveToTrash(path);
+                done++;
+            }
             catch (Exception ex) { errors.Add($"{Path.GetFileName(path)}: {ex.Message}"); }
         }
         await LoadAsync();
@@ -564,6 +592,13 @@ public sealed class MainViewModel : ViewModelBase
         SelectionText = HasSelection
             ? Loc.F("SelectionText", SelectedEntries.Count, FileSystemService.FormatSize(bytes))
             : string.Empty;
+
+        // Files' preview pane reacts to selection: decode the large image or read the text
+        // prefix asynchronously so a big file never blocks the UI thread.
+        _selectionPreviewCts?.Cancel();
+        _selectionPreviewCts = new CancellationTokenSource();
+        if (PrimarySelection is { } selected && selected.PreviewKind != PreviewKind.None)
+            _ = selected.EnsurePreviewAsync(ThumbnailService.PaneWidth, _selectionPreviewCts.Token);
     }
 
     private void ShowInfo(string title, string message, FAInfoBarSeverity severity)
