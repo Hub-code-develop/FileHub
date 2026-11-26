@@ -136,6 +136,10 @@ macOS 优先读系统语言偏好是故意的：从 Finder 启动的 GUI 应用�
 - **VS Code 扩展页面**：扫描 `.vscode`、`.vscode-insiders`、`.vscode-oss`、`.cursor`、`.windsurf`
   下已安装的扩展，可为 FileHub 单独启用 / 禁用，并展示语言、主题、代码片段和语法贡献。
   启用的扩展会向 Monaco 提供文件关联、配色主题和补全片段；**不会执行扩展的 JavaScript**。
+- **Visual Studio Marketplace 官方商店标签**：搜索 Microsoft 公共 Gallery，展示版本 / 发布者 /
+  评分 / 安装量，按需下载 VSIX 并安装到 FileHub 自己的扩展目录（不碰 VS Code 管理的元数据）。
+  卸载只移除 FileHub 安装的包；详情面板可打开商店页面与许可证链接。FileHub 与 Microsoft
+  无隶属关系，Gallery API 无公开 SLA；FileHub 不随包分发任何扩展，搜索词会发送给 Microsoft。
 - **删除一律移到回收站**（Windows Shell / macOS `~/.Trash` / Linux `gio trash`），绝不静默永久删除
 - 多标签页，每个标签有独立的路径、历史、选中项与侧栏位置；标签可拖拽重排、中键关闭、复制，
   下次启动会恢复上次打开的目录；右键标签可关闭其他 / 关闭右侧标签

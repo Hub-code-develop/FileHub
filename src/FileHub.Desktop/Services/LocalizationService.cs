@@ -214,6 +214,36 @@ public static class Loc
         ["ExtFolder"] = new[] { "Folder: {0}", "文件夹：{0}" },
         ["ExtOpenFailed"] = new[] { "Could not open folder: {0}", "无法打开文件夹：{0}" },
         ["ExtNotice"] = new[] { "FileHub reads extension manifests for languages, themes and snippets. It does not run extension JavaScript.", "FileHub 读取扩展清单中的语言、主题和代码片段；不执行扩展 JavaScript。" },
+
+        // Visual Studio Marketplace. "Visual Studio Marketplace" is a Microsoft trademark;
+        // FileHub is not an official Microsoft client.
+        ["MktTitle"] = new[] { "Marketplace", "官方商店" },
+        ["MktInstalledTab"] = new[] { "Installed", "已安装" },
+        ["MktMarketplaceTab"] = new[] { "Marketplace", "官方商店" },
+        ["MktSearchPlaceholder"] = new[] { "Search the Visual Studio Marketplace...", "搜索 Visual Studio Marketplace..." },
+        ["MktSearch"] = new[] { "Search", "搜索" },
+        ["MktCount"] = new[] { "{0} results", "共 {0} 个结果" },
+        ["MktSearching"] = new[] { "Searching for \"{0}\"...", "正在搜索“{0}”..." },
+        ["MktNoResults"] = new[] { "No extensions found", "没有找到扩展" },
+        ["MktSelectHint"] = new[] { "Select an extension from the Marketplace to see its details", "从官方商店选择一个扩展查看详情" },
+        ["MktInstall"] = new[] { "Install", "安装" },
+        ["MktIncompatible"] = new[] { "Not available for this platform", "此平台不可用" },
+        ["MktDownloading"] = new[] { "Downloading {0}...", "正在下载 {0}..." },
+        ["MktInstalling"] = new[] { "Installing {0}...", "正在安装 {0}..." },
+        ["MktInstalled"] = new[] { "Installed {0}. Reopen code files to use new contributions.", "已安装 {0}。重新打开代码文件即可使用新的贡献内容。" },
+        ["MktUninstall"] = new[] { "Uninstall", "卸载" },
+        ["MktUninstalled"] = new[] { "Uninstalled {0}", "已卸载 {0}" },
+        ["MktNotManaged"] = new[] { "This extension was not installed by FileHub", "此扩展不是由 FileHub 安装的" },
+        ["MktFailed"] = new[] { "Marketplace request failed: {0}", "商店请求失败：{0}" },
+        ["MktPublisher"] = new[] { "Publisher: {0}", "发布者：{0}" },
+        ["MktInstalls"] = new[] { "Installs: {0}", "安装量：{0}" },
+        ["MktRating"] = new[] { "Rating: {0:F1} / 5 ({1} ratings)", "评分：{0:F1} / 5（{1} 人评分）" },
+        ["MktPlatform"] = new[] { "Platform: {0}", "平台：{0}" },
+        ["MktPlatformDetail"] = new[] { "Package: {0}", "安装包：{0}" },
+        ["MktUniversal"] = new[] { "universal", "通用" },
+        ["MktOpenStore"] = new[] { "Open on Marketplace", "在商店中打开" },
+        ["MktLicense"] = new[] { "License", "许可证" },
+        ["MktNotice"] = new[] { "Packages are downloaded on request and installed into FileHub's own extension folder. No extension is bundled with FileHub. FileHub is not affiliated with Microsoft and does not run extension JavaScript.", "安装包按需下载并安装到 FileHub 自己的扩展目录；FileHub 不随包分发任何扩展。FileHub 与 Microsoft 无隶属关系，也不执行扩展 JavaScript。" },
     };
 
     /// <summary>"en" (default) or "zh-CN".</summary>
@@ -568,4 +598,12 @@ public static class Strings
     public static string ExtRefresh => Loc.T("ExtRefresh");
     public static string ExtSelectHint => Loc.T("ExtSelectHint");
     public static string ExtNotice => Loc.T("ExtNotice");
+    public static string MktInstalledTab => Loc.T("MktInstalledTab");
+    public static string MktMarketplaceTab => Loc.T("MktMarketplaceTab");
+    public static string MktSearchPlaceholder => Loc.T("MktSearchPlaceholder");
+    public static string MktSearch => Loc.T("MktSearch");
+    public static string MktUninstall => Loc.T("MktUninstall");
+    public static string MktNotice => Loc.T("MktNotice");
+    public static string MktOpenStore => Loc.T("MktOpenStore");
+    public static string MktLicense => Loc.T("MktLicense");
 }

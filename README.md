@@ -172,6 +172,12 @@ FluentUI-CodeHub widgets used: `FANavigationView` (sidebar), `FABreadcrumbBar` (
   for FileHub, and shows their language / theme / snippet / grammar contributions. Enabled
   extensions supply file associations, colour themes and completion snippets to Monaco.
   Extension JavaScript is **not** executed
+- **Visual Studio Marketplace tab**: searches Microsoft's public gallery, shows version /
+  publisher / rating / install count, downloads the VSIX on request and installs it into
+  FileHub's own extension folder (never into VS Code's managed metadata). Uninstall removes only
+  packages FileHub installed. Listings and licence links are surfaced in the details pane.
+  FileHub is not affiliated with Microsoft; the Gallery API has no public SLA. No extension
+  package is bundled with FileHub, and search terms are sent to Microsoft
 - **Delete always moves items to the recycle bin** (Windows Shell, macOS `~/.Trash`, Linux
   `gio trash`). Nothing is silently deleted permanently
 - Multiple tabs, each with its own path, history, selection and sidebar location. Tabs can be

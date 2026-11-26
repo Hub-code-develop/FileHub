@@ -103,6 +103,7 @@ public sealed class ExtensionDiscoveryService
         var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
         var candidates = new List<string>
         {
+            MarketplaceService.InstallRoot, // extensions installed from the marketplace inside FileHub
             Path.Combine(home, ".vscode", "extensions"),
             Path.Combine(home, ".vscode-insiders", "extensions"),
             Path.Combine(home, ".vscode-oss", "extensions"),

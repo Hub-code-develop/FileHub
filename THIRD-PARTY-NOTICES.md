@@ -308,16 +308,30 @@ SOFTWARE.
 
 ---
 
-## VS Code extension data
+## VS Code extension data and Visual Studio Marketplace
 
 The Extensions page reads `package.json`, colour themes and snippet files from extensions the
 user has already installed locally. Those files are **user data, not redistributed with FileHub**
 and are not derived works of FileHub. Their own licences remain with their respective authors.
 
+The Marketplace tab queries the public Visual Studio Marketplace Gallery endpoint
+(`https://marketplace.visualstudio.com/_apis/public/gallery/extensionquery`) at the user's
+request and may download a VSIX package. Search terms are sent to Microsoft. Downloaded packages
+are extracted into FileHub's own extension folder
+(`ApplicationData/FileHub/extensions`), are **never bundled with FileHub or committed to this
+repository**, and remain subject to each extension's own licence. The extensions page can open
+the Marketplace listing and licence URL so the user can review those terms before installing.
+
+"Visual Studio Marketplace", "Visual Studio Code" and "VS Code" are trademarks of Microsoft
+Corporation. FileHub is **not** an official Microsoft client and is not affiliated with or
+endorsed by Microsoft. The Gallery endpoint is an internal API without a public SLA and may
+change or rate-limit; the feature degrades gracefully when it is unavailable.
+
 FileHub implements contribution *consumption* itself: file-extension to language-id mapping,
 VS Code theme to Monaco theme conversion, and snippet completion registration. It does not
 include, translate or execute any VS Code extension source code, and it is not a VS Code
-extension host.
+extension host. Installed packages are not executed: only declarative manifests, themes and
+snippets are read.
 
 ---
 
