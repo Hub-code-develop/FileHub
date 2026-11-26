@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Windows.Input;
+using Avalonia.Threading;
 using FileHub.Desktop.Models;
 using FileHub.Desktop.Services;
 using FileHub.Files.Models;
@@ -28,9 +29,12 @@ public sealed class MainViewModel : ViewModelBase
     private readonly FileClipboard _clipboard = new();
     private readonly List<string> _back = [];
     private readonly List<string> _forward = [];
+    private readonly DirectoryWatcherService _watcher;
     private CancellationTokenSource? _loadCts;
     private CancellationTokenSource? _selectionPreviewCts;
     private List<FileEntryViewModel> _loaded = [];
+    private int _watcherRefreshPending;
+    private string[]? _preserveSelectionPaths;
 
     private string _currentPath = string.Empty;
     private string _addressText = string.Empty;
@@ -62,6 +66,7 @@ public sealed class MainViewModel : ViewModelBase
     public MainViewModel(UiServices ui)
     {
         _ui = ui;
+        _watcher = new DirectoryWatcherService(OnDirectoryChanged);
 
         GoBackCommand = Async(_ => GoBackAsync());
         GoForwardCommand = Async(_ => GoForwardAsync());
@@ -251,6 +256,7 @@ public sealed class MainViewModel : ViewModelBase
         AddressText = full;
         IsAddressEditing = false;
         IsSearchMode = false;
+        _watcher.Watch(full);
         BuildBreadcrumbs(full);
         UpdateNavState();
         await LoadAsync();
@@ -298,8 +304,38 @@ public sealed class MainViewModel : ViewModelBase
         return dir.FullName;
     }
 
-    private async Task LoadAsync()
+    /// <summary>
+    /// Called by the directory watcher on a background thread. Coalesced there already; here we
+    /// marshal to the UI thread, skip search results (a directory refresh would overwrite them)
+    /// and keep the user's current selection by path.
+    /// </summary>
+    private void OnDirectoryChanged()
     {
+        if (_isSearchMode) return;
+        Dispatcher.UIThread.Post(async () =>
+        {
+            if (Interlocked.Exchange(ref _watcherRefreshPending, 1) != 0) return;
+            try
+            {
+                if (_isSearchMode || string.IsNullOrEmpty(CurrentPath)) return;
+                await LoadAsync(preserveSelection: true);
+            }
+            catch (Exception ex)
+            {
+                ShowInfo(Loc.T("MsgReadFailed"), ex.Message, FAInfoBarSeverity.Warning);
+            }
+            finally
+            {
+                Interlocked.Exchange(ref _watcherRefreshPending, 0);
+            }
+        });
+    }
+
+    private async Task LoadAsync(bool preserveSelection = false)
+    {
+        _preserveSelectionPaths = preserveSelection
+            ? SelectedEntries.Select(x => x.FullPath).ToArray()
+            : null;
         _loadCts?.Cancel();
         _loadCts = new CancellationTokenSource();
         var token = _loadCts.Token;
@@ -353,7 +389,14 @@ public sealed class MainViewModel : ViewModelBase
             : query.Length > 0
                 ? Loc.F("StatusFiltered", list.Count, _loaded.Count)
                 : Loc.F("StatusItems", list.Count);
-        SetSelection([]);
+        // A watcher refresh rebuilds the whole list. Re-select by full path so external
+        // changes do not silently drop the user's current selection.
+        var restore = _preserveSelectionPaths;
+        _preserveSelectionPaths = null;
+        if (restore is { Length: > 0 })
+            SetSelection(list.Where(x => restore.Contains(x.FullPath, StringComparer.OrdinalIgnoreCase)));
+        else
+            SetSelection([]);
         RequestListPreviews();
     }
 
@@ -534,6 +577,44 @@ public sealed class MainViewModel : ViewModelBase
                 FAInfoBarSeverity.Success);
         }
         catch (Exception ex) { ShowInfo(Loc.T("MsgPasteFailed"), ex.Message, FAInfoBarSeverity.Error); }
+    }
+
+    /// <summary>
+    /// Handles files dropped onto a folder / the current directory. Destination is validated
+    /// against dropping a folder into its own subtree; per-item errors are collected so a single
+    /// locked file does not cancel the rest of the batch.
+    /// </summary>
+    public async Task DropIntoAsync(IEnumerable<string> sources, string destination, bool copy)
+    {
+        var paths = sources.Where(p => !string.IsNullOrWhiteSpace(p)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        if (paths.Length == 0 || string.IsNullOrWhiteSpace(destination)) return;
+
+        var invalid = paths.FirstOrDefault(p => FileSystemService.IsDescendantOrSelf(p, destination));
+        if (invalid is not null)
+        {
+            ShowInfo(Loc.T("MsgDropInvalid"), Path.GetFileName(invalid), FAInfoBarSeverity.Warning);
+            return;
+        }
+
+        if (!Directory.Exists(destination))
+        {
+            ShowInfo(Loc.T("MsgDropFailed"), Loc.F("MsgLocationDetail", destination), FAInfoBarSeverity.Warning);
+            return;
+        }
+
+        var token = _loadCts?.Token ?? default;
+        var result = await Task.Run(
+            () => FileSystemService.TransferInto(paths, destination,
+                copy ? ClipboardOperation.Copy : ClipboardOperation.Cut, token), token);
+
+        foreach (var path in paths) ThumbnailService.Instance.Invalidate(path);
+        await LoadAsync(preserveSelection: true);
+
+        if (result.Errors.Count > 0)
+            ShowInfo(Loc.T("MsgDropFailed"), string.Join("\n", result.Errors.Take(3)), FAInfoBarSeverity.Warning);
+        else
+            ShowInfo(copy ? Loc.T("MsgDropCopied") : Loc.T("MsgDropDone"),
+                Loc.F("MsgDropBody", result.Succeeded, destination), FAInfoBarSeverity.Success);
     }
 
     private async Task CopyPathAsync()

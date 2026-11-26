@@ -8,6 +8,11 @@
     <Setter Property="HorizontalContentAlignment" Value="Stretch" />
   </Style>
 
+  <!-- Drag-over target highlight, mirroring Files App's drop-target accent. -->
+  <Style Selector="ListBoxItem:drop-target">
+    <Setter Property="Background" Value="{DynamicResource SystemAccentColorLight3Brush}" />
+  </Style>
+
   <Style Selector="Button.columnHeader">
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="BorderThickness" Value="0" />

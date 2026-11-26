@@ -157,6 +157,12 @@ FluentUI-CodeHub widgets used: `FANavigationView` (sidebar), `FABreadcrumbBar` (
 - Live filtering plus recursive search (300 result limit, cancellable)
 - File operations: open, reveal in system file manager, new folder, rename, copy / cut / paste,
   copy path, properties
+- **Drag and drop**: drag selected items onto a folder row, a breadcrumb segment or a sidebar
+  location to move them; hold Ctrl to copy instead. Dropping files from Finder / Explorer
+  imports them as a copy. Name collisions are resolved with a numeric suffix, never overwritten
+- **Live directory watcher**: external creates, deletes and renames in the current folder refresh
+  the list automatically (coalesced, 280 ms debounce), preserving the current selection. Manual
+  refresh (F5) remains available for volumes that cannot be watched
 - **Delete always moves items to the recycle bin** (Windows Shell, macOS `~/.Trash`, Linux
   `gio trash`). Nothing is silently deleted permanently
 - Multiple tabs, each with its own path and history
@@ -255,13 +261,13 @@ FileHub/
 └── src/
     ├── FileHub.Files/     logic only, no UI dependency, unit-testable
     │   ├── Models/        FileEntry / LocationEntry
-    │   └── Services/      FileSystemService / RecycleBinService / PlatformService / FileClipboard / PreviewService
+    │   └── Services/      FileSystemService / RecycleBinService / PlatformService / FileClipboard / PreviewService / DirectoryWatcherService
     └── FileHub.Desktop/   Avalonia application
         ├── App.axaml      theme entry point
         ├── Styles/        application styles
         ├── ViewModels/    ShellViewModel (tabs) / MainViewModel (one tab) / commands
-        ├── Views/         MainWindow
-        └── Services/      LocalizationService (en + zh-CN) / DialogService (FAContentDialog) / ThumbnailService
+        ├── Views/         MainWindow / Views/Controls (Files App layout ports)
+        └── Services/      LocalizationService (en + zh-CN) / DialogService (FAContentDialog) / ThumbnailService / DragDropPayload
 ```
 
 ## Verification
@@ -276,11 +282,15 @@ FileHub/
 - Preview verification (headless Skia): Pictures folder decodes 7/7 image thumbnails; selecting
   an image produces a 512px pane bitmap in both Details and Preview tabs; selecting `README.md`
   produces a 4004-character text preview starting with `# FileHub`
+- Drag-and-drop verification (headless): move 2 files into a folder, copy back with the source
+  kept, folder-into-itself rejected, name collisions renamed not overwritten, payload round-trip
+- Watcher verification: 12 burst writes produce one coalesced callback; end-to-end 3 external
+  creates grow the list 1 -> 4 with selection preserved, external delete refreshes too
 - A fresh clone from GitHub restores and builds with no manual setup
 
 ## Known limitations
 
-- No drag-and-drop move or file system watcher (refresh manually)
+- Some virtual / network volumes cannot raise change events; F5 manual refresh still works there
 - Recursive search has a fixed 300 item limit to keep large trees under control
 - Thumbnails cover common bitmap formats via Avalonia's Skia decoder; SVG, HEIC and video
   thumbnails need platform codecs and currently use the category icon instead

@@ -72,6 +72,24 @@ desktop side decodes bitmaps off the UI thread with Avalonia's Skia-backed
 pane's two-tab layout follow the Files port listed above. No Files thumbnail source code was
 translated, and no upstream binary assets are bundled.
 
+### Drag and drop / directory watcher: behaviour reimplemented
+
+Files App implements drag-and-drop and `IFileSystemWatcher` through WinRT / Windows Shell APIs.
+Those do not exist on macOS or Linux, so FileHub reimplemented both behaviours independently:
+
+- `Desktop/Services/DragDropPayload.cs` defines a private Avalonia `DataFormat<string>` carrying a
+  JSON path list, with `DataFormat.File` and plain text as cross-application fallbacks. The drop
+  targets (folder rows, breadcrumb segments, sidebar locations) and the drag-over highlight are
+  FileHub's own code in `Views/MainWindow.axaml.cs` and `Styles/AppStyles.axaml`. The Ctrl-to-copy
+  gesture follows the same user-facing convention Files uses, but no Files drag-drop source was
+  translated.
+- `FileHub.Files/Services/DirectoryWatcherService.cs` wraps .NET's cross-platform
+  `FileSystemWatcher` with a 280 ms coalescing debounce and error recovery. The per-tab
+  refresh-and-preserve-selection logic in `MainViewModel` is FileHub's own implementation.
+
+No Files drag-drop or watcher source code was translated, and no upstream binary assets are
+bundled for these features.
+
 ### MIT License (Files)
 
 ```

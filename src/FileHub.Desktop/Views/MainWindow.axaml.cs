@@ -11,6 +11,7 @@ using FileHub.Desktop.Models;
 using FileHub.Desktop.Services;
 using FileHub.Desktop.ViewModels;
 using FileHub.Files.Models;
+using FileHub.Files.Services;
 using FluentAvalonia.UI.Controls;
 using WinUI3.Fluent.Controls;
 
@@ -214,6 +215,8 @@ public partial class MainWindow : Window
         FileList.DoubleTapped += OnDoubleTapped;
         GridList.DoubleTapped += OnDoubleTapped;
 
+        WireDragAndDrop();
+
         KeyDown += OnWindowKeyDown;
         AddressBox.KeyDown += OnAddressKeyDown;
         SearchBox.KeyDown += OnSearchKeyDown;
@@ -236,6 +239,144 @@ public partial class MainWindow : Window
     private void OnDoubleTapped(object? sender, TappedEventArgs args)
     {
         if (sender is ListBox { SelectedItem: FileEntryViewModel entry }) Vm.OpenCommand.Execute(entry);
+    }
+
+    /// <summary>
+    /// Files App supports dragging items onto folders, breadcrumbs and sidebar locations. Here
+    /// the two list views are the drag source and every folder-like surface is a drop target.
+    /// Internal drags move; Ctrl turns them into a copy (same as Files). External file drags
+    /// arriving from Finder/Explorer are imported as a copy.
+    /// </summary>
+    private void WireDragAndDrop()
+    {
+        foreach (var list in LayoutPage.FileViews)
+        {
+            DragDrop.SetAllowDrop(list, true);
+            list.AddHandler(DragDrop.DragOverEvent, OnListDragOver);
+            list.AddHandler(DragDrop.DragLeaveEvent, OnListDragLeave);
+            list.AddHandler(DragDrop.DropEvent, OnListDrop);
+            list.PointerPressed += OnListPointerPressed;
+        }
+
+        // Dropping on a breadcrumb segment navigates the payload into that folder.
+        DragDrop.SetAllowDrop(Breadcrumb, true);
+        Breadcrumb.AddHandler(DragDrop.DragOverEvent, OnPathTargetDragOver);
+        Breadcrumb.AddHandler(DragDrop.DropEvent, OnBreadcrumbDrop);
+
+        // Sidebar quick-access and drives are folder targets too.
+        DragDrop.SetAllowDrop(Sidebar, true);
+        Sidebar.AddHandler(DragDrop.DragOverEvent, OnPathTargetDragOver);
+        Sidebar.AddHandler(DragDrop.DropEvent, OnSidebarDrop);
+    }
+
+    private async void OnListPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed || sender is not ListBox list) return;
+
+        // Find the entry under the pointer. Visual-tree walk is required because ListBoxItem
+        // is generated and its DataContext is the row's FileEntryViewModel.
+        var entry = FindAncestorDataContext<FileEntryViewModel>(e.Source as Control);
+        if (entry is null) return;
+
+        // Dragging an already-selected item carries the whole selection (multi-item drag).
+        // Dragging an unselected item selects just that item first, matching Files App.
+        // DoDragDropAsync owns the move threshold, so a plain click still selects normally.
+        var selected = list.SelectedItems?.OfType<FileEntryViewModel>().ToArray() ?? [];
+        if (!selected.Any(x => ReferenceEquals(x, entry)))
+        {
+            list.SelectedItems?.Clear();
+            list.SelectedItems?.Add(entry);
+            selected = [entry];
+        }
+
+        var sources = selected.Select(x => x.FullPath).ToArray();
+        if (sources.Length == 0) return;
+
+        var copy = e.KeyModifiers.HasFlag(KeyModifiers.Control) ||
+                   e.KeyModifiers.HasFlag(KeyModifiers.Meta);
+        var data = DragDropPayload.Create(sources, copy);
+        await DragDrop.DoDragDropAsync(e, data,
+            copy ? DragDropEffects.Copy : DragDropEffects.Move);
+    }
+
+    private static T? FindAncestorDataContext<T>(Control? control) where T : class
+    {
+        var current = control;
+        while (current is not null)
+        {
+            if (current.DataContext is T value) return value;
+            current = current.Parent as Control;
+        }
+        return null;
+    }
+
+    private void OnListDragOver(object? sender, DragEventArgs e)
+    {
+        if (!DragDropPayload.TryRead(e.DataTransfer, out var paths, out _))
+        {
+            e.DragEffects = DragDropEffects.None;
+            return;
+        }
+
+        // Dropping on a folder row targets that folder; anywhere else targets the current folder.
+        var entry = FindAncestorDataContext<FileEntryViewModel>(e.Source as Control);
+        var destination = entry is { IsDirectory: true } ? entry.FullPath : Vm.CurrentPath;
+        var invalid = paths.Any(p => FileSystemService.IsDescendantOrSelf(p, destination));
+        e.DragEffects = invalid ? DragDropEffects.None
+            : e.KeyModifiers.HasFlag(KeyModifiers.Control) ? DragDropEffects.Copy
+            : DragDropEffects.Move;
+
+        SetDropHighlight(e.Source as Control, entry is { IsDirectory: true } && !invalid);
+    }
+
+    private void OnListDragLeave(object? sender, DragEventArgs e) => SetDropHighlight(e.Source as Control, false);
+
+    /// <summary>Toggles the drop-target pseudo-class on the folder row under the pointer.</summary>
+    private static void SetDropHighlight(Control? source, bool active)
+    {
+        var current = source;
+        while (current is not null)
+        {
+            if (current is ListBoxItem item)
+            {
+                item.Classes.Set("drop-target", active);
+                return;
+            }
+            current = current.Parent as Control;
+        }
+    }
+
+    private void OnListDrop(object? sender, DragEventArgs e)
+    {
+        SetDropHighlight(e.Source as Control, false);
+        if (!DragDropPayload.TryRead(e.DataTransfer, out var paths, out var copy)) return;
+        e.Handled = true;
+
+        var entry = FindAncestorDataContext<FileEntryViewModel>(e.Source as Control);
+        var destination = entry is { IsDirectory: true } ? entry.FullPath : Vm.CurrentPath;
+        _ = Vm.DropIntoAsync(paths, destination, copy);
+    }
+
+    private void OnPathTargetDragOver(object? sender, DragEventArgs e)
+    {
+        e.DragEffects = DragDropPayload.TryRead(e.DataTransfer, out _, out _)
+            ? DragDropEffects.Move : DragDropEffects.None;
+    }
+
+    private void OnBreadcrumbDrop(object? sender, DragEventArgs e)
+    {
+        if (!DragDropPayload.TryRead(e.DataTransfer, out var paths, out var copy)) return;
+        if (FindAncestorDataContext<PathSegment>(e.Source as Control) is not { } segment) return;
+        e.Handled = true;
+        _ = Vm.DropIntoAsync(paths, segment.FullPath, copy);
+    }
+
+    private void OnSidebarDrop(object? sender, DragEventArgs e)
+    {
+        if (!DragDropPayload.TryRead(e.DataTransfer, out var paths, out var copy)) return;
+        if (FindAncestorDataContext<LocationEntry>(e.Source as Control) is not { } location) return;
+        e.Handled = true;
+        _ = Vm.DropIntoAsync(paths, location.Path, copy);
     }
 
     private void OnAddressKeyDown(object? sender, KeyEventArgs args)

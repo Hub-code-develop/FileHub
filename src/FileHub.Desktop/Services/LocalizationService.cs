@@ -160,6 +160,12 @@ public static class Loc
         ["LblNoPreview"] = new[] { "No preview available", "暂无预览" },
         ["LblView"] = new[] { "View", "视图" },
         ["LblSelect"] = new[] { "Select", "选择" },
+        ["MsgDropDone"] = new[] { "Moved", "已移动" },
+        ["MsgDropCopied"] = new[] { "Copied", "已复制" },
+        ["MsgDropBody"] = new[] { "{0} item(s) to {1}", "{0} 个项目到 {1}" },
+        ["MsgDropFailed"] = new[] { "Drag and drop failed", "拖放失败" },
+        ["MsgDropInvalid"] = new[] { "Cannot drop a folder into itself", "不能把文件夹拖进它自己的子目录" },
+        ["MsgWatcherChanged"] = new[] { "Folder changed on disk - list refreshed", "目录内容已变化 - 列表已刷新" },
     };
 
     /// <summary>"en" (default) or "zh-CN".</summary>
@@ -478,4 +484,10 @@ public static class Strings
     public static string LblNoPreview => Loc.T("LblNoPreview");
     public static string LblView => Loc.T("LblView");
     public static string LblSelect => Loc.T("LblSelect");
+    public static string MsgDropDone => Loc.T("MsgDropDone");
+    public static string MsgDropCopied => Loc.T("MsgDropCopied");
+    public static string MsgDropBody => Loc.T("MsgDropBody");
+    public static string MsgDropFailed => Loc.T("MsgDropFailed");
+    public static string MsgDropInvalid => Loc.T("MsgDropInvalid");
+    public static string MsgWatcherChanged => Loc.T("MsgWatcherChanged");
 }

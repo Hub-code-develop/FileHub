@@ -126,6 +126,10 @@ macOS 优先读系统语言偏好是故意的：从 Finder 启动的 GUI 应用�
   不支持的格式回退到分类图标。
 - 即时筛选 + 递归搜索（结果上限 300，可取消）
 - 文件操作：打开、在系统文件管理器中显示、新建文件夹、重命名、复制 / 剪切 / 粘贴、复制路径、属性
+- **拖拽**：把选中的项目拖到文件夹行、面包屑片段或侧栏位置即可移动；按住 Ctrl 改为复制。
+  从 Finder / 资源管理器拖入的文件按复制导入。重名自动加序号，绝不覆盖。
+- **实时目录监视**：当前目录里外部新建 / 删除 / 重命名会自动刷新列表（合并事件、280 毫秒防抖），
+  并保留当前选择。无法监视的卷仍可用 F5 手动刷新。
 - **删除一律移到回收站**（Windows Shell / macOS `~/.Trash` / Linux `gio trash`），绝不静默永久删除
 - 多标签页，每个标签有独立的路径与历史
 - 多选、隐藏文件开关、浅色 / 深色 / 跟随系统主题、状态栏统计
@@ -217,13 +221,13 @@ FileHub/
 └── src/
     ├── FileHub.Files/     纯逻辑，无 UI 依赖，可单测
     │   ├── Models/        FileEntry / LocationEntry
-    │   └── Services/      FileSystemService / RecycleBinService / PlatformService / FileClipboard / PreviewService
+    │   └── Services/      FileSystemService / RecycleBinService / PlatformService / FileClipboard / PreviewService / DirectoryWatcherService
     └── FileHub.Desktop/   Avalonia 应用
         ├── App.axaml      主题入口
         ├── Styles/        应用样式
         ├── ViewModels/    ShellViewModel（标签）/ MainViewModel（单个标签）/ 命令
-        ├── Views/         MainWindow
-        └── Services/      LocalizationService（英中双语）/ DialogService（FAContentDialog 封装）/ ThumbnailService
+        ├── Views/         MainWindow / Views/Controls（Files 布局移植）
+        └── Services/      LocalizationService（英中双语）/ DialogService（FAContentDialog 封装）/ ThumbnailService / DragDropPayload
 ```
 
 ## 验证情况
@@ -233,11 +237,15 @@ FileHub/
   `avares://FileHub/Styles/AppStyles.axaml` 加载成功；`MainWindow.axaml` 全部控件实例化成功；
   主目录枚举 55 项 / 7 个位置 / 3 段面包屑；筛选 55 到 0 到 55 正常
 - 语言检测在四种环境下验证（未设置、`auto`、`en`、`zh-CN`），含界面三态切换
+- 拖拽验证（headless）：移动 2 个文件到目录、复制回来源且源文件保留、拒绝文件夹拖进自身、
+  重名加序号不覆盖、payload 往返一致
+- 监视验证：12 次连续写入合并为 1 次回调；端到端外部新建 3 个文件后列表 1 变 4 且选择保留，
+  外部删除同样触发刷新
 - 从 GitHub 全新 clone 后可直接还原并构建，无需手工配置
 
 ## 已知限制 / 后续可加
 
-- 没有拖拽移动、文件监视（目录变化需手动刷新）
+- 部分虚拟 / 网络卷无法产生变更事件，这些目录仍可用 F5 手动刷新
 - 递归搜索固定 300 项上限，避免在大目录里失控
 - 缩略图覆盖 Avalonia 的 Skia 解码器支持的常见位图格式；SVG、HEIC、视频缩略图需要平台编解码器，目前回退到分类图标
 - 复制 / 移动为应用内剪贴板，不写系统剪贴板（只有复制路径会写）

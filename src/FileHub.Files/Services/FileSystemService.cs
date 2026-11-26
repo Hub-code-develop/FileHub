@@ -222,6 +222,82 @@ public static class FileSystemService
         }
     }
 
+    /// <summary>
+    /// Result of a drop operation. Counts successful items and keeps per-item errors so the UI
+    /// can report a partial move instead of failing the whole batch.
+    /// </summary>
+    public sealed class TransferResult
+    {
+        public int Succeeded { get; set; }
+        public int Skipped { get; set; }
+        public List<string> Errors { get; } = [];
+    }
+
+    /// <summary>
+    /// True when moving/copying <paramref name="source"/> would place it inside itself.
+    /// File managers must reject this case: Directory.Move throws, but a copy would recurse.
+    /// </summary>
+    public static bool IsDescendantOrSelf(string source, string destinationDir)
+    {
+        if (!Directory.Exists(source)) return false;
+        var sourceFull = Path.GetFullPath(source).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var destFull = Path.GetFullPath(destinationDir).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        if (string.Equals(sourceFull, destFull, StringComparison.OrdinalIgnoreCase)) return true;
+        return destFull.StartsWith(sourceFull + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Moves or copies a set of dropped paths into a destination directory, collecting errors
+    /// per item so one locked file cannot cancel the rest. Never throws for a single bad item.
+    /// </summary>
+    public static TransferResult TransferInto(
+        IEnumerable<string> sources, string destinationDir, ClipboardOperation operation,
+        CancellationToken ct = default)
+    {
+        var result = new TransferResult();
+        foreach (var source in sources)
+        {
+            ct.ThrowIfCancellationRequested();
+            try
+            {
+                if (!File.Exists(source) && !Directory.Exists(source))
+                {
+                    result.Errors.Add($"{Path.GetFileName(source)}: source no longer exists");
+                    continue;
+                }
+                if (string.Equals(Path.GetDirectoryName(source), destinationDir, StringComparison.OrdinalIgnoreCase))
+                {
+                    result.Skipped++;
+                    continue;
+                }
+                // Both copy and move must reject a folder dropped into its own subtree:
+                // copying would recurse into the freshly created target forever.
+                if (IsDescendantOrSelf(source, destinationDir))
+                {
+                    result.Errors.Add($"{Path.GetFileName(source)}: cannot drop a folder into itself");
+                    continue;
+                }
+
+                var target = EnsureUnique(Path.Combine(destinationDir, Path.GetFileName(source)));
+                if (Directory.Exists(source)) CopyDirectory(source, target, ct);
+                else File.Copy(source, target);
+
+                if (operation == ClipboardOperation.Cut)
+                {
+                    if (Directory.Exists(source)) Directory.Delete(source, recursive: true);
+                    else File.Delete(source);
+                }
+                result.Succeeded++;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or
+                                           ArgumentException or NotSupportedException)
+            {
+                result.Errors.Add($"{Path.GetFileName(source)}: {ex.Message}");
+            }
+        }
+        return result;
+    }
+
     private static void CopyDirectory(string source, string target, CancellationToken ct)
     {
         Directory.CreateDirectory(target);
