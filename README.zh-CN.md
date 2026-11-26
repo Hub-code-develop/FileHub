@@ -64,7 +64,7 @@ WinUI 3 的样式是明文 XAML，所以颜色、圆角、内边距、各状态�
 | Button、ToggleButton、CheckBox、RadioButton、ToggleSwitch、TextBox、TextBlock | 已移植 |
 | ListBoxItem / ListViewItem | 已移植 |
 | ToolTip、FlyoutPresenter | 已移植 |
-| TabView 标签栏（含关闭按钮） | 已移植（`WinTabStrip`） |
+| TabView 标签栏（含关闭按钮、中键关闭、拖拽重排、右键菜单、溢出滚动） | 已移植（`WinTabStrip`） |
 | AppBarButton（命令栏按钮） | 已移植（`WinAppBarButton`） |
 | ScrollBar | 沿用库自带实现 |
 | NavigationView、BreadcrumbBar、InfoBar、ProgressRing、MenuFlyout、ComboBox | 由 CodeHub-FluentUI 提供 |
@@ -137,7 +137,8 @@ macOS 优先读系统语言偏好是故意的：从 Finder 启动的 GUI 应用�
   下已安装的扩展，可为 FileHub 单独启用 / 禁用，并展示语言、主题、代码片段和语法贡献。
   启用的扩展会向 Monaco 提供文件关联、配色主题和补全片段；**不会执行扩展的 JavaScript**。
 - **删除一律移到回收站**（Windows Shell / macOS `~/.Trash` / Linux `gio trash`），绝不静默永久删除
-- 多标签页，每个标签有独立的路径与历史
+- 多标签页，每个标签有独立的路径、历史、选中项与侧栏位置；标签可拖拽重排、中键关闭、复制，
+  下次启动会恢复上次打开的目录；右键标签可关闭其他 / 关闭右侧标签
 - 多选、隐藏文件开关、浅色 / 深色 / 跟随系统主题、状态栏统计
 - 快捷键齐全
 
@@ -149,6 +150,10 @@ macOS 优先读系统语言偏好是故意的：从 Finder 启动的 GUI 应用�
 | `Ctrl/Cmd+A` | 全选 | `Enter` | 打开选中项 |
 | `Ctrl/Cmd+F` | 聚焦搜索 | `Ctrl/Cmd+L` | 编辑路径 |
 | `Esc` | 清除搜索 / 退出路径编辑 | 双击 | 打开 |
+| `Ctrl/Cmd+T` | 新建标签 | `Ctrl/Cmd+W` | 关闭标签 |
+| `Ctrl/Cmd+Tab` / `Ctrl/Cmd+Shift+Tab` | 下一个 / 上一个标签 | `Ctrl/Cmd+1`..`8` | 跳转到第 N 个标签 |
+| `Ctrl/Cmd+Shift+T` | 重开已关闭标签 | `Ctrl/Cmd+Shift+D` | 复制标签 |
+| `Ctrl/Cmd+Shift+Left` / `Right` | 标签左移 / 右移 | 右键标签 | 标签上下文菜单 |
 
 ## 构建与运行
 

@@ -138,13 +138,19 @@
       <Style Selector="^:pointerover /template/ Button#PART_CloseButton">
         <Setter Property="Opacity" Value="1" />
       </Style>
+
+      <!-- Drag-reorder target: the same reveal WinUI uses for a tab drop slot. -->
+      <Style Selector="^.drop-target /template/ Border#PART_Root">
+        <Setter Property="BorderBrush" Value="{DynamicResource AccentFillColorDefaultBrush}" />
+        <Setter Property="BorderThickness" Value="2,2,1,0" />
+      </Style>
     </ControlTheme>
 
     <ControlTheme x:Key="{x:Type c:WinTabStrip}" TargetType="c:WinTabStrip">
       <Setter Property="Background" Value="Transparent" />
       <Setter Property="BorderThickness" Value="0" />
       <Setter Property="Padding" Value="0" />
-      <Setter Property="HorizontalAlignment" Value="Left" />
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
       <Setter Property="VerticalAlignment" Value="Bottom" />
       <Setter Property="ItemContainerTheme" Value="{StaticResource {x:Type c:WinTabStripItem}}" />
       <Setter Property="ItemsPanel">
@@ -152,11 +158,18 @@
           <StackPanel Orientation="Horizontal" />
         </ItemsPanelTemplate>
       </Setter>
+      <!-- The strip scrolls horizontally once the tabs outgrow the titlebar (WinUI overflow). -->
       <Setter Property="Template">
         <ControlTemplate>
-          <ItemsPresenter Name="PART_ItemsPresenter"
-                          ItemsPanel="{TemplateBinding ItemsPanel}"
-                          Margin="{TemplateBinding Padding}" />
+          <ScrollViewer HorizontalScrollBarVisibility="Auto"
+                        VerticalScrollBarVisibility="Disabled"
+                        BringIntoViewOnFocusChange="False"
+                        HorizontalAlignment="Stretch"
+                        VerticalAlignment="Stretch">
+            <ItemsPresenter Name="PART_ItemsPresenter"
+                            ItemsPanel="{TemplateBinding ItemsPanel}"
+                            Margin="{TemplateBinding Padding}" />
+          </ScrollViewer>
         </ControlTemplate>
       </Setter>
     </ControlTheme>

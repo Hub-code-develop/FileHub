@@ -36,8 +36,8 @@
          one: FA's add/close buttons are icon-font glyphs, and that font is not present on
          macOS or Linux, so they rendered as empty boxes. -->
     <Border Grid.Row="0" Classes="tabBarSurface">
-      <StackPanel Orientation="Horizontal" Margin="8,0,8,0" VerticalAlignment="Bottom">
-        <win:WinTabStrip x:Name="TabStrip"
+      <Grid ColumnDefinitions="*,Auto" Margin="8,0,8,0" VerticalAlignment="Bottom">
+        <win:WinTabStrip x:Name="TabStrip" Grid.Column="0"
                          ItemsSource="{Binding Tabs}"
                          SelectedItem="{Binding SelectedTab, Mode=TwoWay}">
           <win:WinTabStrip.ItemTemplate>
@@ -51,7 +51,7 @@
           </win:WinTabStrip.ItemTemplate>
         </win:WinTabStrip>
 
-        <StackPanel Orientation="Horizontal" Spacing="2"
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="2"
                     VerticalAlignment="Bottom" Margin="4,0,0,4">
           <Button Classes="tabAction" ToolTip.Tip="{x:Static loc:Strings.NewTab}"
                   Command="{Binding NewTabCommand}">
@@ -71,7 +71,7 @@
             <ui:FASymbolIcon Symbol="Settings" FontSize="14" />
           </Button>
         </StackPanel>
-      </StackPanel>
+      </Grid>
     </Border>
 
     <!-- Row 1: Files App NavigationToolbar.xaml (Height 48, 36x32 nav buttons, Omnibar). -->

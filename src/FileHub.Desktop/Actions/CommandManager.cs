@@ -86,6 +86,24 @@ public sealed class CommandManager : ViewModelBase, IEnumerable<IRichCommand>
             ActionCategory.Navigation, p => Tab.DeepSearchCommand.Execute(p));
         Add(CommandCodes.NewTab, "NewTab", "NewTab", FASymbol.Add, "Ctrl+T",
             ActionCategory.Global, p => _shell.NewTabCommand.Execute(p));
+        Add(CommandCodes.CloseTab, "CloseTab", "CloseTab", FASymbol.Delete, "Ctrl+W",
+            ActionCategory.Global, p => _shell.CloseActiveTab());
+        Add(CommandCodes.DuplicateTab, "DuplicateTab", "DuplicateTab", FASymbol.Copy, "Ctrl+Shift+D",
+            ActionCategory.Global, p => _shell.DuplicateActiveTab());
+        Add(CommandCodes.NextTab, "NextTab", "NextTab", FASymbol.ChevronRight, "Ctrl+Tab",
+            ActionCategory.Navigation, p => _shell.ActivateNextTab());
+        Add(CommandCodes.PreviousTab, "PreviousTab", "PreviousTab", FASymbol.Back, "Ctrl+Shift+Tab",
+            ActionCategory.Navigation, p => _shell.ActivatePreviousTab());
+        Add(CommandCodes.ReopenClosedTab, "ReopenClosedTab", "ReopenClosedTab", FASymbol.Refresh,
+            "Ctrl+Shift+T", ActionCategory.Global, p => _shell.ReopenClosedTab());
+        Add(CommandCodes.CloseOtherTabs, "CloseOtherTabs", "CloseOtherTabs", FASymbol.Delete,
+            string.Empty, ActionCategory.Global, p => _shell.CloseOtherTabs(_shell.ActiveTab));
+        Add(CommandCodes.CloseTabsToRight, "CloseTabsToRight", "CloseTabsToRight", FASymbol.Delete,
+            string.Empty, ActionCategory.Global, p => _shell.CloseTabsToRight(_shell.ActiveTab));
+        Add(CommandCodes.MoveTabLeft, "MoveTabLeft", "MoveTabLeft", FASymbol.Back, "Ctrl+Shift+Left",
+            ActionCategory.Global, p => _shell.MoveActiveTab(-1));
+        Add(CommandCodes.MoveTabRight, "MoveTabRight", "MoveTabRight", FASymbol.ChevronRight,
+            "Ctrl+Shift+Right", ActionCategory.Global, p => _shell.MoveActiveTab(1));
         Add(CommandCodes.ToggleSidebar, "LblToggleSidebar", "LblToggleSidebar", FASymbol.ViewAll,
             "Ctrl+Shift+S", ActionCategory.Global, p => _shell.ToggleSidebarCommand.Execute(p));
         Add(CommandCodes.ToggleTheme, "ToggleTheme", "ToggleTheme", FASymbol.Settings, string.Empty,

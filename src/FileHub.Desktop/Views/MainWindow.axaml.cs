@@ -88,13 +88,42 @@ public partial class MainWindow : Window
         Breadcrumb.ItemsSource = _boundTab.Breadcrumbs;
         SyncAddressMode();
 
-        FileList.SelectedItems?.Clear();
-        GridList.SelectedItems?.Clear();
+        // Each tab keeps its own selection and sidebar location; restore their visuals on switch.
+        // The lists may still be loading, so re-apply once they finish.
+        RestoreTabVisuals();
+    }
+
+    private void RestoreTabVisuals()
+    {
+        _restoringSelection = true;
+        try
+        {
+            var paths = Vm.SelectedEntries.Select(x => x.FullPath)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            foreach (var list in LayoutPage.FileViews)
+            {
+                list.SelectedItems?.Clear();
+                foreach (var entry in list.Items.OfType<FileEntryViewModel>())
+                    if (paths.Contains(entry.FullPath)) list.SelectedItems?.Add(entry);
+            }
+        }
+        finally { _restoringSelection = false; }
+
+        var current = Vm.CurrentPath;
+        foreach (var item in _sidebarItems)
+        {
+            if (item.DataContext is not LocationEntry location) continue;
+            var selected = !string.IsNullOrEmpty(current) &&
+                (string.Equals(location.Path, current, StringComparison.OrdinalIgnoreCase) ||
+                 current.StartsWith(location.Path.TrimEnd('/') + "/", StringComparison.OrdinalIgnoreCase));
+            if (selected) item.IsSelected = true;
+        }
     }
 
     private void OnTabPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(MainViewModel.IsAddressEditing)) SyncAddressMode();
+        else if (e.PropertyName == nameof(MainViewModel.IsLoading) && !Vm.IsLoading) RestoreTabVisuals();
     }
 
     /// <summary>Swaps the breadcrumb for the editable path box, mirroring Files App's omnibar.</summary>
@@ -205,6 +234,9 @@ public partial class MainWindow : Window
 
         // The tab strip's own close button (WinUI3.Fluent WinTabStripItem.CloseRequested).
         TabStrip.AddHandler(WinTabStripItem.CloseRequestedEvent, OnTabCloseRequested);
+        TabStrip.AddHandler(WinTabStripItem.ContextMenuRequestedEvent, OnTabContextMenuRequested);
+        TabStrip.AddHandler(WinTabStrip.TabReorderedEvent, OnTabReordered);
+        Closing += (_, _) => _shell.SaveSession();
 
         Breadcrumb.ItemClicked += (_, args) =>
         {
@@ -224,10 +256,15 @@ public partial class MainWindow : Window
     }
 
     private void SyncSelection(ListBox box)
-        => Vm.SetSelection((box.SelectedItems ?? Array.Empty<object>())
+    {
+        // RestoreTabVisuals re-selects items programmatically; do not feed that back into the VM.
+        if (_restoringSelection) return;
+        Vm.SetSelection((box.SelectedItems ?? Array.Empty<object>())
             .OfType<FileEntryViewModel>().ToArray());
+    }
+    private bool _restoringSelection;
 
-    /// <summary>Tab close button; the item's DataContext is the tab it represents.</summary>
+    /// <summary>Tab close button / middle click; the item's DataContext is the tab it represents.</summary>
     private void OnTabCloseRequested(object? sender, RoutedEventArgs args)
     {
         args.Handled = true;
@@ -235,6 +272,35 @@ public partial class MainWindow : Window
         {
             _shell.CloseTab(tab);
         }
+    }
+
+    /// <summary>Right-click a tab: activate it and open a Files-style tab context menu.</summary>
+    private void OnTabContextMenuRequested(object? sender, RoutedEventArgs args)
+    {
+        args.Handled = true;
+        if (args.Source is not WinTabStripItem { DataContext: MainViewModel tab }) return;
+        _shell.Activate(tab);
+
+        var menu = new FAMenuFlyout();
+        menu.Items.Add(TabMenuItem(Loc.T("NewTab"), _shell.NewTabCommand));
+        menu.Items.Add(TabMenuItem(Loc.T("DuplicateTab"), new RelayCommand(_ => _shell.DuplicateActiveTab())));
+        menu.Items.Add(TabMenuItem(Loc.T("CloseTab"), new RelayCommand(_ => _shell.CloseActiveTab())));
+        menu.Items.Add(TabMenuItem(Loc.T("CloseOtherTabs"), new RelayCommand(_ => _shell.CloseOtherTabs(tab))));
+        menu.Items.Add(TabMenuItem(Loc.T("CloseTabsToRight"), new RelayCommand(_ => _shell.CloseTabsToRight(tab))));
+        menu.Items.Add(TabMenuItem(Loc.T("PreviousTab"), new RelayCommand(_ => _shell.ActivatePreviousTab())));
+        menu.Items.Add(TabMenuItem(Loc.T("NextTab"), new RelayCommand(_ => _shell.ActivateNextTab())));
+        menu.ShowAt(args.Source as Control ?? TabStrip);
+    }
+
+    private static FAMenuFlyoutItem TabMenuItem(string text, System.Windows.Input.ICommand command)
+        => new() { Text = text, Command = command };
+
+    /// <summary>Drag-reorder: the strip reports source and destination indices.</summary>
+    private void OnTabReordered(object? sender, TabReorderEventArgs args)
+    {
+        args.Handled = true;
+        if (args.FromIndex >= 0 && args.FromIndex < _shell.Tabs.Count)
+            _shell.MoveTab(_shell.Tabs[args.FromIndex], args.ToIndex);
     }
 
     private void OnDoubleTapped(object? sender, TappedEventArgs args)
@@ -427,8 +493,6 @@ public partial class MainWindow : Window
             args.Handled = true;
             return;
         }
-        // File-manager hotkeys must not fire while a full-area page is on top.
-        if (_shell.IsWorkspacePageOpen) return;
 
         // Hotkeys are resolved through the same CommandManager the toolbar and context menu
         // use, mirroring Files App's CommandManager[HotKey] lookup.
@@ -436,6 +500,28 @@ public partial class MainWindow : Window
                    args.KeyModifiers.HasFlag(KeyModifiers.Meta);
         var alt = args.KeyModifiers.HasFlag(KeyModifiers.Alt);
         var shift = args.KeyModifiers.HasFlag(KeyModifiers.Shift);
+
+        // Tab management works on every page, including the code/extension workspace.
+        if (ctrl && !alt && args.Key == Key.Tab)
+        {
+            if (shift) _shell.ActivatePreviousTab(); else _shell.ActivateNextTab();
+            args.Handled = true;
+            return;
+        }
+        if (ctrl && shift && args.Key == Key.T) { _shell.ReopenClosedTab(); args.Handled = true; return; }
+        if (ctrl && shift && args.Key == Key.D) { _shell.DuplicateActiveTab(); args.Handled = true; return; }
+        if (ctrl && !alt && args.Key == Key.W) { _shell.CloseActiveTab(); args.Handled = true; return; }
+        if (ctrl && shift && args.Key == Key.Left) { _shell.MoveActiveTab(-1); args.Handled = true; return; }
+        if (ctrl && shift && args.Key == Key.Right) { _shell.MoveActiveTab(1); args.Handled = true; return; }
+        if (ctrl && !alt && !shift && args.Key >= Key.D1 && args.Key <= Key.D8)
+        {
+            _shell.ActivateByIndex(args.Key - Key.D1 + 1);
+            args.Handled = true;
+            return;
+        }
+
+        // File-manager hotkeys must not fire while a full-area page is on top.
+        if (_shell.IsWorkspacePageOpen) return;
 
         string? hotKey = null;
         if (alt && args.Key == Key.Left) hotKey = "Alt+Left";

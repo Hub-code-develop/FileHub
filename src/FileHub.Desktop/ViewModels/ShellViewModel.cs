@@ -1,7 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
+using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows.Input;
 using Avalonia;
@@ -40,6 +43,10 @@ public sealed class ShellViewModel : ViewModelBase
     private ExtensionDiscoveryService? _extensionDiscovery;
     private CodeEditorViewModel? _codeEditor;
     private ExtensionsViewModel? _extensions;
+
+    /// <summary>Paths of the most recently closed tabs, newest first (Files: reopen closed tab).</summary>
+    private readonly List<string> _closedTabPaths = [];
+    private const int MaxClosedTabs = 20;
 
     private ShellViewModel()
     {
@@ -146,13 +153,22 @@ public sealed class ShellViewModel : ViewModelBase
 
     public MainViewModel EnsureFirstTab()
     {
-        if (Tabs.Count == 0) AddTab();
+        if (Tabs.Count == 0)
+        {
+            var paths = LoadSession();
+            if (paths.Count > 0)
+            {
+                foreach (var path in paths) AddTab(path);
+            }
+            else AddTab();
+        }
         return ActiveTab;
     }
 
-    public void AddTab()
+    /// <summary>Creates a tab. When <paramref name="path"/> is supplied the tab opens it on init.</summary>
+    public void AddTab(string? path = null)
     {
-        var tab = new MainViewModel(CreateUiServices()) { Shell = this };
+        var tab = new MainViewModel(CreateUiServices()) { Shell = this, InitialPath = path ?? string.Empty };
         tab.RaiseDetailsPaneChanged();
         Tabs.Add(tab);
         Activate(tab);
@@ -165,18 +181,128 @@ public sealed class ShellViewModel : ViewModelBase
         if (Set(ref _activeTab, tab)) OnPropertyChanged(nameof(SelectedTab));
     }
 
+    /// <summary>Activates a tab by its 1-based strip position (Files: Ctrl+1..8).</summary>
+    public void ActivateByIndex(int index)
+    {
+        if (index >= 1 && index <= Tabs.Count) Activate(Tabs[index - 1]);
+    }
+
+    public void ActivateNextTab()
+    {
+        if (Tabs.Count < 2) return;
+        var index = Tabs.IndexOf(ActiveTab);
+        Activate(Tabs[(index + 1) % Tabs.Count]);
+    }
+
+    public void ActivatePreviousTab()
+    {
+        if (Tabs.Count < 2) return;
+        var index = Tabs.IndexOf(ActiveTab);
+        Activate(Tabs[(index - 1 + Tabs.Count) % Tabs.Count]);
+    }
+
+    /// <summary>Moves a tab within the strip; the ObservableCollection event updates the view.</summary>
+    public void MoveTab(MainViewModel tab, int newIndex)
+    {
+        var oldIndex = Tabs.IndexOf(tab);
+        if (oldIndex < 0 || newIndex < 0 || newIndex >= Tabs.Count || oldIndex == newIndex) return;
+        Tabs.Move(oldIndex, newIndex);
+    }
+
+    /// <summary>Moves the active tab left/right by one slot.</summary>
+    public void MoveActiveTab(int delta) => MoveTab(ActiveTab, Tabs.IndexOf(ActiveTab) + delta);
+
     public void CloseTab(MainViewModel tab)
     {
         if (Tabs.Count <= 1 || !Tabs.Contains(tab)) return;
         var index = Tabs.IndexOf(tab);
+        RememberClosed(tab);
         Tabs.Remove(tab);
         Activate(Tabs[Math.Min(index, Tabs.Count - 1)]);
+    }
+
+    public void CloseActiveTab() => CloseTab(ActiveTab);
+
+    public void CloseOtherTabs(MainViewModel keep)
+    {
+        if (!Tabs.Contains(keep)) return;
+        foreach (var tab in Tabs.Where(x => !ReferenceEquals(x, keep)).ToArray())
+        {
+            RememberClosed(tab);
+            Tabs.Remove(tab);
+        }
+        Activate(keep);
+    }
+
+    public void CloseTabsToRight(MainViewModel tab)
+    {
+        var index = Tabs.IndexOf(tab);
+        if (index < 0) return;
+        foreach (var other in Tabs.Skip(index + 1).ToArray())
+        {
+            RememberClosed(other);
+            Tabs.Remove(other);
+        }
+        Activate(tab);
+    }
+
+    /// <summary>Opens the last closed folder in a fresh tab (Files: Ctrl+Shift+T).</summary>
+    public void ReopenClosedTab()
+    {
+        if (_closedTabPaths.Count == 0) return;
+        var path = _closedTabPaths[0];
+        _closedTabPaths.RemoveAt(0);
+        AddTab(path);
+    }
+
+    public void DuplicateActiveTab() => AddTab(ActiveTab.CurrentPath);
+
+    private void RememberClosed(MainViewModel tab)
+    {
+        var path = tab.CurrentPath;
+        if (string.IsNullOrWhiteSpace(path)) return;
+        _closedTabPaths.Remove(path);
+        _closedTabPaths.Insert(0, path);
+        if (_closedTabPaths.Count > MaxClosedTabs) _closedTabPaths.RemoveAt(_closedTabPaths.Count - 1);
     }
 
     public async Task InitializeAsync()
     {
         foreach (var tab in Tabs.Where(x => !x.IsReady).ToArray())
             await tab.InitializeAsync();
+    }
+
+    /// <summary>Persists open folders so the next launch restores the same tabs.</summary>
+    public void SaveSession()
+    {
+        try
+        {
+            var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "FileHub");
+            Directory.CreateDirectory(dir);
+            var paths = Tabs.Where(x => !string.IsNullOrWhiteSpace(x.CurrentPath))
+                .Select(x => x.CurrentPath).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+            File.WriteAllText(Path.Combine(dir, "tabs.json"), JsonSerializer.Serialize(paths));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // A read-only profile must not prevent the app from closing.
+        }
+    }
+
+    private static List<string> LoadSession()
+    {
+        try
+        {
+            var file = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "FileHub", "tabs.json");
+            if (!File.Exists(file)) return [];
+            var paths = JsonSerializer.Deserialize<string[]>(File.ReadAllText(file)) ?? [];
+            return paths.Where(p => !string.IsNullOrWhiteSpace(p) && Directory.Exists(p)).ToList();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
+        {
+            return [];
+        }
     }
 
     /// <summary>

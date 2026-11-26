@@ -143,6 +143,9 @@ public sealed class MainViewModel : ViewModelBase
     public bool IsReady { get; private set; }
     public ShellViewModel? Shell { get; set; }
 
+    /// <summary>Optional folder to open on first initialization (session restore / reopen tab).</summary>
+    public string InitialPath { get; set; } = string.Empty;
+
     public string TabTitle => string.IsNullOrWhiteSpace(CurrentPath)
         ? Loc.T("TabHome")
         : (Path.GetFileName(CurrentPath.TrimEnd(Path.DirectorySeparatorChar)) is { Length: > 0 } name
@@ -221,7 +224,10 @@ public sealed class MainViewModel : ViewModelBase
         LoadLocations();
         PlatformText = $"{PlatformService.PlatformName} | {Loc.T("PlatformText")}";
         var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        await NavigateAsync(home, recordHistory: false);
+        var target = !string.IsNullOrWhiteSpace(InitialPath) && Directory.Exists(InitialPath)
+            ? InitialPath : home;
+        await NavigateAsync(target, recordHistory: false);
+        InitialPath = string.Empty;
         IsReady = true;
     }
 

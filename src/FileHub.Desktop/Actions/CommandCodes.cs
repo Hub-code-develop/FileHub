@@ -54,6 +54,15 @@ public enum CommandCodes
     EditAddress,
     DeepSearch,
     NewTab,
+    CloseTab,
+    DuplicateTab,
+    NextTab,
+    PreviousTab,
+    ReopenClosedTab,
+    CloseOtherTabs,
+    CloseTabsToRight,
+    MoveTabLeft,
+    MoveTabRight,
 
     // Global
     ToggleSidebar

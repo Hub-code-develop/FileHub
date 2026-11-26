@@ -83,7 +83,7 @@ state colour in that project was copied from
 | AppBarButton (command bar buttons) | Ported |
 | ListBoxItem / ListViewItem | Ported |
 | ToolTip, FlyoutPresenter | Ported |
-| TabView (tab strip) | Ported, including the close button |
+| TabView (tab strip) | Ported, including the close button, middle-click close, drag reorder, context menu and overflow scroll |
 | ScrollBar | Inherited — see below |
 | NavigationView, BreadcrumbBar, InfoBar, ProgressRing, MenuFlyout, ComboBox | Served by CodeHub-FluentUI |
 
@@ -174,7 +174,9 @@ FluentUI-CodeHub widgets used: `FANavigationView` (sidebar), `FABreadcrumbBar` (
   Extension JavaScript is **not** executed
 - **Delete always moves items to the recycle bin** (Windows Shell, macOS `~/.Trash`, Linux
   `gio trash`). Nothing is silently deleted permanently
-- Multiple tabs, each with its own path and history
+- Multiple tabs, each with its own path, history, selection and sidebar location. Tabs can be
+  reordered by dragging, closed with the middle mouse button, duplicated, and the open folders
+  are restored on the next launch. Right-click a tab for close-other / close-to-the-right
 - Multi-select, hidden items toggle, light / dark / system theme, status bar statistics
 - Full keyboard shortcuts
 
@@ -186,6 +188,10 @@ FluentUI-CodeHub widgets used: `FANavigationView` (sidebar), `FABreadcrumbBar` (
 | `Ctrl/Cmd+A` | Select all | `Enter` | Open selection |
 | `Ctrl/Cmd+F` | Focus search | `Ctrl/Cmd+L` | Edit path |
 | `Esc` | Clear search / leave path editing | Double-click | Open |
+| `Ctrl/Cmd+T` | New tab | `Ctrl/Cmd+W` | Close tab |
+| `Ctrl/Cmd+Tab` / `Ctrl/Cmd+Shift+Tab` | Next / previous tab | `Ctrl/Cmd+1`..`8` | Jump to tab |
+| `Ctrl/Cmd+Shift+T` | Reopen closed tab | `Ctrl/Cmd+Shift+D` | Duplicate tab |
+| `Ctrl/Cmd+Shift+Left` / `Right` | Move tab left / right | Right-click tab | Tab context menu |
 
 ## Build and run
 
