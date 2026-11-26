@@ -5,6 +5,7 @@ using System.Windows.Input;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using FileHub.Code.Services;
 using FileHub.Desktop.Actions;
 using FileHub.Desktop.Controls;
 using FileHub.Desktop.Models;
@@ -238,7 +239,13 @@ public partial class MainWindow : Window
 
     private void OnDoubleTapped(object? sender, TappedEventArgs args)
     {
-        if (sender is ListBox { SelectedItem: FileEntryViewModel entry }) Vm.OpenCommand.Execute(entry);
+        if (sender is not ListBox { SelectedItem: FileEntryViewModel entry }) return;
+        if (!entry.IsDirectory && CodeLanguageService.IsCodeFile(entry.FullPath))
+        {
+            _ = _shell.OpenCodeFileAsync(entry.FullPath);
+            return;
+        }
+        Vm.OpenCommand.Execute(entry);
     }
 
     /// <summary>
@@ -411,6 +418,17 @@ public partial class MainWindow : Window
     {
         // Do not steal shortcuts while typing in a text box.
         if (args.Source is TextBox) return;
+
+        var workspaceCtrl = args.KeyModifiers.HasFlag(KeyModifiers.Control) ||
+                            args.KeyModifiers.HasFlag(KeyModifiers.Meta);
+        if (_shell.IsCodePageOpen && workspaceCtrl && args.Key == Key.S)
+        {
+            if (_shell.CodeEditor.SaveCommand.CanExecute(null)) _shell.CodeEditor.SaveCommand.Execute(null);
+            args.Handled = true;
+            return;
+        }
+        // File-manager hotkeys must not fire while a full-area page is on top.
+        if (_shell.IsWorkspacePageOpen) return;
 
         // Hotkeys are resolved through the same CommandManager the toolbar and context menu
         // use, mirroring Files App's CommandManager[HotKey] lookup.

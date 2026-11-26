@@ -7,12 +7,21 @@ using System.Windows.Input;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
+using FileHub.Code.Services;
 using FileHub.Desktop.Actions;
 using FileHub.Desktop.Services;
 using FileHub.Desktop.Views;
 using FileHub.Files.Services;
 
 namespace FileHub.Desktop.ViewModels;
+
+/// <summary>Which full-area page is shown on top of the Files workspace.</summary>
+public enum WorkspacePageKind
+{
+    Files,
+    Code,
+    Extensions
+}
 
 /// <summary>
 /// Window-level state, modelled after the tab strip in Files App: every tab owns a complete
@@ -27,10 +36,21 @@ public sealed class ShellViewModel : ViewModelBase
     private MainViewModel _activeTab = null!;
     private bool _isDetailsPaneOpen = true;
     private bool _isSidebarOpen = true;
+    private WorkspacePageKind _workspacePage = WorkspacePageKind.Files;
+    private ExtensionDiscoveryService? _extensionDiscovery;
+    private CodeEditorViewModel? _codeEditor;
+    private ExtensionsViewModel? _extensions;
 
     private ShellViewModel()
     {
         NewTabCommand = new RelayCommand(_ => AddTab());
+        OpenCodeEditorCommand = new RelayCommand(_ => WorkspacePage = WorkspacePageKind.Code);
+        OpenExtensionsCommand = new RelayCommand(_ =>
+        {
+            _ = Extensions;
+            WorkspacePage = WorkspacePageKind.Extensions;
+        });
+        CloseWorkspacePageCommand = new RelayCommand(_ => CloseWorkspacePage());
         ToggleDetailsPaneCommand = new RelayCommand(_ =>
         {
             IsDetailsPaneOpen = !IsDetailsPaneOpen;
@@ -84,6 +104,42 @@ public sealed class ShellViewModel : ViewModelBase
     public ICommand ToggleDetailsPaneCommand { get; }
     public ICommand ToggleSidebarCommand { get; }
     public ICommand CycleLanguageCommand { get; }
+    public ICommand OpenCodeEditorCommand { get; }
+    public ICommand OpenExtensionsCommand { get; }
+    public ICommand CloseWorkspacePageCommand { get; }
+
+    /// <summary>Full-area overlay: Files, the Monaco editor, or the VS Code extensions page.</summary>
+    public WorkspacePageKind WorkspacePage
+    {
+        get => _workspacePage;
+        private set
+        {
+            if (!Set(ref _workspacePage, value)) return;
+            OnPropertyChanged(nameof(IsWorkspacePageOpen));
+            OnPropertyChanged(nameof(IsCodePageOpen));
+            OnPropertyChanged(nameof(IsExtensionsPageOpen));
+        }
+    }
+
+    public bool IsWorkspacePageOpen => WorkspacePage != WorkspacePageKind.Files;
+    public bool IsCodePageOpen => WorkspacePage == WorkspacePageKind.Code;
+    public bool IsExtensionsPageOpen => WorkspacePage == WorkspacePageKind.Extensions;
+
+    public ExtensionDiscoveryService ExtensionDiscovery => _extensionDiscovery ??= new ExtensionDiscoveryService();
+    public CodeEditorViewModel CodeEditor => _codeEditor ??= new CodeEditorViewModel(ExtensionDiscovery) { Shell = this };
+    public ExtensionsViewModel Extensions => _extensions ??= new ExtensionsViewModel(ExtensionDiscovery, CodeEditor) { Shell = this };
+
+    /// <summary>Opens a source file in the Monaco editor page.</summary>
+    public async Task OpenCodeFileAsync(string path)
+    {
+        await CodeEditor.OpenAsync(path);
+        WorkspacePage = WorkspacePageKind.Code;
+    }
+
+    public void CloseWorkspacePage()
+    {
+        WorkspacePage = WorkspacePageKind.Files;
+    }
 
     /// <summary>Forwarded so the tab-strip footer can switch theme without reaching into a tab.</summary>
     public ICommand ToggleThemeCommand => ActiveTab.ToggleThemeCommand;

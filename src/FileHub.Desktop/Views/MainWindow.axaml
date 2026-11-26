@@ -60,6 +60,12 @@
           <Button Classes="tabAction" Content="{Binding LanguageLabel}"
                   ToolTip.Tip="{Binding LanguageTooltip}"
                   Command="{Binding CycleLanguageCommand}" />
+          <Button Classes="tabAction" ToolTip.Tip="{x:Static loc:Strings.CodeTab}"
+                  Content="{x:Static loc:Strings.CodeTab}"
+                  Command="{Binding OpenCodeEditorCommand}" />
+          <Button Classes="tabAction" ToolTip.Tip="{x:Static loc:Strings.ExtensionsTab}"
+                  Content="{x:Static loc:Strings.ExtensionsTab}"
+                  Command="{Binding OpenExtensionsCommand}" />
           <Button Classes="tabAction" ToolTip.Tip="{x:Static loc:Strings.ToggleTheme}"
                   Command="{Binding ToggleThemeCommand}">
             <ui:FASymbolIcon Symbol="Settings" FontSize="14" />
@@ -108,6 +114,14 @@
                         IsVisible="{Binding IsDetailsPaneOpen}" />
           <t:FilesInfoPane Grid.Column="2" />
         </Grid>
+      </Grid>
+
+      <!-- Full-area workspace pages (Monaco editor / VS Code extensions) sit above the Files
+           content so the ported Files layout stays untouched underneath. -->
+      <Grid Grid.Column="2" IsVisible="{Binding IsWorkspacePageOpen}"
+            Background="{DynamicResource SystemControlBackgroundAltHighBrush}">
+        <t:CodeEditorPage IsVisible="{Binding IsCodePageOpen}" />
+        <t:ExtensionsPage IsVisible="{Binding IsExtensionsPageOpen}" />
       </Grid>
     </Grid>
 

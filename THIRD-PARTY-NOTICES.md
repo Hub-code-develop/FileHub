@@ -255,8 +255,78 @@ restores offline. See `local-feed/README.md`.
 
 ---
 
+## monaco-editor (code editor)
+
+- **Project:** monaco-editor, version 0.52.2
+- **Source:** https://github.com/microsoft/monaco-editor
+- **License:** MIT License
+- **Copyright:** Copyright (c) 2016 - present Microsoft Corporation
+- **Status:** **Redistributed verbatim.** The minified `min/vs` directory (103 files, including
+  `editor.main.js`, `editor.main.css`, `loader.js`, basic language definitions and the web worker)
+  is bundled under `src/FileHub.Desktop/Assets/Monaco/vs/` and copied to the application output.
+  No upstream source file was modified.
+- The full upstream licence is kept at `licenses/Monaco/LICENSE`, and the upstream list of
+  components bundled inside monaco-editor is kept at `licenses/Monaco/ThirdPartyNotices.txt`.
+  Both must accompany any redistribution of FileHub.
+
+### MIT License (monaco-editor)
+
+```
+The MIT License (MIT)
+
+Copyright (c) 2016 - present Microsoft Corporation
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+---
+
+## Avalonia Controls WebView
+
+- **Project:** Avalonia.Controls.WebView, version 12.1.2
+- **Source:** https://github.com/AvaloniaUI/Avalonia.Controls.WebView
+- **License:** MIT License
+- **Copyright:** Copyright 2019-2026 © AvaloniaUI OÜ
+- **Status:** **Binary dependency.** Referenced as a NuGet package; no source was modified. It
+  wraps WebView2 (Windows), WKWebView (macOS) and WebKit / WPE WebKit (Linux).
+
+---
+
+## VS Code extension data
+
+The Extensions page reads `package.json`, colour themes and snippet files from extensions the
+user has already installed locally. Those files are **user data, not redistributed with FileHub**
+and are not derived works of FileHub. Their own licences remain with their respective authors.
+
+FileHub implements contribution *consumption* itself: file-extension to language-id mapping,
+VS Code theme to Monaco theme conversion, and snippet completion registration. It does not
+include, translate or execute any VS Code extension source code, and it is not a VS Code
+extension host.
+
+---
+
 ## Fonts and icons
 
 FileHub uses the Segoe Fluent Icons / Symbol icon font through FluentAvalonia's `FASymbolIcon`.
-The font is provided by the operating system or by the FluentAvalonia package; no font file is
+That font is provided by the operating system or by the FluentAvalonia package; it is not
 redistributed in this repository.
+
+The bundled monaco-editor assets do include one font file, `codicon.ttf`, used by Monaco's own
+editor UI. It is redistributed verbatim as part of monaco-editor under the MIT license above and
+is covered by `licenses/Monaco/ThirdPartyNotices.txt`.

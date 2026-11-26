@@ -1,0 +1,64 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="using:FluentAvalonia.UI.Controls"
+             xmlns:av="using:Avalonia.Controls"
+             xmlns:loc="using:FileHub.Desktop.Services"
+             x:Class="FileHub.Desktop.Views.Controls.CodeEditorPage">
+
+  <Grid RowDefinitions="Auto,Auto,*,Auto" Background="{DynamicResource SystemControlBackgroundAltHighBrush}">
+
+    <!-- Title row -->
+    <Border Grid.Row="0" Classes="paneSurface" Padding="12,8">
+      <Grid ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Center">
+        <Button Grid.Column="0" Content="{x:Static loc:Strings.ClosePage}"
+                Command="{Binding CloseCommand}"
+                ToolTip.Tip="{x:Static loc:Strings.CodeCloseHint}" Padding="10,4" />
+        <StackPanel Grid.Column="1" Margin="12,0,0,0" Spacing="2">
+          <TextBlock Text="{Binding FileName}" FontWeight="SemiBold" FontSize="14"
+                     TextTrimming="CharacterEllipsis" />
+          <TextBlock Text="{Binding FilePath}" Opacity="0.65" FontSize="11"
+                     TextTrimming="CharacterEllipsis" />
+        </StackPanel>
+        <TextBlock Grid.Column="2" Text="{x:Static loc:Strings.CodeTitle}"
+                   Opacity="0.6" FontSize="12" Margin="12,0,0,0" />
+      </Grid>
+    </Border>
+
+    <!-- Editor command row -->
+    <Border Grid.Row="1" Padding="12,6" BorderThickness="0,0,0,1"
+            BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
+      <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+        <Button Content="{x:Static loc:Strings.CodeOpenFile}" Click="OnOpenFileClick" Padding="10,4" />
+        <Button Content="{x:Static loc:Strings.CodeSave}" Command="{Binding SaveCommand}"
+                ToolTip.Tip="Ctrl+S" Padding="10,4" />
+        <TextBlock Text="{Binding LanguageLabel}" Margin="8,0,0,0" VerticalAlignment="Center"
+                   Opacity="0.75" FontSize="12" />
+        <TextBlock Text="*" IsVisible="{Binding IsDirty}" Foreground="#D13438"
+                   FontSize="16" VerticalAlignment="Center" />
+        <ComboBox ItemsSource="{Binding ThemeOptions}" SelectedItem="{Binding SelectedTheme}"
+                  MinWidth="180" Margin="8,0,0,0" VerticalAlignment="Center" />
+      </StackPanel>
+    </Border>
+
+    <!-- Monaco host -->
+    <Grid Grid.Row="2">
+      <av:NativeWebView x:Name="EditorView" />
+      <TextBlock x:Name="EmptyHint" Text="{x:Static loc:Strings.CodeNoFile}"
+                 HorizontalAlignment="Center" VerticalAlignment="Center"
+                 IsVisible="{Binding !HasFile}" Opacity="0.6" FontSize="14" />
+      <TextBlock x:Name="EngineHint" Text="{x:Static loc:Strings.CodeEngineLoading}"
+                 HorizontalAlignment="Center" VerticalAlignment="Center"
+                 Opacity="0.6" FontSize="13" IsVisible="False" />
+    </Grid>
+
+    <!-- Status row -->
+    <Border Grid.Row="3" Classes="paneSurface" Padding="12,5">
+      <StackPanel Orientation="Horizontal" Spacing="18">
+        <TextBlock Text="{Binding Cursor}" FontSize="11" Opacity="0.8" />
+        <TextBlock Text="{Binding EncodingName}" FontSize="11" Opacity="0.8" />
+        <TextBlock Text="{Binding Status}" FontSize="11" Opacity="0.8"
+                   TextTrimming="CharacterEllipsis" />
+      </StackPanel>
+    </Border>
+  </Grid>
+</UserControl>

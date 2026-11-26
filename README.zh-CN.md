@@ -130,6 +130,12 @@ macOS 优先读系统语言偏好是故意的：从 Finder 启动的 GUI 应用�
   从 Finder / 资源管理器拖入的文件按复制导入。重名自动加序号，绝不覆盖。
 - **实时目录监视**：当前目录里外部新建 / 删除 / 重命名会自动刷新列表（合并事件、280 毫秒防抖），
   并保留当前选择。无法监视的卷仍可用 F5 手动刷新。
+- **Monaco 代码编辑器**：双击源代码文件（或点标签栏的「代码」）即可打开本地 Monaco 编辑器，
+  支持语法高亮、语言自动识别、Ctrl+S 保存、保留原编码写入、未保存标记与光标位置显示。
+  所有资源都随应用打包，离线也能写代码。
+- **VS Code 扩展页面**：扫描 `.vscode`、`.vscode-insiders`、`.vscode-oss`、`.cursor`、`.windsurf`
+  下已安装的扩展，可为 FileHub 单独启用 / 禁用，并展示语言、主题、代码片段和语法贡献。
+  启用的扩展会向 Monaco 提供文件关联、配色主题和补全片段；**不会执行扩展的 JavaScript**。
 - **删除一律移到回收站**（Windows Shell / macOS `~/.Trash` / Linux `gio trash`），绝不静默永久删除
 - 多标签页，每个标签有独立的路径与历史
 - 多选、隐藏文件开关、浅色 / 深色 / 跟随系统主题、状态栏统计
@@ -214,6 +220,7 @@ FileHub/
 ├── global.json            SDK 10.0.400
 ├── NuGet.Config           nuget.org + 仓库内离线源
 ├── local-feed/            CodeHub-FluentUI 的 nupkg（MIT）
+├── licenses/Monaco/       monaco-editor 的 LICENSE + ThirdPartyNotices.txt（MIT）
 ├── LICENSE                MIT
 ├── build.sh               带资源护栏的构建脚本
 ├── README.md              英文主说明
@@ -222,12 +229,16 @@ FileHub/
     ├── FileHub.Files/     纯逻辑，无 UI 依赖，可单测
     │   ├── Models/        FileEntry / LocationEntry
     │   └── Services/      FileSystemService / RecycleBinService / PlatformService / FileClipboard / PreviewService / DirectoryWatcherService
+    ├── FileHub.Code/      纯逻辑，代码编辑与 VS Code 贡献数据
+    │   ├── Models/        ExtensionInfo / ExtensionLanguage / ExtensionTheme / ExtensionSnippet
+    │   └── Services/      CodeFileService / CodeLanguageService / ExtensionDiscoveryService / MonacoThemeConverter
     └── FileHub.Desktop/   Avalonia 应用
         ├── App.axaml      主题入口
+        ├── Assets/Monaco/ 随包分发的 monaco-editor 0.52.2 min/vs 资源（MIT）
         ├── Styles/        应用样式
-        ├── ViewModels/    ShellViewModel（标签）/ MainViewModel（单个标签）/ 命令
-        ├── Views/         MainWindow / Views/Controls（Files 布局移植）
-        └── Services/      LocalizationService（英中双语）/ DialogService（FAContentDialog 封装）/ ThumbnailService / DragDropPayload
+        ├── ViewModels/    ShellViewModel（标签与页面）/ MainViewModel / CodeEditorViewModel / ExtensionsViewModel
+        ├── Views/         MainWindow / Views/Controls（Files 布局移植 + 编辑器 + 扩展页）
+        └── Services/      LocalizationService / DialogService / ThumbnailService / DragDropPayload / MonacoAssetServer
 ```
 
 ## 验证情况
@@ -241,10 +252,16 @@ FileHub/
   重名加序号不覆盖、payload 往返一致
 - 监视验证：12 次连续写入合并为 1 次回调；端到端外部新建 3 个文件后列表 1 变 4 且选择保留，
   外部删除同样触发刷新
+- Monaco / 扩展验证：扫描到 30 个已安装扩展（23 个语言贡献、2 个主题、5 组代码片段、22 个文件关联）；
+  真实 VS Code 主题转换成 195 条 Monaco 规则；本地资源服务正确返回 index/loader.js 并对路径穿越返回 404；
+  UTF-8 BOM 往返一致；浏览器实测 Monaco 初始化并完成 C# 语法高亮
 - 从 GitHub 全新 clone 后可直接还原并构建，无需手工配置
 
 ## 已知限制 / 后续可加
 
+- FileHub **不是** VS Code 扩展宿主：不会执行扩展 JavaScript，也不运行语言服务器、调试器和扩展贡献的界面；
+  只读取声明式的语言 / 主题 / 代码片段贡献
+- 不执行 TextMate 语法文件。高亮来自 Monaco 自带语言集；扩展贡献的自定义语言 id 会注册，但按纯文本显示
 - 部分虚拟 / 网络卷无法产生变更事件，这些目录仍可用 F5 手动刷新
 - 递归搜索固定 300 项上限，避免在大目录里失控
 - 缩略图覆盖 Avalonia 的 Skia 解码器支持的常见位图格式；SVG、HEIC、视频缩略图需要平台编解码器，目前回退到分类图标
@@ -253,5 +270,6 @@ FileHub/
 
 ## 许可证
 
-[MIT](LICENSE) - Copyright (c) 2026 Hub-code-develop。Files App 的完整声明（界面布局移植自该项目）
-以及全部第三方组件说明见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。
+[MIT](LICENSE) - Copyright (c) 2026 Hub-code-develop。Files App 的完整声明（界面布局移植自该项目）、
+随包分发的 monaco-editor（MIT）以及全部第三方组件说明见
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。

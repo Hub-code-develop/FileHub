@@ -19,12 +19,24 @@
     <PackageReference Include="Avalonia.Desktop" Version="12.1.0" />
     <!-- FluentUI-CodeHub：FluentAvalonia 的 CodeHub 分支，绑定 Avalonia 12.1.0 -->
     <PackageReference Include="CodeHub-FluentUI" Version="3.1.0-codehub.1" />
+    <!-- Native WebView (WebView2 / WKWebView / WebKitGTK), MIT, AvaloniaUI OÜ. -->
+    <PackageReference Include="Avalonia.Controls.WebView" Version="12.1.2" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\FileHub.Files\FileHub.Files.csproj" />
+    <ProjectReference Include="..\FileHub.Code\FileHub.Code.csproj" />
     <!-- WinUI 3 控件样式的源码移植版（MIT，微软版权）。 -->
     <ProjectReference Include="..\WinUI3.Fluent\WinUI3.Fluent.csproj" />
+  </ItemGroup>
+
+  <!--
+    monaco-editor 0.52.2 min/vs assets (MIT, Microsoft). Served from a loopback HTTP server so
+    the editor works offline and AMD workers stay same-origin. See THIRD-PARTY-NOTICES.md.
+  -->
+  <ItemGroup>
+    <Content Include="Assets\Monaco\**\*" Link="Assets\Monaco\%(RecursiveDir)%(Filename)%(Extension)"
+             CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <!--

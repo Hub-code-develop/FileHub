@@ -163,6 +163,15 @@ FluentUI-CodeHub widgets used: `FANavigationView` (sidebar), `FABreadcrumbBar` (
 - **Live directory watcher**: external creates, deletes and renames in the current folder refresh
   the list automatically (coalesced, 280 ms debounce), preserving the current selection. Manual
   refresh (F5) remains available for volumes that cannot be watched
+- **Monaco code editor**: double-click a source file (or press Code in the tab strip) to open a
+  local Monaco editor with syntax highlighting, language auto-detection, Ctrl+S save, an
+  encoding-preserving writer, a dirty marker and a cursor readout. All assets are bundled, so
+  editing works offline
+- **VS Code extensions page**: discovers extensions installed under `.vscode`,
+  `.vscode-insiders`, `.vscode-oss`, `.cursor` and `.windsurf`, lets you enable or disable them
+  for FileHub, and shows their language / theme / snippet / grammar contributions. Enabled
+  extensions supply file associations, colour themes and completion snippets to Monaco.
+  Extension JavaScript is **not** executed
 - **Delete always moves items to the recycle bin** (Windows Shell, macOS `~/.Trash`, Linux
   `gio trash`). Nothing is silently deleted permanently
 - Multiple tabs, each with its own path and history
@@ -254,6 +263,7 @@ FileHub/
 ├── global.json            SDK 10.0.400
 ├── NuGet.Config           nuget.org + bundled offline feed
 ├── local-feed/            CodeHub-FluentUI nupkg (MIT)
+├── licenses/Monaco/       monaco-editor LICENSE + ThirdPartyNotices.txt (MIT)
 ├── LICENSE                MIT
 ├── build.sh               build script with resource guards
 ├── README.md              this file (English, primary)
@@ -262,12 +272,16 @@ FileHub/
     ├── FileHub.Files/     logic only, no UI dependency, unit-testable
     │   ├── Models/        FileEntry / LocationEntry
     │   └── Services/      FileSystemService / RecycleBinService / PlatformService / FileClipboard / PreviewService / DirectoryWatcherService
+    ├── FileHub.Code/      logic only, code editing + VS Code contribution data
+    │   ├── Models/        ExtensionInfo / ExtensionLanguage / ExtensionTheme / ExtensionSnippet
+    │   └── Services/      CodeFileService / CodeLanguageService / ExtensionDiscoveryService / MonacoThemeConverter
     └── FileHub.Desktop/   Avalonia application
         ├── App.axaml      theme entry point
+        ├── Assets/Monaco/ bundled monaco-editor 0.52.2 min/vs assets (MIT)
         ├── Styles/        application styles
-        ├── ViewModels/    ShellViewModel (tabs) / MainViewModel (one tab) / commands
-        ├── Views/         MainWindow / Views/Controls (Files App layout ports)
-        └── Services/      LocalizationService (en + zh-CN) / DialogService (FAContentDialog) / ThumbnailService / DragDropPayload
+        ├── ViewModels/    ShellViewModel (tabs + pages) / MainViewModel / CodeEditorViewModel / ExtensionsViewModel
+        ├── Views/         MainWindow / Views/Controls (Files App layout ports + editor + extensions)
+        └── Services/      LocalizationService / DialogService / ThumbnailService / DragDropPayload / MonacoAssetServer
 ```
 
 ## Verification
@@ -286,10 +300,19 @@ FileHub/
   kept, folder-into-itself rejected, name collisions renamed not overwritten, payload round-trip
 - Watcher verification: 12 burst writes produce one coalesced callback; end-to-end 3 external
   creates grow the list 1 -> 4 with selection preserved, external delete refreshes too
+- Monaco / extension verification: 30 installed extensions scanned (23 language contributions,
+  2 themes, 5 snippet sets, 22 file associations); a real VS Code theme converts to 195 Monaco
+  rules; the local asset server serves `index.html` and `loader.js` and returns 404 for path
+  traversal; UTF-8 BOM text round-trips; a browser smoke test confirms Monaco initialises with
+  C# syntax highlighting
 - A fresh clone from GitHub restores and builds with no manual setup
 
 ## Known limitations
 
+- FileHub is **not** a VS Code extension host: extension JavaScript, language servers, debuggers
+  and contributed UI are not run. Only declarative language / theme / snippet contributions are read
+- TextMate grammars are not executed. Highlighting comes from Monaco's bundled language set; a
+  custom language id contributed by an extension is registered but renders as plain text
 - Some virtual / network volumes cannot raise change events; F5 manual refresh still works there
 - Recursive search has a fixed 300 item limit to keep large trees under control
 - Thumbnails cover common bitmap formats via Avalonia's Skia decoder; SVG, HEIC and video
@@ -300,7 +323,7 @@ FileHub/
 ## License
 
 [MIT](LICENSE) - Copyright (c) 2026 Hub-code-develop. FileHub is a derived work: its
-file-browsing UI and command structure were ported from Files App and WinUI 3 (both MIT).
-When redistributing FileHub, in source or binary form, include
+file-browsing UI and command structure were ported from Files App and WinUI 3 (both MIT), and
+it bundles monaco-editor (MIT). When redistributing FileHub, in source or binary form, include
 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) alongside `LICENSE`; the upstream copyright
 and permission notices are reproduced there verbatim as the MIT License requires.
