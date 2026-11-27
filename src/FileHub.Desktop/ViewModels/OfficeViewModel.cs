@@ -1,10 +1,40 @@
 using System.Collections.ObjectModel;
+using System.Linq;
 using System.Windows.Input;
 using FileHub.Desktop.Services;
 using FileHub.Office.Models;
 using FileHub.Office.Services;
 
 namespace FileHub.Desktop.ViewModels;
+
+/// <summary>
+/// One ribbon tab. <see cref="Key"/> is the stable identifier that filters groups; <see cref="Label"/>
+/// is localized, because the ribbon used to show English tab names inside a Chinese window.
+/// </summary>
+public sealed class RibbonTab
+{
+    public RibbonTab(string key)
+    {
+        Key = key;
+        Label = key switch
+        {
+            "File" => Loc.T("OfficeTabFile"),
+            "Home" => Loc.T("OfficeTabHome"),
+            "Insert" => Loc.T("OfficeTabInsert"),
+            "Layout" => Loc.T("OfficeTabLayout"),
+            "Review" => Loc.T("OfficeTabReview"),
+            "View" => Loc.T("OfficeTabView"),
+            "Formulas" => Loc.T("OfficeTabFormulas"),
+            "Data" => Loc.T("OfficeTabData"),
+            "Design" => Loc.T("OfficeTabDesign"),
+            _ => key
+        };
+    }
+
+    public string Key { get; }
+    public string Label { get; }
+    public override string ToString() => Label;
+}
 
 /// <summary>One button in the Office ribbon.</summary>
 public sealed class RibbonItem : ViewModelBase
@@ -72,7 +102,7 @@ public sealed class OfficeViewModel : ViewModelBase
     private bool _isItalic;
     private bool _isUnderline;
     private bool _isRecording;
-    private bool _isAdvancedPanelOpen = true;
+    private bool _isAdvancedPanelOpen;
     private int _advancedPanelIndex;
     private MacroRecording? _currentMacro;
     private readonly List<string> _lastParagraphTexts = new();
@@ -89,7 +119,11 @@ public sealed class OfficeViewModel : ViewModelBase
         RedoCommand = new RelayCommand(_ => Redo(), _ => _redo.Count > 0 && !IsBusy);
         CreateNewCommand = new RelayCommand(_ => CreateNew());
 
-        SelectTabCommand = new RelayCommand(p => { ActiveTab = p?.ToString() ?? "Home"; RebuildRibbon(); });
+        SelectTabCommand = new RelayCommand(p =>
+        {
+            ActiveTab = p is RibbonTab tab ? tab.Key : p?.ToString() ?? "Home";
+            RebuildRibbon();
+        });
         SelectSheetCommand = new RelayCommand(p => SelectSheet(ToIndex(p)));
         SelectSlideCommand = new RelayCommand(p => SelectSlide(p is PowerPointSlide slide ? Slides.IndexOf(slide) : ToIndex(p)));
 
@@ -265,7 +299,7 @@ public sealed class OfficeViewModel : ViewModelBase
     public ObservableCollection<string> ColumnHeaders { get; } = new();
     public ObservableCollection<ExcelSheet> Sheets { get; } = new();
     public ObservableCollection<PowerPointSlide> Slides { get; } = new();
-    public ObservableCollection<string> RibbonTabs { get; } = new();
+    public ObservableCollection<RibbonTab> RibbonTabs { get; } = new();
     public ObservableCollection<RibbonGroup> RibbonGroups { get; } = new();
     public ObservableCollection<string> StyleOptions { get; } = new() { "Normal", "Title", "Heading1", "Heading2", "Heading3" };
     public ObservableCollection<string> FontSizes { get; } = new() { "8", "9", "10", "11", "12", "14", "16", "18", "20", "24", "28", "36", "48", "72" };
@@ -327,7 +361,17 @@ public sealed class OfficeViewModel : ViewModelBase
     public string Status { get => _status; private set => Set(ref _status, value); }
     public bool IsDirty { get => _isDirty; private set { if (Set(ref _isDirty, value)) RaiseCommands(); } }
     public bool IsBusy { get => _isBusy; private set => Set(ref _isBusy, value); }
-    public string ActiveTab { get => _activeTab; private set => Set(ref _activeTab, value); }
+    public string ActiveTab
+    {
+        get => _activeTab;
+        private set
+        {
+            if (Set(ref _activeTab, value)) OnPropertyChanged(nameof(ActiveTabLabel));
+        }
+    }
+
+    /// <summary>Localized ribbon-tab caption for the title strip ("开始" instead of "Home").</summary>
+    public string ActiveTabLabel => RibbonTabs.FirstOrDefault(t => t.Key == ActiveTab)?.Label ?? ActiveTab;
     public string NewFileName { get => _newFileName; set => Set(ref _newFileName, value); }
     public string NewDocumentKind { get => _newDocumentKind; set => Set(ref _newDocumentKind, value); }
     public string SelectedStyle { get => _selectedStyle; set { if (Set(ref _selectedStyle, value)) SetStyle(value); } }
@@ -1233,7 +1277,8 @@ public sealed class OfficeViewModel : ViewModelBase
             OfficeDocumentKind.PowerPoint => new[] { "File", "Home", "Insert", "Design", "View" },
             _ => Array.Empty<string>()
         };
-        foreach (var tab in tabs) RibbonTabs.Add(tab);
+        foreach (var tab in tabs) RibbonTabs.Add(new RibbonTab(tab));
+        OnPropertyChanged(nameof(ActiveTabLabel));
         if (tabs.Length == 0) return;
         if (!tabs.Contains(ActiveTab)) ActiveTab = "Home";
 
@@ -1605,13 +1650,15 @@ public sealed class OfficeViewModel : ViewModelBase
         foreach (var item in group.Items)
         {
             if (!item.IsToggle) continue;
-            var value = item.Label switch
+            // Match on the command, not the label: labels are localized ("修订模式"), so the old
+            // label switch never matched Track changes and its toggle looked permanently off.
+            var value = item.Command switch
             {
-                "B" => IsBold,
-                "I" => IsItalic,
-                "U" => IsUnderline,
-                "TrackChanges" => TrackChanges,
-                _ => false
+                _ when ReferenceEquals(item.Command, ToggleBoldCommand) => IsBold,
+                _ when ReferenceEquals(item.Command, ToggleItalicCommand) => IsItalic,
+                _ when ReferenceEquals(item.Command, ToggleUnderlineCommand) => IsUnderline,
+                _ when ReferenceEquals(item.Command, ToggleTrackChangesCommand) => TrackChanges,
+                _ => item.IsChecked
             };
             if (item.IsChecked != value) item.IsChecked = value;
         }

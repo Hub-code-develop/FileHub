@@ -67,9 +67,7 @@ public sealed class ShellViewModel : ViewModelBase
             _ = Extensions;
             WorkspacePage = WorkspacePageKind.Extensions;
         });
-        OpenOfficeCommand = new RelayCommand(_ => WorkspacePage = WorkspacePageKind.Office);
-        CloseWorkspacePageCommand = new RelayCommand(_ => CloseWorkspacePage());
-        ToggleDetailsPaneCommand = new RelayCommand(_ =>
+        CloseWorkspacePageCommand = new RelayCommand(_ => CloseWorkspacePage());        ToggleDetailsPaneCommand = new RelayCommand(_ =>
         {
             IsDetailsPaneOpen = !IsDetailsPaneOpen;
             foreach (var tab in Tabs) tab.RaiseDetailsPaneChanged();
@@ -129,8 +127,32 @@ public sealed class ShellViewModel : ViewModelBase
         get => _isDualPaneOpen;
         private set
         {
-            if (Set(ref _isDualPaneOpen, value)) OnPropertyChanged(nameof(IsFilesAreaVisible));
+            if (Set(ref _isDualPaneOpen, value))
+            {
+                OnPropertyChanged(nameof(IsFilesAreaVisible));
+                RaiseDualPaneState();
+            }
         }
+    }
+
+    /// <summary>
+    /// The second folder pane belongs to the file-manager surface; document mode hides it together
+    /// with the tab strip, toolbar and status bar so only the document and the sidebar remain.
+    /// </summary>
+    public bool IsDualPaneVisible => IsDualPaneOpen && !IsOfficePageOpen;
+
+    /// <summary>
+    /// Width of the dual-pane column. A bare "*" column keeps half the window even when its child
+    /// is collapsed, so the column is driven by the same flag that hides the pane.
+    /// </summary>
+    public GridLength DualPaneColumnWidth => IsDualPaneVisible
+        ? new GridLength(1, GridUnitType.Star)
+        : new GridLength(0);
+
+    private void RaiseDualPaneState()
+    {
+        OnPropertyChanged(nameof(IsDualPaneVisible));
+        OnPropertyChanged(nameof(DualPaneColumnWidth));
     }
 
     /// <summary>Secondary folder pane; created on first use and kept afterwards.</summary>
@@ -181,7 +203,6 @@ public sealed class ShellViewModel : ViewModelBase
     public ICommand CycleLanguageCommand { get; }
     public ICommand OpenCodeEditorCommand { get; }
     public ICommand OpenExtensionsCommand { get; }
-    public ICommand OpenOfficeCommand { get; }
     public ICommand CloseWorkspacePageCommand { get; }
     public ICommand ToggleTransferPaneCommand { get; }
     public ICommand ToggleDualPaneCommand { get; }
@@ -204,6 +225,8 @@ public sealed class ShellViewModel : ViewModelBase
             OnPropertyChanged(nameof(IsCodePageOpen));
             OnPropertyChanged(nameof(IsExtensionsPageOpen));
             OnPropertyChanged(nameof(IsOfficePageOpen));
+            OnPropertyChanged(nameof(IsFilesChromeVisible));
+            RaiseDualPaneState();
         }
     }
 
@@ -211,6 +234,13 @@ public sealed class ShellViewModel : ViewModelBase
     public bool IsCodePageOpen => WorkspacePage == WorkspacePageKind.Code;
     public bool IsExtensionsPageOpen => WorkspacePage == WorkspacePageKind.Extensions;
     public bool IsOfficePageOpen => WorkspacePage == WorkspacePageKind.Office;
+
+    /// <summary>
+    /// File-manager chrome (tab strip, navigation toolbar, command bar, status bar) is hidden in
+    /// document mode so the document owns the window. The sidebar is deliberately not part of
+    /// this: it stays as the file browser next to the document.
+    /// </summary>
+    public bool IsFilesChromeVisible => !IsOfficePageOpen;
 
     public ExtensionDiscoveryService ExtensionDiscovery => _extensionDiscovery ??= new ExtensionDiscoveryService();
     public CodeEditorViewModel CodeEditor => _codeEditor ??= new CodeEditorViewModel(ExtensionDiscovery) { Shell = this };
@@ -224,10 +254,32 @@ public sealed class ShellViewModel : ViewModelBase
         WorkspacePage = WorkspacePageKind.Code;
     }
 
-    /// <summary>Opens a Word / Excel / PowerPoint file in the built-in Office page.</summary>
+    /// <summary>
+    /// Opens a Word / Excel / PowerPoint file in document mode: the file-manager chrome collapses
+    /// and the document takes the window, with the sidebar left as a file browser.
+    /// </summary>
     public async Task OpenOfficeFileAsync(string path)
     {
+        // The sidebar stays usable in document mode, so switching documents is one click away.
+        // Ask before silently dropping unsaved edits.
+        if (Office.HasDocument && Office.IsDirty)
+        {
+            var discard = await CreateUiServices().ConfirmAsync(
+                Loc.T("OfficeUnsavedTitle"), Loc.T("OfficeUnsavedSwitch")).ConfigureAwait(true);
+            if (!discard) return;
+        }
+
         await Office.OpenAsync(path);
+
+        // A failed load leaves no document behind; report it instead of collapsing the file
+        // manager only to show an empty page.
+        if (!Office.HasDocument)
+        {
+            await CreateUiServices().ShowInfoAsync(
+                Loc.T("OfficeOpenFailedTitle"), Office.Status).ConfigureAwait(true);
+            return;
+        }
+
         WorkspacePage = WorkspacePageKind.Office;
     }
 
@@ -262,6 +314,11 @@ public sealed class ShellViewModel : ViewModelBase
     {
         if (!VfsPath.IsVirtualPath(path)) return path;
 
+        // A web file already has a stable cache entry; reusing it avoids downloading twice.
+        var scheme = VfsPath.Parse(path).Scheme;
+        if (scheme is VfsScheme.Http or VfsScheme.Https)
+            return await WebCacheService.DownloadAsync(path).ConfigureAwait(false);
+
         var name = VfsPath.Parse(path).FileName;
         if (string.IsNullOrWhiteSpace(name)) name = "entry";
         var folder = Path.Combine(Path.GetTempPath(), "FileHub", "open");
@@ -276,7 +333,20 @@ public sealed class ShellViewModel : ViewModelBase
 
     public void CloseWorkspacePage()
     {
+        // Leaving document mode with unsaved edits is the second place data could vanish.
+        if (IsOfficePageOpen && Office.HasDocument && Office.IsDirty)
+        {
+            _ = ConfirmCloseDocumentAsync();
+            return;
+        }
         WorkspacePage = WorkspacePageKind.Files;
+    }
+
+    private async Task ConfirmCloseDocumentAsync()
+    {
+        var discard = await CreateUiServices().ConfirmAsync(
+            Loc.T("OfficeUnsavedTitle"), Loc.T("OfficeUnsavedClose")).ConfigureAwait(true);
+        if (discard) WorkspacePage = WorkspacePageKind.Files;
     }
 
     /// <summary>
@@ -394,9 +464,8 @@ public sealed class ShellViewModel : ViewModelBase
             new PaletteItem("Undo", "Edit", "undo revert", () => StepUndoAsync(true)),
             new PaletteItem("Redo", "Edit", "redo repeat", () => StepUndoAsync(false)),
             new PaletteItem("Open code editor", "Workspace", "monaco code editor source", () => { WorkspacePage = WorkspacePageKind.Code; return Task.CompletedTask; }),
-            new PaletteItem("Open office workspace", "Workspace", "word excel powerpoint docx xlsx pptx", () => { WorkspacePage = WorkspacePageKind.Office; return Task.CompletedTask; }),
             new PaletteItem("Open extensions", "Workspace", "vs code extensions marketplace", () => { WorkspacePage = WorkspacePageKind.Extensions; return Task.CompletedTask; }),
-            new PaletteItem("Close workspace page", "Workspace", "back to files escape", () => { CloseWorkspacePage(); return Task.CompletedTask; })
+            new PaletteItem("Back to files", "Workspace", "close document back to files escape", () => { CloseWorkspacePage(); return Task.CompletedTask; })
         };
 
         // Plugin contributions are appended so a third-party command sits beside the built-ins.
@@ -427,9 +496,20 @@ public sealed class ShellViewModel : ViewModelBase
         if (Tabs.Count == 0)
         {
             // A path passed by the shell or a filehub:// link wins over the restored session.
+            // A document path opens the folder it lives in and then the document itself, so
+            // "filehub report.docx" lands in document mode rather than failing to list a file.
             if (Program.StartupPath is { Length: > 0 } startup)
             {
-                AddTab(startup);
+                if (File.Exists(startup))
+                {
+                    var folder = Path.GetDirectoryName(startup);
+                    AddTab(string.IsNullOrEmpty(folder) ? null : folder);
+                    _ = OpenFileAsync(startup);
+                }
+                else
+                {
+                    AddTab(startup);
+                }
                 return ActiveTab;
             }
             var paths = LoadSession();

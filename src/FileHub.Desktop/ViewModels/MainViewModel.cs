@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Windows.Input;
 using Avalonia.Threading;
 using FileHub.Desktop.Models;
@@ -178,7 +179,18 @@ public sealed class MainViewModel : ViewModelBase
         }
     }
 
-    public string AddressText { get => _addressText; set => Set(ref _addressText, value); }
+    public string AddressText
+    {
+        get => _addressText;
+        set
+        {
+            if (!Set(ref _addressText, value)) return;
+            OnPropertyChanged(nameof(IsAddressUrl));
+        }
+    }
+
+    /// <summary>True while the address box holds a URL the resolver will take over on Enter.</summary>
+    public bool IsAddressUrl => WebLocationService.TryParse(AddressText, out _);
 
     public string SearchQuery
     {
@@ -247,6 +259,19 @@ public sealed class MainViewModel : ViewModelBase
         // Browsing inside an archive adds a pin for the container so it is one click away.
         foreach (var archive in RecentArchives())
             Locations.Add(archive);
+
+        // URLs opened from the address bar come back as ordinary locations.
+        foreach (var web in WebHistoryStore.Load().Take(6))
+        {
+            Locations.Add(new LocationEntry
+            {
+                Name = web.Title,
+                Path = web.Url,
+                IconKey = "Globe",
+                Kind = LocationKind.QuickAccess,
+                Detail = "Web"
+            });
+        }
     }
 
     private IEnumerable<LocationEntry> RecentArchives()
@@ -284,6 +309,15 @@ public sealed class MainViewModel : ViewModelBase
     {
         if (string.IsNullOrWhiteSpace(path)) return;
         var trimmed = path.Trim().Trim('"');
+
+        // A URL is resolved before the filesystem sees it. It may be a browsable folder, a
+        // single file to download, or an ordinary page that belongs in the browser.
+        if (WebLocationService.TryParse(trimmed, out var webUrl))
+        {
+            await NavigateWebAsync(webUrl, recordHistory).ConfigureAwait(true);
+            return;
+        }
+
         string full;
         if (VfsPath.IsVirtualPath(trimmed))
         {
@@ -302,6 +336,85 @@ public sealed class MainViewModel : ViewModelBase
             }
         }
 
+        await NavigateCoreAsync(full, recordHistory).ConfigureAwait(true);
+    }
+
+    /// <summary>
+    /// Opens what a URL points at: folders are browsed in place, files are pulled into the URL
+    /// cache and opened with the matching viewer, pages go to the system browser.
+    /// </summary>
+    private async Task NavigateWebAsync(string url, bool recordHistory)
+    {
+        StatusText = Loc.T("StatusWebResolving");
+        try
+        {
+            var location = await WebLocationService.ResolveAsync(url).ConfigureAwait(true);
+            switch (location.Kind)
+            {
+                case WebLocationKind.Folder:
+                    WebHistoryStore.Record(location.BrowsablePath);
+                    LoadLocations(force: true);
+                    await NavigateCoreAsync(location.BrowsablePath, recordHistory).ConfigureAwait(true);
+                    break;
+
+                case WebLocationKind.File:
+                    await DownloadAndOpenAsync(location).ConfigureAwait(true);
+                    break;
+
+                default:
+                    OpenInBrowser(location.Url);
+                    ShowInfo(Loc.T("MsgWebPageTitle"), Loc.F("MsgWebPageBody", location.Url),
+                        FAInfoBarSeverity.Informational);
+                    StatusText = Loc.F("StatusItems", Entries.Count);
+                    break;
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException
+                                       or NotSupportedException or TimeoutException or ArgumentException
+                                       or System.Net.Http.HttpRequestException)
+        {
+            ShowInfo(Loc.T("MsgWebFailed"), ex.Message, FAInfoBarSeverity.Error);
+            StatusText = Loc.F("StatusItems", Entries.Count);
+        }
+    }
+
+    private async Task DownloadAndOpenAsync(WebLocation location)
+    {
+        var name = location.SuggestedName ?? location.Url;
+        StatusText = Loc.F("StatusWebDownloading", name);
+        var progress = new Progress<double>(fraction =>
+            StatusText = Loc.F("StatusWebProgress", (int)Math.Round(fraction * 100)));
+
+        var local = await WebCacheService.DownloadAsync(location.Url, progress).ConfigureAwait(true);
+        WebHistoryStore.Record(location.Url, name);
+        LoadLocations(force: true);
+        StatusText = Loc.F("StatusItems", Entries.Count);
+        ShowInfo(Loc.T("MsgWebDownloaded"), local, FAInfoBarSeverity.Success);
+
+        try
+        {
+            await _ui.OpenFileAsync(local).ConfigureAwait(true);
+        }
+        catch (Exception ex)
+        {
+            ShowInfo(Loc.T("MsgCannotOpen"), ex.Message, FAInfoBarSeverity.Warning);
+        }
+    }
+
+    private static void OpenInBrowser(string url)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+        }
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException)
+        {
+            // No default browser: the info bar already names the URL.
+        }
+    }
+
+    private async Task NavigateCoreAsync(string full, bool recordHistory)
+    {
         if (!await VfsFileSystem.Default.DirectoryExistsAsync(full))
         {
             ShowInfo(Loc.T("MsgCannotOpenLocation"), Loc.F("MsgLocationDetail", full), FAInfoBarSeverity.Warning);

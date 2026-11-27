@@ -167,8 +167,11 @@ FluentUI-CodeHub widgets used: `FANavigationView` (sidebar), `FABreadcrumbBar` (
   local Monaco editor with syntax highlighting, language auto-detection, Ctrl+S save, an
   encoding-preserving writer, a dirty marker and a cursor readout. All assets are bundled, so
   editing works offline
-- **Built-in Office suite**: double-click a `.docx` / `.xlsx` / `.pptx` (or press Office in the tab
-  strip) to open a Microsoft-Office-style ribbon workspace with three real editors:
+- **Built-in Office suite**: double-click a `.docx` / `.xlsx` / `.pptx` and the file manager gets
+  out of the way - tab strip, navigation toolbar, command bar and status bar collapse, the document
+  takes the window, and the sidebar stays as a file browser. There is no separate "Office" button
+  to press; document mode is a consequence of opening a document, and Back (or Ctrl+W) returns to
+  the folder. Three real editors are included:
   - **Word**: page canvas, styles, font/size/colour, bold / italic / underline, alignment,
     bullets/numbering, tables, inline pictures, hyperlinks, find/replace, undo/redo and HTML export.
   - **Excel**: worksheet tabs, a scrollable cell grid, formula bar with a formula engine
@@ -230,6 +233,12 @@ FluentUI-CodeHub widgets used: `FANavigationView` (sidebar), `FABreadcrumbBar` (
   which makes drag-to-move between two trees trivial
 - **Command palette**: `Ctrl+Shift+P` lists every verb in the window with keywords, filtered as
   you type; plugin commands are appended to the same list
+- **Paste a URL into the address bar**: `https://`, `http://` and bare `www.` hosts are resolved
+  for you. A directory - either a WebDAV collection or a plain HTML index - opens as a folder you
+  can navigate, preview and copy from; a single file is pulled into the per-user web cache and
+  opened with the matching viewer; an ordinary web page is handed to the system browser instead of
+  showing an empty folder. `user:pass@host` in the URL becomes Basic credentials, and the hosts you
+  opened come back under Quick access
 - **Network locations**: add SMB, SFTP, WebDAV or S3-compatible endpoints from the palette. The
   bookmark is stored in `remote-locations.json`, the password in the OS keychain where available,
   and the location appears in the sidebar like a drive
@@ -381,9 +390,10 @@ FileHub/
     ├── FileHub.Files/     logic only, no UI dependency, unit-testable
     │   ├── Models/        FileEntry / LocationEntry
     │   ├── Plugin/        IFileHubPlugin contracts (commands, columns, previewers, providers)
-    │   ├── Vfs/           VfsPath / IFileSystemProvider / local + archive + SMB + SFTP + WebDAV + S3
+    │   ├── Vfs/           VfsPath / IFileSystemProvider / local + archive + http(s) + SMB + SFTP + WebDAV + S3
     │   └── Services/      FileSystemService / ArchiveService / TransferQueue / UndoService /
-    │                      BatchRenameService / FileInspector / WatchRuleService / RecycleBinService /
+    │                      BatchRenameService / FileInspector / WebLocationService / WebCacheService /
+    │                      WebHistoryStore / WatchRuleService / RecycleBinService /
     │                      PlatformService / FileClipboard / PreviewService / DirectoryWatcherService
     ├── FileHub.Code/      logic only, code editing + VS Code contribution data
     │   ├── Models/        ExtensionInfo / ExtensionLanguage / ExtensionTheme / ExtensionSnippet
@@ -432,6 +442,10 @@ FileHub/
   custom language id contributed by an extension is registered but renders as plain text
 - Some virtual / network volumes cannot raise change events; F5 manual refresh still works there
 - Recursive search has a fixed 300 item limit to keep large trees under control
+- Web locations follow what the server exposes: listings need PROPFIND or an HTML index, and
+  writing needs WebDAV (PUT/MKCOL/DELETE/MOVE). Uploading to a plain static server is refused with
+  the server's own status rather than a silent failure. Only Basic authentication is supported, and
+  the site's cookies are kept in memory for the session, never written to disk
 - Network providers are implemented but have not been exercised against real hardware in CI:
   SMB uses SMBLibrary (LGPL-3.0, dynamically linked — see THIRD-PARTY-NOTICES.md), SFTP uses
   SSH.NET without `known_hosts` verification, WebDAV assumes a standards-compliant PROPFIND, and

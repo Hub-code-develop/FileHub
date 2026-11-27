@@ -35,7 +35,7 @@
          The strip is our own WinUI 3 TabView port (WinUI3.Fluent), not the FluentAvalonia
          one: FA's add/close buttons are icon-font glyphs, and that font is not present on
          macOS or Linux, so they rendered as empty boxes. -->
-    <Border Grid.Row="0" Classes="tabBarSurface">
+    <Border Grid.Row="0" Classes="tabBarSurface" IsVisible="{Binding IsFilesChromeVisible}">
       <Grid ColumnDefinitions="*,Auto" Margin="8,0,8,0" VerticalAlignment="Bottom">
         <win:WinTabStrip x:Name="TabStrip" Grid.Column="0"
                          ItemsSource="{Binding Tabs}"
@@ -66,9 +66,6 @@
           <Button Classes="tabAction" ToolTip.Tip="{x:Static loc:Strings.ExtensionsTab}"
                   Content="{x:Static loc:Strings.ExtensionsTab}"
                   Command="{Binding OpenExtensionsCommand}" />
-          <Button Classes="tabAction" ToolTip.Tip="{x:Static loc:Strings.OfficeTab}"
-                  Content="{x:Static loc:Strings.OfficeTab}"
-                  Command="{Binding OpenOfficeCommand}" />
           <Button Classes="tabAction" ToolTip.Tip="{x:Static loc:Strings.ToggleTheme}"
                   Command="{Binding ToggleThemeCommand}">
             <ui:FASymbolIcon Symbol="Settings" FontSize="14" />
@@ -77,11 +74,23 @@
       </Grid>
     </Border>
 
-    <!-- Row 1: Files App NavigationToolbar.xaml (Height 48, 36x32 nav buttons, Omnibar). -->
+    <!-- Row 1: Files App NavigationToolbar.xaml (Height 48, 36x32 nav buttons, Omnibar).
+         Visibility is applied in code (ApplyShellVisibility): this control's DataContext is the
+         active tab, so a shell-level binding would resolve against the wrong view model. -->
     <t:FilesNavigationToolbar x:Name="NavToolbar" Grid.Row="1" />
 
-    <!-- Row 2: SidebarView + InnerContent (Files MainPage Grid.Row=2) -->
-    <Grid Grid.Row="2" ColumnDefinitions="Auto,Auto,*,Auto,*">
+    <!-- Row 2: SidebarView + InnerContent (Files MainPage Grid.Row=2).
+         The second pane's column collapses to zero when dual pane is off: a plain "*" column
+         keeps its share of the width even while its child is hidden, which used to squeeze the
+         main content into half the window. -->
+    <Grid Grid.Row="2">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="Auto" />
+        <ColumnDefinition Width="Auto" />
+        <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="Auto" />
+        <ColumnDefinition Width="{Binding DualPaneColumnWidth}" />
+      </Grid.ColumnDefinitions>
 
       <!-- Sidebar: Files App SidebarView.xaml, ported as Views/Controls/FilesSidebar.axaml. -->
       <t:FilesSidebar x:Name="Sidebar" Grid.Column="0" />
@@ -119,22 +128,24 @@
         </Grid>
       </Grid>
 
-      <!-- Full-area workspace pages (Monaco editor / VS Code extensions) sit above the Files
-           content so the ported Files layout stays untouched underneath. -->
+      <!-- Each page replaces its own DataContext in code-behind (OfficePage -> OfficeViewModel,
+           CodeEditorPage -> CodeEditorViewModel, ExtensionsPage -> ExtensionsViewModel), so their
+           visibility is applied from code in ApplyShellVisibility(); a binding here would resolve
+           against the page's own view model. Without that, all three stacks up at once. -->
       <Grid Grid.Column="2" IsVisible="{Binding IsWorkspacePageOpen}"
             Background="{DynamicResource SystemControlBackgroundAltHighBrush}">
-        <t:CodeEditorPage IsVisible="{Binding IsCodePageOpen}" />
-        <t:ExtensionsPage IsVisible="{Binding IsExtensionsPageOpen}" />
-        <t:OfficePage IsVisible="{Binding IsOfficePageOpen}" />
+        <t:CodeEditorPage x:Name="CodeEditorView" />
+        <t:ExtensionsPage x:Name="ExtensionsView" />
+        <t:OfficePage x:Name="DocumentView" />
       </Grid>
 
       <!-- Dual pane: a second folder with its own path, history, selection and drag targets.
            Kept at window level (not inside InnerContent) because InnerContent's DataContext is
            the active tab, and these bindings must resolve against the shell. -->
       <GridSplitter Grid.Column="3" Width="3" Background="Transparent"
-                    ResizeDirection="Columns" IsVisible="{Binding IsDualPaneOpen}" />
+                    ResizeDirection="Columns" IsVisible="{Binding IsDualPaneVisible}" />
 
-      <Grid Grid.Column="4" RowDefinitions="Auto,*" IsVisible="{Binding IsDualPaneOpen}"
+      <Grid Grid.Column="4" RowDefinitions="Auto,*" IsVisible="{Binding IsDualPaneVisible}"
             Margin="8,8,8,8">
         <Border Grid.Row="0" Padding="10,6" CornerRadius="6,6,0,0"
                 Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}">

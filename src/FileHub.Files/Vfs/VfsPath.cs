@@ -10,6 +10,7 @@
 //   sftp      sftp://user@host/var/www
 //   webdav    webdav://dav.example.com/remote.php/dav/files/me
 //   s3        s3://bucket/prefix
+//   https     https://example.com/files/report.pdf
 //
 // The canonical form is deliberately path-shaped so existing helpers (Path.GetFileName) keep
 // working; anything that needs the real location uses Parse.
@@ -24,6 +25,8 @@ public enum VfsScheme
     Sftp,
     WebDav,
     S3,
+    Http,
+    Https,
     Plugin
 }
 
@@ -42,6 +45,8 @@ public readonly record struct VfsPath(VfsScheme Scheme, string Authority, string
         VfsScheme.Sftp => "sftp",
         VfsScheme.WebDav => "webdav",
         VfsScheme.S3 => "s3",
+        VfsScheme.Http => "http",
+        VfsScheme.Https => "https",
         _ => "plugin"
     };
 
@@ -56,6 +61,8 @@ public readonly record struct VfsPath(VfsScheme Scheme, string Authority, string
             case "sftp": scheme = VfsScheme.Sftp; return true;
             case "webdav": scheme = VfsScheme.WebDav; return true;
             case "s3": scheme = VfsScheme.S3; return true;
+            case "http": scheme = VfsScheme.Http; return true;
+            case "https": scheme = VfsScheme.Https; return true;
             case "plugin": scheme = VfsScheme.Plugin; return true;
             default: scheme = VfsScheme.Plugin; return false;
         }
@@ -162,7 +169,10 @@ public readonly record struct VfsPath(VfsScheme Scheme, string Authority, string
             if (p.Length == 0) return null;
             var slash = p.LastIndexOf('/');
             if (slash < 0) return new VfsPath(Scheme, Authority, "/");
-            return new VfsPath(Scheme, Authority, "/" + p[..slash]);
+            // Web folders keep the trailing slash so going up does not cost a redirect, and so
+            // the parent of ".../a/b/" is ".../a/" rather than ".../a".
+            var keepSlash = Scheme is VfsScheme.Http or VfsScheme.Https;
+            return new VfsPath(Scheme, Authority, "/" + p[..slash] + (keepSlash ? "/" : string.Empty));
         }
     }
 

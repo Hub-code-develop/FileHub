@@ -1,6 +1,7 @@
 using Avalonia.Media.Imaging;
 using FileHub.Desktop.Services;
 using FileHub.Files.Models;
+using FileHub.Files.Vfs;
 using FileHub.Files.Services;
 using FluentAvalonia.UI.Controls;
 
@@ -78,6 +79,12 @@ public sealed class FileEntryViewModel : ViewModelBase
     public async Task EnsurePreviewAsync(int width, CancellationToken cancellationToken = default)
     {
         if (cancellationToken.IsCancellationRequested) return;
+
+        // Painting a folder of web images must not fire one download per row. Web entries get
+        // their preview when the user selects them or opens quick look.
+        if (width == ThumbnailService.ListWidth && VfsPath.IsVirtualPath(FullPath)
+            && VfsPath.Parse(FullPath).Scheme is VfsScheme.Http or VfsScheme.Https)
+            return;
 
         if (PreviewKind == PreviewKind.Image)
         {

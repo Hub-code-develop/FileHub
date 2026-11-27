@@ -133,8 +133,9 @@ macOS 优先读系统语言偏好是故意的：从 Finder 启动的 GUI 应用�
 - **Monaco 代码编辑器**：双击源代码文件（或点标签栏的「代码」）即可打开本地 Monaco 编辑器，
   支持语法高亮、语言自动识别、Ctrl+S 保存、保留原编码写入、未保存标记与光标位置显示。
   所有资源都随应用打包，离线也能写代码。
-- **内置 Office 工作套件**：双击 `.docx` / `.xlsx` / `.pptx`（或点标签栏「Office」）即可打开 Microsoft Office
-  风格的功能区工作区，内含三款真正可编辑的组件：
+- **内置 Office 工作套件**：双击 `.docx` / `.xlsx` / `.pptx` 即可进入文档模式 —— 标签栏、导航栏、
+  命令栏和状态栏自动收起，文档占据窗口，侧边栏保留为文件浏览器。没有单独的「Office」按钮需要按，
+  打开文档就是进入文档模式的唯一入口；点「文件」或 Ctrl+W 回到原文件夹。内含三款真正可编辑的组件：
   - **Word**：页面画布、样式、字体/字号/颜色、粗体/斜体/下划线、对齐、项目符号与编号、表格、内嵌图片、
     超链接、查找替换、撤销/重做与 HTML 导出。
   - **Excel**：工作表标签、可滚动单元格网格、公式栏与公式引擎（`SUM`、`AVERAGE`、`IF`、单元格引用与区域）、
@@ -173,6 +174,10 @@ macOS 优先读系统语言偏好是故意的：从 Finder 启动的 GUI 应用�
   图片、文本、Markdown、PDF 信息、音视频元数据、字体、压缩包、Office 属性与 EXIF 都在这里解析
 - **双栏对照**：右侧再开一个独立文件夹视图（各自路径、历史、选择），两边直接拖拽即可搬文件
 - **命令面板**：`Ctrl+Shift+P` 列出窗口内所有动作并支持关键词过滤，插件命令也接在同一列表
+- **地址栏直接贴网址**：`https://`、`http://` 和裸 `www.` 开头都会自动解析。目录（WebDAV 集合或
+  普通 HTML 索引页）会当成文件夹打开，可导航、预览、复制；单个文件会下载到用户级 web 缓存并用对应
+  查看器打开；普通网页则交给系统浏览器，而不是显示一个空文件夹。URL 里的 `user:pass@host` 会转成
+  Basic 认证，打开过的站点会回到"快速访问"
 - **网络位置**：从命令面板添加 SMB / SFTP / WebDAV / S3 兼容位置；书签存进 `remote-locations.json`，
   密码优先交给系统钥匙串，位置会像驱动器一样出现在侧栏
 - **插件**：把带 `plugin.json` 的文件夹放进 `%APPDATA%/FileHub/plugins` 即可。每个插件在独立的
@@ -310,9 +315,10 @@ FileHub/
     ├── FileHub.Files/     纯逻辑，无 UI 依赖，可单测
     │   ├── Models/        FileEntry / LocationEntry
     │   ├── Plugin/        IFileHubPlugin 契约（命令 / 列 / 预览器 / Provider）
-    │   ├── Vfs/           VfsPath / IFileSystemProvider / 本地 + 压缩包 + SMB + SFTP + WebDAV + S3
+    │   ├── Vfs/           VfsPath / IFileSystemProvider / 本地 + 压缩包 + http(s) + SMB + SFTP + WebDAV + S3
     │   └── Services/      FileSystemService / ArchiveService / TransferQueue / UndoService /
-    │                      BatchRenameService / FileInspector / WatchRuleService / RecycleBinService /
+    │                      BatchRenameService / FileInspector / WebLocationService / WebCacheService /
+    │                      WebHistoryStore / WatchRuleService / RecycleBinService /
     │                      PlatformService / FileClipboard / PreviewService / DirectoryWatcherService
     ├── FileHub.Code/      纯逻辑，代码编辑与 VS Code 贡献数据
     │   ├── Models/        ExtensionInfo / ExtensionLanguage / ExtensionTheme / ExtensionSnippet
@@ -357,6 +363,9 @@ FileHub/
 - FileHub **不是** VS Code 扩展宿主：不会执行扩展 JavaScript，也不运行语言服务器、调试器和扩展贡献的界面；
   只读取声明式的语言 / 主题 / 代码片段贡献
 - 不执行 TextMate 语法文件。高亮来自 Monaco 自带语言集；扩展贡献的自定义语言 id 会注册，但按纯文本显示
+- 网页位置的能力取决于服务器：列举需要 PROPFIND 或 HTML 索引页，写入需要 WebDAV
+  （PUT/MKCOL/DELETE/MOVE）。向纯静态服务器上传会如实回报服务器状态码，不会静默成功。
+  认证只支持 Basic，站点 Cookie 仅保存在会话内存里，不落盘
 - 部分虚拟 / 网络卷无法产生变更事件，这些目录仍可用 F5 手动刷新
 - 递归搜索固定 300 项上限，避免在大目录里失控
 - 缩略图覆盖 Avalonia 的 Skia 解码器支持的常见位图格式；SVG、HEIC、视频缩略图需要平台编解码器，目前回退到分类图标

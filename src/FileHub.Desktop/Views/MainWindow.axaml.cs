@@ -61,6 +61,7 @@ public partial class MainWindow : Window
                 Dispatcher.UIThread.Post(() => PaletteBox.Focus(), DispatcherPriority.Input);
         };
         SyncActiveTab();
+        ApplyShellVisibility();
 
         Vm.LoadLocations();
         BuildNavigation(Vm.Locations);
@@ -77,7 +78,38 @@ public partial class MainWindow : Window
 
     private void OnShellPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(ShellViewModel.ActiveTab)) SyncActiveTab();
+        switch (e.PropertyName)
+        {
+            case nameof(ShellViewModel.ActiveTab):
+                SyncActiveTab();
+                break;
+            case nameof(ShellViewModel.IsFilesChromeVisible):
+            case nameof(ShellViewModel.IsCodePageOpen):
+            case nameof(ShellViewModel.IsExtensionsPageOpen):
+            case nameof(ShellViewModel.IsOfficePageOpen):
+                ApplyShellVisibility();
+                break;
+        }
+    }
+
+    /// <summary>
+    /// Applies shell-level visibility to regions whose DataContext is something else: the
+    /// navigation toolbar, content area and status bar are re-pointed at the active tab in
+    /// SyncActiveTab, and the three workspace pages own their view models. Binding these in XAML
+    /// therefore resolved against the wrong object (silently failing, and leaving the code editor,
+    /// extensions and Office pages stacked on top of each other). Setting them here is explicit.
+    /// </summary>
+    private void ApplyShellVisibility()
+    {
+        // Document mode: only the document and the sidebar stay on screen.
+        var chrome = _shell.IsFilesChromeVisible;
+        NavToolbar.IsVisible = chrome;
+        InnerContent.IsVisible = chrome;
+        StatusBar.IsVisible = chrome;
+
+        CodeEditorView.IsVisible = _shell.IsCodePageOpen;
+        ExtensionsView.IsVisible = _shell.IsExtensionsPageOpen;
+        DocumentView.IsVisible = _shell.IsOfficePageOpen;
     }
 
     /// <summary>Points the content area, address bar and status bar at the active tab.</summary>
@@ -620,7 +652,14 @@ public partial class MainWindow : Window
         }
         if (ctrl && shift && args.Key == Key.T) { _shell.ReopenClosedTab(); args.Handled = true; return; }
         if (ctrl && shift && args.Key == Key.D) { _shell.DuplicateActiveTab(); args.Handled = true; return; }
-        if (ctrl && !alt && args.Key == Key.W) { _shell.CloseActiveTab(); args.Handled = true; return; }
+        if (ctrl && !alt && args.Key == Key.W)
+        {
+            // The tab strip is hidden in document mode, so Ctrl+W means "close the document".
+            if (_shell.IsOfficePageOpen) _shell.CloseWorkspacePage();
+            else _shell.CloseActiveTab();
+            args.Handled = true;
+            return;
+        }
         if (ctrl && shift && args.Key == Key.Left) { _shell.MoveActiveTab(-1); args.Handled = true; return; }
         if (ctrl && shift && args.Key == Key.Right) { _shell.MoveActiveTab(1); args.Handled = true; return; }
         if (ctrl && !alt && !shift && args.Key >= Key.D1 && args.Key <= Key.D8)

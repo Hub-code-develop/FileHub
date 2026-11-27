@@ -22,6 +22,10 @@ public sealed class VfsFileSystem
     {
         VfsRegistry.Register(Local);
         VfsRegistry.Register(new ArchiveFileSystemProvider());
+        // A URL pasted into the address bar becomes an ordinary location, so plain http(s)
+        // paths browse, preview and copy like everything else.
+        VfsRegistry.Register(new HttpFileSystemProvider(VfsScheme.Http));
+        VfsRegistry.Register(new HttpFileSystemProvider(VfsScheme.Https));
     }
 
     /// <summary>
@@ -93,12 +97,17 @@ public sealed class VfsFileSystem
         if (vp.IsLocal) return await SearchLocalAsync(root, query, maxResults, ct).ConfigureAwait(false);
 
         var results = new List<FileEntry>();
-        var queue = new Queue<string>();
-        queue.Enqueue(root);
+        // A website is not a file tree: an index page can link anywhere. Crawling it without a
+        // budget would hammer the server, so web search is depth-limited and request-capped.
+        var isWeb = vp.Scheme is VfsScheme.Http or VfsScheme.Https;
+        var queue = new Queue<(string Path, int Depth)>();
+        queue.Enqueue((root, 0));
+        var visited = 0;
         while (queue.Count > 0 && results.Count < maxResults)
         {
             ct.ThrowIfCancellationRequested();
-            var dir = queue.Dequeue();
+            var (dir, depth) = queue.Dequeue();
+            if (isWeb && ++visited > 60) break;
             IReadOnlyList<FileEntry> children;
             try { children = await ListAsync(dir, includeHidden: false, ct).ConfigureAwait(false); }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException)
@@ -111,7 +120,7 @@ public sealed class VfsFileSystem
                     results.Add(child);
                     if (results.Count >= maxResults) break;
                 }
-                if (child.IsDirectory) queue.Enqueue(child.FullPath);
+                if (child.IsDirectory && (!isWeb || depth < 3)) queue.Enqueue((child.FullPath, depth + 1));
             }
         }
         return results;

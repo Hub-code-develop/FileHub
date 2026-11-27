@@ -1,13 +1,16 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="using:FluentAvalonia.UI.Controls"
              xmlns:loc="using:FileHub.Desktop.Services"
              xmlns:m="using:FileHub.Office.Models"
              xmlns:c="using:FileHub.Desktop.Views.Controls"
              x:Class="FileHub.Desktop.Views.Controls.OfficePage">
 
   <!--
-    Built-in Office workspace. The ribbon, page grid and slide canvas follow the Microsoft
-    Office information architecture while using FileHub's WinUI 3 styled controls.
+    Document mode. Opening a Word / Excel / PowerPoint file swaps the whole file-manager chrome
+    (tab strip, navigation toolbar, command bar, status bar) for this page; only the sidebar stays
+    as a file browser. The ribbon, page grid and slide canvas follow Microsoft Office's
+    information architecture while using FileHub's WinUI 3 styled controls.
   -->
   <UserControl.Resources>
     <loc:ByteArrayToImageConverter x:Key="OfficeImageConverter" />
@@ -18,12 +21,16 @@
     <DataTemplate DataType="m:WordParagraph">
       <Border Padding="2,3">
         <Panel>
+          <!-- The page is a white sheet even in the dark theme, so its text must not inherit the
+               theme's light foreground. -->
           <TextBox Text="{Binding PlainText, Mode=TwoWay}"
                    BorderThickness="0" Background="Transparent" Padding="4,3"
                    FontSize="14" TextWrapping="Wrap" AcceptsReturn="True"
+                   Foreground="#1B1B1B" CaretBrush="#1B1B1B"
                    IsVisible="{Binding IsEditing}"
                    GotFocus="OnParagraphGotFocus" LostFocus="OnParagraphLostFocus" />
           <TextBlock Text="{Binding DisplayText}" TextWrapping="Wrap" FontSize="14"
+                     Foreground="#1B1B1B"
                      Margin="4,3" IsVisible="{Binding !IsEditing}"
                      PointerPressed="OnParagraphDisplayPressed" />
         </Panel>
@@ -31,7 +38,7 @@
     </DataTemplate>
     <DataTemplate DataType="m:WordTable">
       <Border Margin="0,8" Padding="4"
-              BorderThickness="1" BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
+              BorderThickness="1" BorderBrush="#D0D0D0">
         <ItemsControl ItemsSource="{Binding Rows}">
           <ItemsControl.ItemTemplate>
             <DataTemplate>
@@ -45,9 +52,10 @@
                   <ItemsControl.ItemTemplate>
                     <DataTemplate DataType="m:WordTableCell">
                       <Border Width="150" BorderThickness="0,0,1,1"
-                              BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
+                              BorderBrush="#D0D0D0">
                         <TextBox Text="{Binding Text, Mode=TwoWay}" BorderThickness="0"
                                  Background="Transparent" FontSize="12" Padding="4,3"
+                                 Foreground="#1B1B1B" CaretBrush="#1B1B1B"
                                  GotFocus="OnTableGotFocus" LostFocus="OnTableLostFocus" />
                       </Border>
                     </DataTemplate>
@@ -73,8 +81,21 @@
     <!-- Title strip -->
     <Border Grid.Row="0" Classes="paneSurface" Padding="12,8">
       <Grid ColumnDefinitions="Auto,Auto,*,Auto" VerticalAlignment="Center">
-        <Button Grid.Column="0" Content="{x:Static loc:Strings.ClosePage}"
-                Command="{Binding CloseCommand}" Padding="10,4" />
+        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="4">
+          <Button Command="{Binding CloseCommand}" Padding="10,4"
+                  ToolTip.Tip="{x:Static loc:Strings.OfficeDocumentModeHint}">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <ui:FASymbolIcon Symbol="Back" FontSize="12" VerticalAlignment="Center" />
+              <TextBlock Text="{x:Static loc:Strings.OfficeBackToFiles}" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+          <!-- The sidebar is the only file-manager affordance kept in document mode; this keeps
+               it reachable when it was collapsed before opening the document. -->
+          <Button Command="{Binding Shell.ToggleSidebarCommand}" Padding="8,4"
+                  ToolTip.Tip="{x:Static loc:Strings.LblToggleSidebar}">
+            <ui:FASymbolIcon Symbol="ViewAll" FontSize="12" />
+          </Button>
+        </StackPanel>
         <Border Grid.Column="1" Width="4" Height="22" Margin="12,0,0,0" CornerRadius="2"
                 Background="#2B579A" />
         <StackPanel Grid.Column="2" Margin="10,0,0,0" Spacing="2">
@@ -91,7 +112,7 @@
           </StackPanel>
         </StackPanel>
         <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="10" Margin="12,0,0,0">
-          <TextBlock Text="{Binding ActiveTab}" Opacity="0.55" FontSize="12" />
+          <TextBlock Text="{Binding ActiveTabLabel}" Opacity="0.55" FontSize="12" />
           <TextBlock Text="{Binding DocumentTypeLabel}" Opacity="0.65" FontSize="12" />
         </StackPanel>
       </Grid>
@@ -108,7 +129,7 @@
         </ItemsControl.ItemsPanel>
         <ItemsControl.ItemTemplate>
           <DataTemplate>
-            <Button Content="{Binding}" Classes="subtle" Padding="14,6"
+            <Button Content="{Binding Label}" Classes="subtle" Padding="14,6"
                     Command="{Binding $parent[UserControl].DataContext.SelectTabCommand}"
                     CommandParameter="{Binding}" />
           </DataTemplate>
@@ -138,8 +159,10 @@
                   </ItemsControl.ItemsPanel>
                   <ItemsControl.ItemTemplate>
                     <DataTemplate>
-                      <ToggleButton Content="{Binding Label}" Width="44" MinHeight="28"
-                                    FontSize="12" Padding="4,2"
+                      <!-- MinWidth, not a fixed Width: Chinese ribbon labels are up to four
+                           characters and used to be clipped into unreadable fragments. -->
+                      <ToggleButton Content="{Binding Label}" MinWidth="52" MinHeight="28"
+                                    FontSize="12" Padding="8,3"
                                     ToolTip.Tip="{Binding ToolTip}"
                                     IsChecked="{Binding IsChecked, Mode=OneWay}"
                                     IsEnabled="{Binding IsEnabled}"
@@ -161,7 +184,8 @@
     <!-- Contextual tool strip -->
     <Border Grid.Row="3" Padding="12,6" BorderThickness="0,0,0,1"
             BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
-      <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+      <Grid ColumnDefinitions="*,Auto">
+      <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
 
         <!-- Word tools -->
         <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding IsWord}">
@@ -172,7 +196,18 @@
           <ComboBox ItemsSource="{Binding FontSizes}" SelectedItem="{Binding SelectedFontSize}"
                     Width="64" FontSize="12" />
           <ComboBox ItemsSource="{Binding FontColors}" SelectedItem="{Binding SelectedColor}"
-                    Width="80" FontSize="12" />
+                    Width="104" FontSize="12">
+            <ComboBox.ItemTemplate>
+              <DataTemplate>
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <Border Width="12" Height="12" CornerRadius="2"
+                          BorderThickness="1" BorderBrush="#808080"
+                          Background="{Binding Converter={x:Static loc:StringToBrushConverter.Instance}}" />
+                  <TextBlock Text="{Binding}" FontSize="11" VerticalAlignment="Center" />
+                </StackPanel>
+              </DataTemplate>
+            </ComboBox.ItemTemplate>
+          </ComboBox>
           <TextBlock Text="{x:Static loc:Strings.OfficeFind}" FontSize="11" Opacity="0.7"
                      Margin="12,0,0,0" VerticalAlignment="Center" />
           <TextBox Text="{Binding SearchText, Mode=TwoWay}" Width="120" FontSize="12"
@@ -223,6 +258,14 @@
                   Padding="10,4" />
         </StackPanel>
       </StackPanel>
+
+        <!-- The advanced OOXML panel is collapsed by default so the document gets the height;
+             this is its only always-visible toggle. -->
+        <Button Grid.Column="1" Content="{x:Static loc:Strings.OfficeAdvancedPanel}"
+                Command="{Binding ToggleAdvancedPanelCommand}" Padding="8,3" FontSize="11"
+                VerticalAlignment="Center"
+                ToolTip.Tip="{x:Static loc:Strings.OfficeRichDisclaimer}" />
+      </Grid>
     </Border>
 
     <!-- Document canvas -->
@@ -240,7 +283,8 @@
       <!-- Word: page canvas -->
       <ScrollViewer IsVisible="{Binding IsWord}" HorizontalScrollBarVisibility="Disabled">
         <Border Background="White" Margin="24" Padding="48,40" MaxWidth="860"
-                BorderThickness="1" BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
+                MinHeight="520" HorizontalAlignment="Stretch"
+                BorderThickness="1" BorderBrush="#D0D0D0">
           <ItemsControl ItemsSource="{Binding Blocks}" />
         </Border>
       </ScrollViewer>
@@ -357,6 +401,7 @@
                             BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
                       <TextBox Text="{Binding Text, Mode=TwoWay}" Background="Transparent"
                                BorderThickness="0" FontSize="{Binding FontSize}"
+                               Foreground="#1B1B1B" CaretBrush="#1B1B1B"
                                FontWeight="{Binding IsBold, Converter={x:Static loc:BoolToFontWeightConverter.Instance}}"
                                TextWrapping="Wrap" AcceptsReturn="True"
                                GotFocus="OnShapeGotFocus" LostFocus="OnShapeLostFocus" />
@@ -377,8 +422,9 @@
         <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,6">
           <TextBlock Grid.Column="0" Text="{x:Static loc:Strings.OfficeRichDisclaimer}"
                      FontSize="11" Opacity="0.6" TextTrimming="CharacterEllipsis" />
-          <Button Grid.Column="1" Content="{x:Static loc:Strings.OfficeAdvancedPanel}"
-                  Command="{Binding ToggleAdvancedPanelCommand}" Padding="8,2" FontSize="11" />
+          <Button Grid.Column="1" Content="&#x2715;"
+                  Command="{Binding ToggleAdvancedPanelCommand}" Padding="8,2" FontSize="11"
+                  ToolTip.Tip="{x:Static loc:Strings.OfficeAdvancedPanel}" />
         </Grid>
         <TabControl SelectedIndex="{Binding AdvancedPanelIndex}" FontSize="11">
           <TabItem Header="{x:Static loc:Strings.OfficeRevisionsTab}">

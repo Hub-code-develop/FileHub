@@ -62,7 +62,8 @@ public static class Loc
         ["Layout"] = new[] { "Layout", "布局" },
         ["EditAddress"] = new[] { "Edit path (Ctrl+L)", "编辑路径 (Ctrl+L)" },
         ["DeepSearch"] = new[] { "Search recursively in this folder", "在当前目录递归搜索" },
-        ["AddressPlaceholder"] = new[] { "Enter a full path and press Enter (~ supported)", "输入完整路径后回车，支持 ~ 开头" },
+        ["AddressUrlHint"] = new[] { "This is a URL - Enter opens it in FileHub", "这是网址，回车交给 FileHub 打开" },
+        ["AddressPlaceholder"] = new[] { "Path or URL, then Enter (~ and https:// supported)", "输入路径或网址后回车，支持 ~ 与 https://" },
         ["SearchPlaceholder"] = new[] { "Filter current folder...", "筛选当前目录..." },
         ["ColName"] = new[] { "Name", "名称" },
         ["ColSize"] = new[] { "Size", "大小" },
@@ -184,6 +185,10 @@ public static class Loc
         ["MsgWatcherChanged"] = new[] { "Folder changed on disk - list refreshed", "目录内容已变化 - 列表已刷新" },
         ["CodeTab"] = new[] { "Code", "代码" },
         ["OfficeTab"] = new[] { "Office", "Office" },
+        ["OfficeBackToFiles"] = new[] { "Files", "文件" },
+        ["OfficeDocumentModeHint"] = new[] { "Document mode - file manager panels are hidden while a document is open", "文档模式 - 打开文档时自动隐藏文件管理器界面" },
+        ["OfficeUnsavedTitle"] = new[] { "Unsaved changes", "未保存的修改" },        ["OfficeUnsavedSwitch"] = new[] { "The current document has unsaved changes. Open another document and lose them?", "当前文档有未保存的修改，打开其他文档会丢失这些修改。继续？" },
+        ["OfficeUnsavedClose"] = new[] { "The current document has unsaved changes. Leave document mode and lose them?", "当前文档有未保存的修改，返回文件列表会丢失这些修改。继续？" },
         ["OfficeWord"] = new[] { "Word document", "Word 文档" },
         ["OfficeExcel"] = new[] { "Excel workbook", "Excel 工作簿" },
         ["OfficePowerPoint"] = new[] { "PowerPoint presentation", "PowerPoint 演示文稿" },
@@ -205,6 +210,7 @@ public static class Loc
         ["OfficeOpened"] = new[] { "Opened {0}", "已打开 {0}" },
         ["OfficeSaved"] = new[] { "Saved", "已保存" },
         ["OfficeOpenFailed"] = new[] { "Cannot open document: {0}", "无法打开文档：{0}" },
+        ["OfficeOpenFailedTitle"] = new[] { "Cannot open document", "无法打开文档" },
         ["OfficeSaveFailed"] = new[] { "Cannot save: {0}", "无法保存：{0}" },
         ["OfficeCreateFailed"] = new[] { "Cannot create document: {0}", "无法创建文档：{0}" },
         ["OfficeEmpty"] = new[] { "No document open", "未打开文档" },
@@ -334,6 +340,13 @@ public static class Loc
         ["Compress"] = new[] { "Compress", "压缩" },
         ["Extract"] = new[] { "Extract", "解压" },
         ["AddRemoteLocation"] = new[] { "Add network location", "添加网络位置" },
+        ["StatusWebResolving"] = new[] { "Resolving URL...", "正在解析网址..." },
+        ["StatusWebDownloading"] = new[] { "Downloading {0}...", "正在下载 {0}..." },
+        ["StatusWebProgress"] = new[] { "Downloading... {0}%", "正在下载... {0}%" },
+        ["MsgWebPageTitle"] = new[] { "Opened in the browser", "已在浏览器打开" },
+        ["MsgWebPageBody"] = new[] { "{0} is a web page, not a folder, so it was opened in your default browser.", "{0} 是网页而不是文件夹，已交给默认浏览器打开。" },
+        ["MsgWebDownloaded"] = new[] { "Downloaded", "已下载" },
+        ["MsgWebFailed"] = new[] { "Cannot open this URL", "无法打开该网址" },
         ["CodeTitle"] = new[] { "Code editor", "代码编辑器" },
         ["CodeOpenFile"] = new[] { "Open file", "打开文件" },
         ["CodeSave"] = new[] { "Save", "保存" },
@@ -619,6 +632,7 @@ public static class Strings
     public static string Layout => Loc.T("Layout");
     public static string EditAddress => Loc.T("EditAddress");
     public static string DeepSearch => Loc.T("DeepSearch");
+    public static string AddressUrlHint => Loc.T("AddressUrlHint");
     public static string AddressPlaceholder => Loc.T("AddressPlaceholder");
     public static string SearchPlaceholder => Loc.T("SearchPlaceholder");
     public static string ColName => Loc.T("ColName");
@@ -741,6 +755,8 @@ public static class Strings
     public static string MsgWatcherChanged => Loc.T("MsgWatcherChanged");
     public static string CodeTab => Loc.T("CodeTab");
     public static string OfficeTab => Loc.T("OfficeTab");
+    public static string OfficeBackToFiles => Loc.T("OfficeBackToFiles");
+    public static string OfficeDocumentModeHint => Loc.T("OfficeDocumentModeHint");
     public static string OfficeWord => Loc.T("OfficeWord");
     public static string OfficeExcel => Loc.T("OfficeExcel");
     public static string OfficePowerPoint => Loc.T("OfficePowerPoint");
@@ -891,6 +907,13 @@ public static class Strings
     public static string Compress => Loc.T("Compress");
     public static string Extract => Loc.T("Extract");
     public static string AddRemoteLocation => Loc.T("AddRemoteLocation");
+    public static string StatusWebResolving => Loc.T("StatusWebResolving");
+    public static string StatusWebDownloading => Loc.T("StatusWebDownloading");
+    public static string StatusWebProgress => Loc.T("StatusWebProgress");
+    public static string MsgWebPageTitle => Loc.T("MsgWebPageTitle");
+    public static string MsgWebPageBody => Loc.T("MsgWebPageBody");
+    public static string MsgWebDownloaded => Loc.T("MsgWebDownloaded");
+    public static string MsgWebFailed => Loc.T("MsgWebFailed");
     public static string CodeTitle => Loc.T("CodeTitle");
     public static string CodeOpenFile => Loc.T("CodeOpenFile");
     public static string CodeSave => Loc.T("CodeSave");

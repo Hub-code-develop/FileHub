@@ -34,20 +34,25 @@
 
       <!-- Omnibar / Files' OmnibarPathMode -->
       <Border Grid.Column="5" Classes="omnibar" Margin="4,0,4,0">
-        <Grid ColumnDefinitions="Auto,*,Auto">
+        <Grid ColumnDefinitions="Auto,Auto,*,Auto">
           <Button Grid.Column="0" Classes="tabAction"
                   ToolTip.Tip="{x:Static loc:Strings.EditAddress}"
                   Command="{Binding EditAddressCommand}">
             <ui:FASymbolIcon Symbol="Edit" FontSize="13" />
           </Button>
-          <ui:FABreadcrumbBar Grid.Column="1" x:Name="_breadcrumb" Margin="6,0"
+          <!-- Appears only when the typed text is a URL, so it is clear who will handle Enter. -->
+          <ui:FASymbolIcon Grid.Column="1" Symbol="Globe" FontSize="12" Margin="4,0,0,0"
+                           VerticalAlignment="Center"
+                           IsVisible="{Binding IsAddressUrl}"
+                           ToolTip.Tip="{x:Static loc:Strings.AddressUrlHint}" />
+          <ui:FABreadcrumbBar Grid.Column="2" x:Name="_breadcrumb" Margin="6,0"
                               VerticalAlignment="Center" />
-          <TextBox Grid.Column="1" x:Name="_addressBox" Margin="6,0"
+          <TextBox Grid.Column="2" x:Name="_addressBox" Margin="6,0"
                    Text="{Binding AddressText, Mode=TwoWay}"
                    PlaceholderText="{x:Static loc:Strings.AddressPlaceholder}"
                    BorderThickness="0" Background="Transparent"
                    VerticalAlignment="Center" FontSize="12" IsVisible="False" />
-          <Button Grid.Column="2" Classes="tabAction"
+          <Button Grid.Column="3" Classes="tabAction"
                   ToolTip.Tip="{x:Static loc:Strings.DeepSearch}"
                   Command="{Binding DeepSearchCommand}">
             <ui:FASymbolIcon Symbol="Find" FontSize="13" />
