@@ -23,6 +23,7 @@ public partial class CodeEditorPage : UserControl
         _vm.FilePayloadReady += OnFilePayloadReady;
         _vm.ThemePayloadReady += OnThemePayloadReady;
         _vm.SnippetsPayloadReady += OnSnippetsPayloadReady;
+        _vm.OptionsPayloadReady += OnOptionsPayloadReady;
         _vm.SaveRequested += OnSaveRequested;
 
         EditorView.WebMessageReceived += OnWebMessage;
@@ -58,6 +59,9 @@ public partial class CodeEditorPage : UserControl
 
     private void OnSnippetsPayloadReady(string payload)
         => RunScript($"window.fileHub.registerSnippets({JsonSerializer.Serialize(payload)})");
+
+    private void OnOptionsPayloadReady(string payload)
+        => RunScript($"window.fileHub.applyOptions({JsonSerializer.Serialize(payload)})");
 
     private async void OnSaveRequested()
     {

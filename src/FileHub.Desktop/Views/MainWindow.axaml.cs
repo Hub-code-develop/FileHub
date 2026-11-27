@@ -3,8 +3,10 @@ using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Linq;
 using System.Windows.Input;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.VisualTree;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
 using FileHub.Code.Services;
@@ -15,6 +17,7 @@ using FileHub.Desktop.Services;
 using FileHub.Desktop.ViewModels;
 using FileHub.Files.Models;
 using FileHub.Files.Services;
+using FileHub.Files.Vfs;
 using FluentAvalonia.UI.Controls;
 using WinUI3.Fluent.Controls;
 
@@ -247,55 +250,256 @@ public partial class MainWindow : Window
         _ => FASymbol.Folder
     };
 
+    /// <summary>
+    /// Two context menus, rebuilt on every right click: one for a file/folder and one for empty
+    /// space. Files' CommandManager supplies the command identities, but the menu layout is
+    /// hand-built so it can show separators, submenus, check marks and shortcut hints - the
+    /// flat command list it replaced could not express any of that.
+    /// </summary>
     private void BuildContextMenus()
     {
-        FileList.ContextFlyout = CreateContextMenu();
-        GridList.ContextFlyout = CreateContextMenu();
+        foreach (var list in LayoutPage.FileViews)
+        {
+            list.ContextFlyout = CreateBackgroundMenu();
+            list.AddHandler(PointerPressedEvent, OnListRightPressed, RoutingStrategies.Tunnel);
+            list.AddHandler(ContextRequestedEvent, OnListContextRequested, RoutingStrategies.Tunnel);
+        }
+    }
+
+    /// <summary>Right click: select the item under the pointer before the flyout opens.</summary>
+    private void OnListRightPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (sender is not ListBox list) return;
+        if (!e.GetCurrentPoint(list).Properties.IsRightButtonPressed) return;
+
+        var hit = FindAncestor<ListBoxItem>(e.Source as Visual, list);
+        var entry = hit?.DataContext as FileEntryViewModel;
+        if (entry is null)
+        {
+            list.SelectedItems?.Clear();
+            Vm.SetSelection([]);
+            list.ContextFlyout = CreateBackgroundMenu();
+            return;
+        }
+
+        var selected = list.SelectedItems;
+        if (selected is null || !selected.Contains(entry))
+        {
+            selected?.Clear();
+            selected?.Add(entry);
+        }
+        list.ContextFlyout = CreateItemMenu(entry);
     }
 
     /// <summary>
-    /// Files builds context menus from its CommandManager; do the same so the menu and the
-    /// toolbar always expose the same command identities. Commands are resolved lazily by
-    /// CommandManager, so they always target the active tab.
+    /// Keyboard menu key / Shift+F10 has no pointer position; fall back to the current selection
+    /// and make sure the assigned flyout matches it.
     /// </summary>
-    private FAMenuFlyout CreateContextMenu()
+    private void OnListContextRequested(object? sender, ContextRequestedEventArgs e)
     {
-        var flyout = new FAMenuFlyout();
-        var commands = _shell.Commands.ContextCommands.ToList();
-        for (var i = 0; i < commands.Count; i++)
+        if (sender is not ListBox list) return;
+
+        FileEntryViewModel? entry = null;
+        if (e.TryGetPosition(list, out var point))
         {
-            var command = commands[i];
-            flyout.Items.Add(new FAMenuFlyoutItem
-            {
-                Text = command.Label,
-                IconSource = new FASymbolIconSource { Symbol = command.Symbol, FontSize = 16 },
-                Command = command,
-                CommandParameter = command.Parameter
-            });
+            // Pointer-opened menu: trust the position, so right-clicking blank space never falls
+            // back to the selection that happens to be active.
+            entry = FindAncestor<ListBoxItem>(list.InputHitTest(point) as Visual, list)?.DataContext
+                as FileEntryViewModel;
+        }
+        else
+        {
+            entry = list.SelectedItem as FileEntryViewModel;
         }
 
-        // Archive and batch operations are tab methods rather than CommandManager entries, so
-        // they are appended here and resolve the active tab at invoke time.
+        list.ContextFlyout = entry is null ? CreateBackgroundMenu() : CreateItemMenu(entry);
+    }
+
+    private static T? FindAncestor<T>(Visual? source, Visual stop) where T : Visual
+    {
+        while (source is not null && !ReferenceEquals(source, stop))
+        {
+            if (source is T match) return match;
+            source = source.GetVisualParent();
+        }
+        return null;
+    }
+
+    // ------------------------------------------------------------------ item menu
+
+    private FAMenuFlyout CreateItemMenu(FileEntryViewModel entry)
+    {
+        var flyout = new FAMenuFlyout();
+        var tab = Vm;
+        var selectionCount = Math.Max(1, tab.SelectedEntries.Count);
+        var multi = selectionCount > 1;
+        var isDir = entry.IsDirectory;
+        var isLocal = !VfsPath.IsVirtualPath(entry.FullPath);
+        var isArchive = !isDir && isLocal && ArchiveService.IsArchiveExtension(entry.FullPath);
+
+        flyout.Items.Add(MenuItem(Loc.T("CtxOpen"), FASymbol.OpenFile, tab.OpenCommand, entry, "Enter"));
+
+        var openWith = new FAMenuFlyoutSubItem
+        {
+            Text = Loc.T("CtxOpenWith"),
+            IconSource = new FASymbolIconSource { Symbol = FASymbol.OpenFile, FontSize = 16 }
+        };
+        if (!isDir && CodeLanguageService.IsCodeFile(entry.FullPath))
+        {
+            openWith.Items.Add(MenuItem(Loc.T("CtxOpenCode"), FASymbol.Code,
+                new RelayCommand(_ => _ = _shell.OpenCodeFileAsync(entry.FullPath))));
+        }
+        if (!isDir && FileHub.Office.Services.OfficeDocumentService.IsOfficeFile(entry.FullPath))
+        {
+            openWith.Items.Add(MenuItem(Loc.T("CtxOpenOffice"), FASymbol.Document,
+                new RelayCommand(_ => _ = _shell.OpenOfficeFileAsync(entry.FullPath))));
+        }
+        openWith.Items.Add(MenuItem(Loc.T("CtxOpenPreview"), FASymbol.View,
+            new RelayCommand(_ => _ = _shell.OpenQuickLookAsync(entry.FullPath))));
+        openWith.Items.Add(new FAMenuFlyoutSeparator());
+        openWith.Items.Add(MenuItem(Loc.T("CtxOpenSystem"), FASymbol.OpenFolder,
+            new RelayCommand(_ => _ = _shell.OpenWithSystemAsync(entry.FullPath))));
+        flyout.Items.Add(openWith);
+
+        if (isDir)
+        {
+            flyout.Items.Add(MenuItem(Loc.T("CtxOpenNewTab"), FASymbol.Add,
+                new RelayCommand(_ => _shell.AddTab(entry.FullPath))));
+        }
+
         flyout.Items.Add(new FAMenuFlyoutSeparator());
-        flyout.Items.Add(new FAMenuFlyoutItem
+        flyout.Items.Add(MenuItem(Loc.T("LblCut"), FASymbol.Cut, tab.CutCommand, null, "Ctrl+X"));
+        flyout.Items.Add(MenuItem(Loc.T("LblCopy"), FASymbol.Copy, tab.CopyCommand, null, "Ctrl+C"));
+        flyout.Items.Add(MenuItem(Loc.T("LblPaste"), FASymbol.Paste, tab.PasteCommand, null, "Ctrl+V"));
+
+        if (multi)
         {
-            Text = Loc.T("Compress"),
-            IconSource = new FASymbolIconSource { Symbol = FASymbol.ZipFolder, FontSize = 16 },
-            Command = new RelayCommand(_ => _ = Vm.CompressSelectionAsync())
-        });
-        flyout.Items.Add(new FAMenuFlyoutItem
+            flyout.Items.Add(MenuItem(Loc.T("BatchRename"), FASymbol.Edit,
+                new RelayCommand(_ => _ = tab.OpenBatchRenameAsync())));
+        }
+        else
         {
-            Text = Loc.T("Extract"),
-            IconSource = new FASymbolIconSource { Symbol = FASymbol.OpenFile, FontSize = 16 },
-            Command = new RelayCommand(_ => _ = Vm.ExtractArchiveAsync())
-        });
-        flyout.Items.Add(new FAMenuFlyoutItem
+            flyout.Items.Add(MenuItem(Loc.T("LblRename"), FASymbol.Edit, tab.RenameCommand, null, "F2"));
+        }
+        flyout.Items.Add(MenuItem(Loc.T("LblDelete"), FASymbol.Delete, tab.DeleteCommand, null, "Delete"));
+
+        flyout.Items.Add(new FAMenuFlyoutSeparator());
+        flyout.Items.Add(MenuItem(Loc.T("Compress"), FASymbol.ZipFolder,
+            new RelayCommand(_ => _ = tab.CompressSelectionAsync())));
+        if (isArchive)
         {
-            Text = Loc.T("BatchRename"),
-            IconSource = new FASymbolIconSource { Symbol = FASymbol.Edit, FontSize = 16 },
-            Command = new RelayCommand(_ => _ = Vm.OpenBatchRenameAsync())
-        });
+            flyout.Items.Add(MenuItem(Loc.T("Extract"), FASymbol.OpenFolder,
+                new RelayCommand(_ => _ = tab.ExtractArchiveAsync())));
+        }
+
+        flyout.Items.Add(new FAMenuFlyoutSeparator());
+        flyout.Items.Add(MenuItem(Loc.T("CtxCopyPath"), FASymbol.Link, tab.CopyPathCommand, null, "Ctrl+Shift+C"));
+        flyout.Items.Add(MenuItem(Loc.T("CtxCopyName"), FASymbol.Document, tab.CopyNameCommand));
+        if (isLocal)
+        {
+            flyout.Items.Add(MenuItem(Loc.T("CtxReveal"), FASymbol.OpenFolder, tab.RevealCommand));
+        }
+        if (isDir && isLocal)
+        {
+            flyout.Items.Add(MenuItem(Loc.T("CtxOpenTerminal"), FASymbol.Code, tab.OpenTerminalCommand));
+        }
+
+        flyout.Items.Add(new FAMenuFlyoutSeparator());
+        flyout.Items.Add(MenuItem(Loc.T("LblProperties"), FASymbol.ContactInfo, tab.PropertiesCommand, null, "Alt+Enter"));
         return flyout;
+    }
+
+    // ------------------------------------------------------------------ background menu
+
+    private FAMenuFlyout CreateBackgroundMenu()
+    {
+        var flyout = new FAMenuFlyout();
+        var tab = Vm;
+
+        flyout.Items.Add(MenuItem(Loc.T("LblNew"), FASymbol.Add, tab.NewFolderCommand, null, "Ctrl+Shift+N"));
+        flyout.Items.Add(MenuItem(Loc.T("LblPaste"), FASymbol.Paste, tab.PasteCommand, null, "Ctrl+V"));
+        flyout.Items.Add(MenuItem(Loc.T("Refresh"), FASymbol.Refresh, tab.RefreshCommand, null, "F5"));
+        flyout.Items.Add(new FAMenuFlyoutSeparator());
+
+        var sort = new FAMenuFlyoutSubItem
+        {
+            Text = Loc.T("CtxSortBy"),
+            IconSource = new FASymbolIconSource { Symbol = FASymbol.Sort, FontSize = 16 }
+        };
+        sort.Items.Add(CheckedItem(Loc.T("SortName"), tab.IsSortedBy("Name"),
+            new RelayCommand(_ => tab.SetSortCommand.Execute("Name"))));
+        sort.Items.Add(CheckedItem(Loc.T("SortModified"), tab.IsSortedBy("Modified"),
+            new RelayCommand(_ => tab.SetSortCommand.Execute("Modified"))));
+        sort.Items.Add(CheckedItem(Loc.T("SortSize"), tab.IsSortedBy("Size"),
+            new RelayCommand(_ => tab.SetSortCommand.Execute("Size"))));
+        sort.Items.Add(CheckedItem(Loc.T("SortKind"), tab.IsSortedBy("Kind"),
+            new RelayCommand(_ => tab.SetSortCommand.Execute("Kind"))));
+        sort.Items.Add(new FAMenuFlyoutSeparator());
+        sort.Items.Add(CheckedItem(Loc.T("CtxSortAsc"), !tab.SortDescending,
+            new RelayCommand(_ => tab.SetSortCommand.Execute(tab.SortColumn + ":asc"))));
+        sort.Items.Add(CheckedItem(Loc.T("CtxSortDesc"), tab.SortDescending,
+            new RelayCommand(_ => tab.SetSortCommand.Execute(tab.SortColumn + ":desc"))));
+        flyout.Items.Add(sort);
+
+        var view = new FAMenuFlyoutSubItem
+        {
+            Text = Loc.T("CtxView"),
+            IconSource = new FASymbolIconSource { Symbol = FASymbol.ViewAll, FontSize = 16 }
+        };
+        view.Items.Add(CheckedItem(Loc.T("CtxViewDetails"), tab.IsDetailsView,
+            new RelayCommand(_ => tab.SetViewCommand.Execute("list"))));
+        view.Items.Add(CheckedItem(Loc.T("CtxViewIcons"), tab.IsGridView,
+            new RelayCommand(_ => tab.SetViewCommand.Execute("grid"))));
+        flyout.Items.Add(view);
+
+        flyout.Items.Add(CheckedItem(Loc.T("LblHidden"), tab.ShowHiddenFiles, tab.ToggleHiddenCommand,
+            "Ctrl+H"));
+        flyout.Items.Add(MenuItem(Loc.T("LblSelect"), FASymbol.ViewAll, tab.SelectAllCommand, null, "Ctrl+A"));
+
+        flyout.Items.Add(new FAMenuFlyoutSeparator());
+        flyout.Items.Add(MenuItem(Loc.T("CtxOpenTerminal"), FASymbol.Code, tab.OpenTerminalCommand));
+        flyout.Items.Add(MenuItem(Loc.T("LblSettings"), FASymbol.Settings, _shell.OpenSettingsCommand, null, "Ctrl+,"));
+        return flyout;
+    }
+
+    // ------------------------------------------------------------------ helpers
+
+    private static FAMenuFlyoutItem MenuItem(
+        string text, FASymbol symbol, ICommand command, object? parameter = null, string? hotKey = null)
+    {
+        var item = new FAMenuFlyoutItem
+        {
+            Text = text,
+            IconSource = new FASymbolIconSource { Symbol = symbol, FontSize = 16 },
+            Command = command,
+            CommandParameter = parameter
+        };
+        if (!string.IsNullOrEmpty(hotKey))
+        {
+            try { item.HotKey = KeyGesture.Parse(hotKey); }
+            catch (FormatException) { }
+        }
+        return item;
+    }
+
+    /// <summary>A menu entry with a tick in the icon slot when it is the current state.</summary>
+    private static FAMenuFlyoutItem CheckedItem(
+        string text, bool isChecked, ICommand command, string? hotKey = null)
+    {
+        var item = new FAMenuFlyoutItem
+        {
+            Text = text,
+            IconSource = isChecked
+                ? new FASymbolIconSource { Symbol = FASymbol.Accept, FontSize = 14 }
+                : null,
+            Command = command
+        };
+        if (!string.IsNullOrEmpty(hotKey))
+        {
+            try { item.HotKey = KeyGesture.Parse(hotKey); }
+            catch (FormatException) { }
+        }
+        return item;
     }
 
     private void WireEvents()
@@ -354,18 +558,23 @@ public partial class MainWindow : Window
         _shell.Activate(tab);
 
         var menu = new FAMenuFlyout();
-        menu.Items.Add(TabMenuItem(Loc.T("NewTab"), _shell.NewTabCommand));
-        menu.Items.Add(TabMenuItem(Loc.T("DuplicateTab"), new RelayCommand(_ => _shell.DuplicateActiveTab())));
-        menu.Items.Add(TabMenuItem(Loc.T("CloseTab"), new RelayCommand(_ => _shell.CloseActiveTab())));
-        menu.Items.Add(TabMenuItem(Loc.T("CloseOtherTabs"), new RelayCommand(_ => _shell.CloseOtherTabs(tab))));
-        menu.Items.Add(TabMenuItem(Loc.T("CloseTabsToRight"), new RelayCommand(_ => _shell.CloseTabsToRight(tab))));
-        menu.Items.Add(TabMenuItem(Loc.T("PreviousTab"), new RelayCommand(_ => _shell.ActivatePreviousTab())));
-        menu.Items.Add(TabMenuItem(Loc.T("NextTab"), new RelayCommand(_ => _shell.ActivateNextTab())));
+        menu.Items.Add(MenuItem(Loc.T("NewTab"), FASymbol.Add, _shell.NewTabCommand, null, "Ctrl+T"));
+        menu.Items.Add(MenuItem(Loc.T("DuplicateTab"), FASymbol.Copy,
+            new RelayCommand(_ => _shell.DuplicateActiveTab()), null, "Ctrl+Shift+D"));
+        menu.Items.Add(new FAMenuFlyoutSeparator());
+        menu.Items.Add(MenuItem(Loc.T("CloseTab"), FASymbol.Delete,
+            new RelayCommand(_ => _shell.CloseActiveTab()), null, "Ctrl+W"));
+        menu.Items.Add(MenuItem(Loc.T("CloseOtherTabs"), FASymbol.Delete,
+            new RelayCommand(_ => _shell.CloseOtherTabs(tab))));
+        menu.Items.Add(MenuItem(Loc.T("CloseTabsToRight"), FASymbol.Delete,
+            new RelayCommand(_ => _shell.CloseTabsToRight(tab))));
+        menu.Items.Add(new FAMenuFlyoutSeparator());
+        menu.Items.Add(MenuItem(Loc.T("PreviousTab"), FASymbol.Back,
+            new RelayCommand(_ => _shell.ActivatePreviousTab()), null, "Ctrl+Shift+Tab"));
+        menu.Items.Add(MenuItem(Loc.T("NextTab"), FASymbol.ChevronRight,
+            new RelayCommand(_ => _shell.ActivateNextTab()), null, "Ctrl+Tab"));
         menu.ShowAt(args.Source as Control ?? TabStrip);
     }
-
-    private static FAMenuFlyoutItem TabMenuItem(string text, System.Windows.Input.ICommand command)
-        => new() { Text = text, Command = command };
 
     /// <summary>Drag-reorder: the strip reports source and destination indices.</summary>
     private void OnTabReordered(object? sender, TabReorderEventArgs args)

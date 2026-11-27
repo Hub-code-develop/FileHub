@@ -65,11 +65,29 @@ public sealed class MainViewModel : ViewModelBase
     private FAInfoBarSeverity _infoSeverity = FAInfoBarSeverity.Informational;
     private FileEntryViewModel? _primarySelection;
     private bool _hasSelection;
+    private bool _thumbnailsEnabled = true;
 
     public MainViewModel(UiServices ui)
     {
         _ui = ui;
         _watcher = new DirectoryWatcherService(OnDirectoryChanged);
+
+        // Per-tab view state starts as a copy of the saved defaults, so a new tab opens with the
+        // same layout the user left behind instead of the historical hard-coded details view.
+        var prefs = Preferences.Current;
+        _showHiddenFiles = prefs.ShowHiddenFiles;
+        _isDetailsView = !prefs.DefaultGridView;
+        _sortColumn = prefs.SortColumn;
+        _sortDescending = prefs.SortDescending;
+        _themeMode = prefs.ThemeMode;
+        _themeLabel = _themeMode switch
+        {
+            "light" => Loc.T("ThemeLight"),
+            "dark" => Loc.T("ThemeDark"),
+            _ => Loc.T("ThemeSystem")
+        };
+        _sortIndicator = SortLabel(_sortColumn) + (_sortDescending ? Loc.T("SortDesc") : Loc.T("SortAsc"));
+        _thumbnailsEnabled = prefs.ShowThumbnails;
 
         GoBackCommand = Async(_ => GoBackAsync());
         GoForwardCommand = Async(_ => GoForwardAsync());
@@ -88,11 +106,14 @@ public sealed class MainViewModel : ViewModelBase
         CutCommand = new RelayCommand(_ => CopyOrCut(ClipboardOperation.Cut));
         PasteCommand = Async(_ => PasteAsync());
         CopyPathCommand = Async(_ => CopyPathAsync());
+        CopyNameCommand = Async(_ => CopyNameAsync());
+        OpenTerminalCommand = new RelayCommand(_ => OpenTerminal());
         RevealCommand = new RelayCommand(_ => RevealSelected());
         PropertiesCommand = Async(_ => PropertiesAsync());
         SelectAllCommand = new RelayCommand(_ => _ui.SelectAll());
-        ToggleHiddenCommand = Async(async _ => { ShowHiddenFiles = !ShowHiddenFiles; await LoadAsync(); });
-        ToggleViewCommand = new RelayCommand(_ => IsDetailsView = !IsDetailsView);
+        ToggleHiddenCommand = Async(async _ => { ShowHiddenFiles = !ShowHiddenFiles; PersistViewState(); await LoadAsync(); });
+        ToggleViewCommand = new RelayCommand(_ => { IsDetailsView = !IsDetailsView; PersistViewState(); });
+        SetViewCommand = new RelayCommand(p => SetView(p?.ToString() == "grid"));
         ToggleThemeCommand = new RelayCommand(_ => ToggleTheme());
         SetSortCommand = new RelayCommand(p => SetSort(p as string ?? "Name"));
         DeepSearchCommand = Async(_ => DeepSearchAsync());
@@ -126,11 +147,14 @@ public sealed class MainViewModel : ViewModelBase
     public ICommand CutCommand { get; }
     public ICommand PasteCommand { get; }
     public ICommand CopyPathCommand { get; }
+    public ICommand CopyNameCommand { get; }
+    public ICommand OpenTerminalCommand { get; }
     public ICommand RevealCommand { get; }
     public ICommand PropertiesCommand { get; }
     public ICommand SelectAllCommand { get; }
     public ICommand ToggleHiddenCommand { get; }
     public ICommand ToggleViewCommand { get; }
+    public ICommand SetViewCommand { get; }
     public ICommand ToggleThemeCommand { get; }
     public ICommand SetSortCommand { get; }
     public ICommand DeepSearchCommand { get; }
@@ -238,6 +262,8 @@ public sealed class MainViewModel : ViewModelBase
                 _ => Loc.T("ThemeSystem")
             };
             _ui.SetTheme(mode);
+            Preferences.Current.ThemeMode = mode;
+            Preferences.Current.Save();
         }
     }
 
@@ -254,6 +280,52 @@ public sealed class MainViewModel : ViewModelBase
     public FAInfoBarSeverity InfoSeverity { get => _infoSeverity; private set => Set(ref _infoSeverity, value); }
     public FileEntryViewModel? PrimarySelection { get => _primarySelection; private set => Set(ref _primarySelection, value); }
     public bool HasSelection { get => _hasSelection; private set => Set(ref _hasSelection, value); }
+
+    /// <summary>Current sort column / direction, read by the context menu to tick the active entry.</summary>
+    public string SortColumn => _sortColumn;
+    public bool SortDescending => _sortDescending;
+
+    public bool IsSortedBy(string column)
+        => string.Equals(_sortColumn, column, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Re-applies the persisted file-manager preferences to this tab. Called by the settings
+    /// dialog; a hidden-file or thumbnail change needs a fresh listing, the rest only re-sorts.
+    /// </summary>
+    public void ApplyFileListPreferences()
+    {
+        // A tab that has not navigated yet has no directory to re-list.
+        if (string.IsNullOrWhiteSpace(CurrentPath)) return;
+
+        var prefs = Preferences.Current;
+
+        var hiddenChanged = _showHiddenFiles != prefs.ShowHiddenFiles;
+        if (hiddenChanged)
+        {
+            _showHiddenFiles = prefs.ShowHiddenFiles;
+            OnPropertyChanged(nameof(ShowHiddenFiles));
+        }
+
+        var thumbnailsChanged = _thumbnailsEnabled != prefs.ShowThumbnails;
+        _thumbnailsEnabled = prefs.ShowThumbnails;
+
+        var wantGrid = prefs.DefaultGridView;
+        if (_isDetailsView == wantGrid)
+        {
+            _isDetailsView = !wantGrid;
+            OnPropertyChanged(nameof(IsDetailsView));
+            OnPropertyChanged(nameof(IsGridView));
+        }
+
+        _sortColumn = NormalizeSortColumn(prefs.SortColumn);
+        _sortDescending = prefs.SortDescending;
+        SortIndicator = SortLabel(_sortColumn) + (_sortDescending ? Loc.T("SortDesc") : Loc.T("SortAsc"));
+
+        foreach (var entry in Entries) entry.RaiseDisplayNameChanged();
+
+        if (hiddenChanged || thumbnailsChanged) _ = LoadAsync();
+        else ApplyFilterAndSort();
+    }
 
     public void LoadLocations(bool force = false)
     {
@@ -572,9 +644,10 @@ public sealed class MainViewModel : ViewModelBase
             source = source.Where(x => x.Name.Contains(query, StringComparison.OrdinalIgnoreCase));
 
         var list = source.ToList();
+        var foldersFirst = Preferences.Current.FoldersFirst;
         list.Sort((a, b) =>
         {
-            if (a.IsDirectory != b.IsDirectory) return a.IsDirectory ? -1 : 1;
+            if (foldersFirst && a.IsDirectory != b.IsDirectory) return a.IsDirectory ? -1 : 1;
             var result = _sortColumn switch
             {
                 "Size" => a.Model.Size.CompareTo(b.Model.Size),
@@ -612,6 +685,7 @@ public sealed class MainViewModel : ViewModelBase
     /// </summary>
     private void RequestListPreviews()
     {
+        if (!Preferences.Current.ShowThumbnails) return;
         var token = _loadCts?.Token ?? default;
         var images = Entries.Where(x => x.PreviewKind == PreviewKind.Image).Take(80);
         foreach (var entry in images)
@@ -749,7 +823,9 @@ public sealed class MainViewModel : ViewModelBase
     {
         var target = PrimarySelection;
         if (target is null) return;
-        var name = await _ui.PromptAsync(Loc.T("DlgRenameTitle"), Loc.F("DlgRenameMessage", target.Name), target.Name, Loc.T("DlgRenameButton"));
+        // Always the real file name: the list may hide extensions for display.
+        var currentName = target.Model.Name;
+        var name = await _ui.PromptAsync(Loc.T("DlgRenameTitle"), Loc.F("DlgRenameMessage", currentName), currentName, Loc.T("DlgRenameButton"));
         if (string.IsNullOrWhiteSpace(name)) return;
         try
         {
@@ -768,10 +844,13 @@ public sealed class MainViewModel : ViewModelBase
     {
         var targets = SelectedEntries.Select(x => x.FullPath).ToArray();
         if (targets.Length == 0) return;
-        var ok = await _ui.ConfirmAsync(Loc.T("DlgDeleteTitle"),
-            Loc.F("DlgDeleteMessage", targets.Length,
-                Path.GetFileName(targets[0]) + (targets.Length > 1 ? " ..." : "")));
-        if (!ok) return;
+        if (Preferences.Current.ConfirmDelete)
+        {
+            var ok = await _ui.ConfirmAsync(Loc.T("DlgDeleteTitle"),
+                Loc.F("DlgDeleteMessage", targets.Length,
+                    Path.GetFileName(targets[0]) + (targets.Length > 1 ? " ..." : "")));
+            if (!ok) return;
+        }
 
         var done = 0;
         var errors = new List<string>();
@@ -885,6 +964,40 @@ public sealed class MainViewModel : ViewModelBase
         ShowInfo(Loc.T("MsgPathCopied"), PrimarySelection.FullPath, FAInfoBarSeverity.Success);
     }
 
+    private async Task CopyNameAsync()
+    {
+        if (PrimarySelection is null) return;
+        await _ui.CopyTextAsync(PrimarySelection.Model.Name);
+        ShowInfo(Loc.T("MsgNameCopied"), PrimarySelection.Model.Name, FAInfoBarSeverity.Success);
+    }
+
+    /// <summary>
+    /// Opens the current folder (or the selected folder) in the platform terminal. Only local
+    /// paths qualify — a terminal cannot cd into an archive or a WebDAV collection.
+    /// </summary>
+    private void OpenTerminal()
+    {
+        var folder = PrimarySelection is { IsDirectory: true } selected ? selected.FullPath : CurrentPath;
+        if (string.IsNullOrWhiteSpace(folder) || VfsPath.IsVirtualPath(folder) || !Directory.Exists(folder))
+        {
+            ShowInfo(Loc.T("MsgTerminalUnavailable"), folder, FAInfoBarSeverity.Warning);
+            return;
+        }
+        try
+        {
+            if (OperatingSystem.IsMacOS())
+                Process.Start(new ProcessStartInfo("/usr/bin/open", ["-a", "Terminal", folder]));
+            else if (OperatingSystem.IsWindows())
+                Process.Start(new ProcessStartInfo("wt.exe", ["-d", folder]) { UseShellExecute = true });
+            else
+                Process.Start(new ProcessStartInfo("x-terminal-emulator") { WorkingDirectory = folder });
+        }
+        catch (Exception ex)
+        {
+            ShowInfo(Loc.T("MsgTerminalFailed"), ex.Message, FAInfoBarSeverity.Error);
+        }
+    }
+
     private void RevealSelected()
     {
         if (PrimarySelection is null) return;
@@ -908,13 +1021,67 @@ public sealed class MainViewModel : ViewModelBase
         catch { return Loc.T("Unknown"); }
     }
 
-    private void SetSort(string column)
+    /// <summary>
+    /// Called from the context menu / column headers. "Name" toggles direction when it is already
+    /// the sort column; "Name:desc" (used by the explicit sort submenu) sets column and direction.
+    /// </summary>
+    private void SetSort(string value)
     {
-        if (_sortColumn == column) _sortDescending = !_sortDescending;
-        else { _sortColumn = column; _sortDescending = false; }
-        var label = column switch { "Size" => Loc.T("SortSize"), "Modified" => Loc.T("SortModified"), "Kind" => Loc.T("SortKind"), _ => Loc.T("SortName") };
-        SortIndicator = label + (_sortDescending ? Loc.T("SortDesc") : Loc.T("SortAsc"));
+        var parts = value.Split(':', 2, StringSplitOptions.TrimEntries);
+        var column = NormalizeSortColumn(parts[0]);
+        if (parts.Length == 2)
+        {
+            _sortColumn = column;
+            _sortDescending = parts[1].Equals("desc", StringComparison.OrdinalIgnoreCase);
+        }
+        else if (_sortColumn == column)
+        {
+            _sortDescending = !_sortDescending;
+        }
+        else
+        {
+            _sortColumn = column;
+            _sortDescending = false;
+        }
+
+        SortIndicator = SortLabel(column) + (_sortDescending ? Loc.T("SortDesc") : Loc.T("SortAsc"));
+        PersistViewState();
         ApplyFilterAndSort();
+    }
+
+    /// <summary>Explicit view switch from the context menu ("grid" / "list").</summary>
+    private void SetView(bool grid)
+    {
+        if (_isDetailsView == !grid) return;
+        _isDetailsView = !grid;
+        OnPropertyChanged(nameof(IsDetailsView));
+        OnPropertyChanged(nameof(IsGridView));
+        PersistViewState();
+    }
+
+    private static string NormalizeSortColumn(string? column) => column switch
+    {
+        "Size" or "Modified" or "Kind" => column,
+        _ => "Name"
+    };
+
+    private static string SortLabel(string column) => column switch
+    {
+        "Size" => Loc.T("SortSize"),
+        "Modified" => Loc.T("SortModified"),
+        "Kind" => Loc.T("SortKind"),
+        _ => Loc.T("SortName")
+    };
+
+    /// <summary>Writes the per-tab view state back to the persisted defaults.</summary>
+    private void PersistViewState()
+    {
+        var prefs = Preferences.Current;
+        prefs.ShowHiddenFiles = _showHiddenFiles;
+        prefs.DefaultGridView = !_isDetailsView;
+        prefs.SortColumn = _sortColumn;
+        prefs.SortDescending = _sortDescending;
+        prefs.Save();
     }
 
     private void ToggleTheme()

@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Text.Json;
 using System.Windows.Input;
+using Avalonia.Threading;
 using FileHub.Code.Services;
 using FileHub.Desktop.Services;
 
@@ -21,6 +22,7 @@ public sealed class CodeEditorViewModel : ViewModelBase
     private bool _isDirty;
     private bool _engineReady;
     private string _selectedTheme = string.Empty;
+    private DispatcherTimer? _autoSaveTimer;
 
     public CodeEditorViewModel(ExtensionDiscoveryService extensions)
     {
@@ -40,6 +42,7 @@ public sealed class CodeEditorViewModel : ViewModelBase
     public event Action<string>? FilePayloadReady;
     public event Action<string>? ThemePayloadReady;
     public event Action<string>? SnippetsPayloadReady;
+    public event Action<string>? OptionsPayloadReady;
     public event Action? SaveRequested;
 
     public string FilePath { get => _filePath; private set => Set(ref _filePath, value); }
@@ -56,7 +59,16 @@ public sealed class CodeEditorViewModel : ViewModelBase
     public string EncodingName { get => _encodingName; private set => Set(ref _encodingName, value); }
     public string Cursor { get => _cursor; private set => Set(ref _cursor, value); }
     public string Status { get => _status; private set => Set(ref _status, value); }
-    public bool IsDirty { get => _isDirty; private set { if (Set(ref _isDirty, value)) RaiseCanSave(); } }
+    public bool IsDirty
+    {
+        get => _isDirty;
+        private set
+        {
+            if (!Set(ref _isDirty, value)) return;
+            RaiseCanSave();
+            UpdateAutoSaveTimer();
+        }
+    }
     public bool EngineReady { get => _engineReady; private set => Set(ref _engineReady, value); }
 
     public ObservableCollection<string> ThemeOptions { get; } = [];
@@ -74,6 +86,72 @@ public sealed class CodeEditorViewModel : ViewModelBase
     public string? PendingPayload { get; private set; }
     public string? PendingTheme { get; private set; }
     public string? PendingSnippets { get; private set; }
+    public string? PendingOptions { get; private set; }
+
+    /// <summary>
+    /// The Monaco option set built from the persisted preferences. Monaco receives these through
+    /// <c>fileHub.applyOptions</c>; keeping the mapping in one place means the settings dialog and
+    /// the editor toolbar can never drift apart.
+    /// </summary>
+    public string BuildOptionsJson()
+    {
+        var p = Preferences.Current;
+        return JsonSerializer.Serialize(new Dictionary<string, object?>
+        {
+            ["fontFamily"] = p.CodeFontFamily,
+            ["fontSize"] = p.CodeFontSize,
+            ["tabSize"] = p.CodeTabSize,
+            ["insertSpaces"] = p.CodeInsertSpaces,
+            ["wordWrap"] = p.CodeWordWrap,
+            ["lineNumbers"] = p.CodeLineNumbers,
+            ["renderWhitespace"] = p.CodeRenderWhitespace,
+            ["cursorStyle"] = p.CodeCursorStyle,
+            ["smoothScrolling"] = p.CodeSmoothScrolling,
+            ["minimap"] = new Dictionary<string, object?> { ["enabled"] = p.CodeMinimap },
+            ["bracketPairColorization"] = new Dictionary<string, object?> { ["enabled"] = p.CodeBracketPairs }
+        });
+    }
+
+    /// <summary>Re-pushes every editor option; called when the settings dialog changes one.</summary>
+    public void ApplyPreferences()
+    {
+        PendingOptions = BuildOptionsJson();
+        // The page replays PendingOptions when it finishes loading; pushing into a WebView that
+        // has no engine yet would only produce a bridge error.
+        if (EngineReady) OptionsPayloadReady?.Invoke(PendingOptions);
+        UpdateAutoSaveTimer();
+    }
+
+    /// <summary>Refreshes the theme list without opening a file (used by the settings dialog).</summary>
+    public void RefreshThemeList() => RefreshThemes();
+
+    /// <summary>
+    /// "Auto save after delay" is implemented on the VM rather than in Monaco: the view owns the
+    /// text, so the timer raises SaveRequested and the page round-trips getValue() -> write.
+    /// </summary>
+    private void UpdateAutoSaveTimer()
+    {
+        var enabled = Preferences.Current.CodeAutoSave == "afterDelay" && IsDirty && HasFile;
+        if (!enabled)
+        {
+            _autoSaveTimer?.Stop();
+            return;
+        }
+
+        var delay = TimeSpan.FromMilliseconds(Preferences.Current.CodeAutoSaveDelayMs);
+        if (_autoSaveTimer is null)
+        {
+            _autoSaveTimer = new DispatcherTimer { Interval = delay };
+            _autoSaveTimer.Tick += (_, _) =>
+            {
+                if (IsDirty && HasFile) SaveRequested?.Invoke();
+                else _autoSaveTimer?.Stop();
+            };
+        }
+        _autoSaveTimer.Interval = delay;
+        _autoSaveTimer.Stop();
+        _autoSaveTimer.Start();
+    }
 
     public async Task OpenAsync(string path)
     {
@@ -101,6 +179,9 @@ public sealed class CodeEditorViewModel : ViewModelBase
     public void MarkEngineReady()
     {
         EngineReady = true;
+        // Options go first: the model is created by the next payload with the right tab size.
+        PendingOptions ??= BuildOptionsJson();
+        OptionsPayloadReady?.Invoke(PendingOptions);
         if (PendingPayload is not null) FilePayloadReady?.Invoke(PendingPayload);
         if (PendingTheme is not null) ThemePayloadReady?.Invoke(PendingTheme);
         if (PendingSnippets is not null) SnippetsPayloadReady?.Invoke(PendingSnippets);

@@ -68,17 +68,19 @@ public partial class SettingsDialog : Window
 
     private void OnSectionChanged(object? sender, SelectionChangedEventArgs e)
     {
-        // Panels are named widgets rather than a template selector: four sections, four grids.
+        // Named panels rather than a template selector: one panel per rail entry, in rail order.
         if (GeneralSection is null) return;
         var index = Nav.SelectedIndex;
         GeneralSection.IsVisible = index == 0;
-        AppearanceSection.IsVisible = index == 1;
-        ExtensionsSection.IsVisible = index == 2;
-        AboutSection.IsVisible = index == 3;
+        FilesSection.IsVisible = index == 1;
+        CodeSection.IsVisible = index == 2;
+        OfficeSection.IsVisible = index == 3;
+        ExtensionsSection.IsVisible = index == 4;
+        AboutSection.IsVisible = index == 5;
 
         // The extension detail pane is empty until something is selected; pick the first item so
         // the section never opens as a blank panel.
-        if (index == 2 && _settings.Extensions.Selected is null &&
+        if (index == 4 && _settings.Extensions.Selected is null &&
             _settings.Extensions.Items.Count > 0)
         {
             _settings.Extensions.Selected = _settings.Extensions.Items[0];

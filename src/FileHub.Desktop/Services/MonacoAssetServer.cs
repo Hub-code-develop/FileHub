@@ -188,6 +188,7 @@ public sealed class MonacoAssetServer : IDisposable
       window.fileHub = {
         ready: true,
         dirty: false,
+        options: { tabSize: 4, insertSpaces: true },
         customLanguages: {},
         openFile: function (json) {
           var cfg = JSON.parse(json);
@@ -199,6 +200,7 @@ public sealed class MonacoAssetServer : IDisposable
           var old = monaco.editor.getModel(monaco.Uri.parse(cfg.uri));
           if (old) old.dispose();
           var model = monaco.editor.createModel(cfg.value || '', cfg.language || 'plaintext', monaco.Uri.parse(cfg.uri));
+          model.updateOptions(window.fileHub.options);
           editor.setModel(model);
           window.fileHub.dirty = false;
           model.onDidChangeContent(function () {
@@ -249,6 +251,26 @@ public sealed class MonacoAssetServer : IDisposable
               }
             });
           });
+        },
+        // Settings dialog -> C# -> here. Tab size and indent are model options in Monaco, the
+        // rest are editor options; both sides are updated so existing models follow too.
+        applyOptions: function (json) {
+          try {
+            var next = JSON.parse(json);
+            window.fileHub.options = {
+              tabSize: next.tabSize || 4,
+              insertSpaces: next.insertSpaces !== false
+            };
+            var model = editor.getModel();
+            if (model) model.updateOptions(window.fileHub.options);
+            var editorOptions = JSON.parse(json);
+            delete editorOptions.tabSize;
+            delete editorOptions.insertSpaces;
+            editor.updateOptions(editorOptions);
+            editor.layout();
+          } catch (err) {
+            send({ type: 'engine', message: 'Options: ' + err });
+          }
         },
         layout: function () { editor.layout(); },
         focus: function () { editor.focus(); }

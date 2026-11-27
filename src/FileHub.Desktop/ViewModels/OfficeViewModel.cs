@@ -104,6 +104,11 @@ public sealed class OfficeViewModel : ViewModelBase
     private bool _isRecording;
     private bool _isAdvancedPanelOpen;
     private int _advancedPanelIndex;
+    private double _bodyFontSize = 14;
+    private bool _showRuler = true;
+    private bool _widePage;
+    private bool _showGridLines = true;
+    private readonly Avalonia.Threading.DispatcherTimer? _autoSaveTimer;
     private MacroRecording? _currentMacro;
     private readonly List<string> _lastParagraphTexts = new();
     private readonly Dictionary<ICommand, string> _commandKeys = new();
@@ -184,6 +189,28 @@ public sealed class OfficeViewModel : ViewModelBase
         RunMacroCommand = new RelayCommand(p => RunMacro(p as MacroRecording));
         DeleteMacroCommand = new RelayCommand(p => DeleteMacro(p as MacroRecording));
         ToggleAdvancedPanelCommand = new RelayCommand(_ => IsAdvancedPanelOpen = !IsAdvancedPanelOpen);
+
+        // Document-surface defaults come from the settings dialog. They are read once here and
+        // refreshed by ApplyPreferences() so an open document follows a change immediately.
+        var prefs = Preferences.Current;
+        _newDocumentKind = prefs.OfficeDefaultKind;
+        _zoom = prefs.OfficeZoom;
+        _bodyFontSize = prefs.OfficeFontSize;
+        _showRuler = prefs.OfficeShowRuler;
+        _widePage = prefs.OfficeWidePage;
+        _showGridLines = prefs.OfficeGridLines;
+        MacroService.SecurityLevel = prefs.OfficeMacroSecurity switch
+        {
+            "Disabled" => MacroSecurityLevel.Disabled,
+            "Enabled" => MacroSecurityLevel.Enabled,
+            _ => MacroSecurityLevel.Prompt
+        };
+        _autoSaveTimer = new Avalonia.Threading.DispatcherTimer
+        {
+            Interval = TimeSpan.FromSeconds(Math.Clamp(prefs.OfficeAutoSaveSeconds, 10, 3600))
+        };
+        _autoSaveTimer.Tick += (_, _) => AutoSaveTick();
+        if (prefs.OfficeAutoSave) _autoSaveTimer.Start();
 
         Register("New", CreateNewCommand);
         Register("Save", SaveCommand);
@@ -390,6 +417,63 @@ public sealed class OfficeViewModel : ViewModelBase
     public int Words { get => _words; private set => Set(ref _words, value); }
     public int Characters { get => _characters; private set => Set(ref _characters, value); }
     public int Zoom { get => _zoom; set => Set(ref _zoom, value); }
+
+    // ---------------------------------------------------------------- settings-backed surface
+
+    /// <summary>Body font size for Word paragraphs (points). Also the size of a new paragraph.</summary>
+    public double BodyFontSize
+    {
+        get => _bodyFontSize;
+        set
+        {
+            var clamped = Math.Clamp(value, 8, 72);
+            if (!Set(ref _bodyFontSize, clamped)) return;
+            Preferences.Current.OfficeFontSize = clamped;
+            Preferences.Current.Save();
+        }
+    }
+
+    /// <summary>Horizontal ruler above the Word page.</summary>
+    public bool ShowRuler
+    {
+        get => _showRuler;
+        set
+        {
+            if (!Set(ref _showRuler, value)) return;
+            Preferences.Current.OfficeShowRuler = value;
+            Preferences.Current.Save();
+        }
+    }
+
+    /// <summary>Full-width canvas instead of the 860px paper column.</summary>
+    public bool WidePage
+    {
+        get => _widePage;
+        set
+        {
+            if (!Set(ref _widePage, value)) return;
+            OnPropertyChanged(nameof(PageMaxWidth));
+            Preferences.Current.OfficeWidePage = value;
+            Preferences.Current.Save();
+        }
+    }
+
+    public bool ShowGridLines
+    {
+        get => _showGridLines;
+        set
+        {
+            if (!Set(ref _showGridLines, value)) return;
+            Preferences.Current.OfficeGridLines = value;
+            Preferences.Current.Save();
+        }
+    }
+
+    public double PageMaxWidth => _widePage ? 1400d : 860d;
+
+    /// <summary>Ruler ticks: a numbered mark every inch with an unnumbered half-inch tick.</summary>
+    public ObservableCollection<string> RulerMarks { get; } = new(
+        Enumerable.Range(0, 17).Select(i => i % 2 == 0 ? (i / 2).ToString() : "·"));
     public bool IsBold { get => _isBold; set { if (Set(ref _isBold, value)) ApplyBold(value); } }
     public bool IsItalic { get => _isItalic; set { if (Set(ref _isItalic, value)) ApplyItalic(value); } }
     public bool IsUnderline { get => _isUnderline; set { if (Set(ref _isUnderline, value)) ApplyUnderline(value); } }
@@ -431,6 +515,61 @@ public sealed class OfficeViewModel : ViewModelBase
 
     public ExcelSheet? ActiveSheet => Sheets.ElementAtOrDefault(_activeSheetIndex);
     public PowerPointSlide? ActiveSlide => Slides.ElementAtOrDefault(_activeSlideIndex);
+
+    /// <summary>
+    /// Re-reads every document-surface preference. Called by the settings dialog; fields are set
+    /// directly so the change does not bounce back into the persisted file.
+    /// </summary>
+    public void ApplyPreferences()
+    {
+        var p = Preferences.Current;
+
+        _bodyFontSize = p.OfficeFontSize;
+        OnPropertyChanged(nameof(BodyFontSize));
+
+        _showRuler = p.OfficeShowRuler;
+        OnPropertyChanged(nameof(ShowRuler));
+
+        _widePage = p.OfficeWidePage;
+        OnPropertyChanged(nameof(WidePage));
+        OnPropertyChanged(nameof(PageMaxWidth));
+
+        _showGridLines = p.OfficeGridLines;
+        OnPropertyChanged(nameof(ShowGridLines));
+
+        _zoom = p.OfficeZoom;
+        OnPropertyChanged(nameof(Zoom));
+
+        if (_newDocumentKind != p.OfficeDefaultKind)
+        {
+            _newDocumentKind = p.OfficeDefaultKind;
+            OnPropertyChanged(nameof(NewDocumentKind));
+        }
+
+        MacroService.SecurityLevel = p.OfficeMacroSecurity switch
+        {
+            "Disabled" => MacroSecurityLevel.Disabled,
+            "Enabled" => MacroSecurityLevel.Enabled,
+            _ => MacroSecurityLevel.Prompt
+        };
+        OnPropertyChanged(nameof(MacroSecurity));
+
+        if (_autoSaveTimer is not null)
+        {
+            _autoSaveTimer.Interval = TimeSpan.FromSeconds(Math.Clamp(p.OfficeAutoSaveSeconds, 10, 3600));
+            if (p.OfficeAutoSave) _autoSaveTimer.Start();
+            else _autoSaveTimer.Stop();
+        }
+    }
+
+    /// <summary>Writes a dirty local document on the configured interval. Decoded WPS files are
+    /// never auto-saved: overwriting the original container needs an explicit Save As.</summary>
+    private void AutoSaveTick()
+    {
+        if (!Preferences.Current.OfficeAutoSave) return;
+        if (_document is null || !IsDirty || IsBusy || _document.IsDecoded) return;
+        Save();
+    }
 
     // ---------------------------------------------------------------- file lifecycle
 
@@ -583,11 +722,41 @@ public sealed class OfficeViewModel : ViewModelBase
         {
             await Task.Run(() => OfficeDocumentService.CreateNew(path, kind));
             await OpenAsync(path);
+            ApplyNewDocumentDefaults();
         }
         catch (Exception ex)
         {
             Status = Loc.F("OfficeCreateFailed", ex.Message);
         }
+    }
+
+    /// <summary>
+    /// Applies the Office defaults to a freshly created document: tracked changes and the body
+    /// font size. Existing files keep exactly the formatting they were authored with.
+    /// </summary>
+    private void ApplyNewDocumentDefaults()
+    {
+        if (_document is null || !IsWord) return;
+
+        if (Preferences.Current.OfficeTrackChanges && !_document.TrackChangesEnabled)
+        {
+            _document.TrackChangesEnabled = true;
+            OnPropertyChanged(nameof(TrackChanges));
+            OnPropertyChanged(nameof(TrackChangesLabel));
+            RebuildRibbon();
+        }
+
+        var changed = false;
+        foreach (var paragraph in _document.Paragraphs)
+        {
+            foreach (var run in paragraph.Runs)
+            {
+                if (run.FontSize > 0) continue;
+                run.FontSize = _bodyFontSize;
+                changed = true;
+            }
+        }
+        if (changed) IsDirty = true;
     }
 
     // ---------------------------------------------------------------- undo / redo
@@ -696,6 +865,9 @@ public sealed class OfficeViewModel : ViewModelBase
         if (_document is null || !IsWord) return;
         PushUndo();
         var paragraph = new WordParagraph();
+        // A run carries the document's body size; PlainText rebuilds from the leading run, so the
+        // typed text keeps the configured size instead of falling back to the style default.
+        if (_bodyFontSize > 0) paragraph.Runs.Add(new WordRun { FontSize = _bodyFontSize });
         var index = SelectedParagraph is null ? _document.Blocks.Count : _document.Blocks.IndexOf(SelectedParagraph) + 1;
         _document.Blocks.Insert(Math.Max(0, index), paragraph);
         Blocks.Insert(Math.Max(0, index), paragraph);

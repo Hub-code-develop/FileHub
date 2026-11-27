@@ -194,10 +194,19 @@ FluentUI-CodeHub widgets used: `FANavigationView` (sidebar), `FABreadcrumbBar` (
   installation, no COM, cross-platform. VBA code is never executed; macro recording replays
   FileHub editor actions only. Advanced OOXML features outside our implementation (VBA execution,
   macros with dialogs, pivot charts, OLE activation) are documented in THIRD-PARTY-NOTICES.md
-- **Settings dialog**: the gear in the tab strip (or Settings in the sidebar footer) opens a modal
-  settings window instead of a workspace page. General (hidden files, sidebar, details pane, dual
-  pane), Appearance (system / light / dark theme), Extensions and About (version, build channel,
-  licence and third-party notices) live in one place, and every change applies immediately
+- **Settings dialog**: the gear in the tab strip (or Settings in the sidebar footer, or `Ctrl+,`)
+  opens a modal settings window laid out like VS Code's: a rail on the left, grouped rows on the
+  right, no OK/Apply step. Six sections - **General** (language, theme, sidebar, details pane, dual
+  pane), **File manager** (hidden files, show extensions, folders first, thumbnails, icon view,
+  default sort column and direction, delete confirmation), **Code editor** (font family and size,
+  tab size, insert spaces, word wrap, minimap, line numbers, whitespace rendering, bracket pair
+  colorization, cursor style, smooth scrolling, auto save delay, editor theme),
+  **Office** (default document type, body font size, default zoom, ruler, wide page, cell grid
+  lines, track changes by default, auto save + interval, macro security), **Extensions** and
+  **About** (version, build channel, licence, third-party notices). "Restore defaults" resets
+  everything. Code values are pushed into Monaco through `fileHub.applyOptions`, Office values
+  re-render the open document, and preferences persist to
+  `%APPDATA%/FileHub/preferences.json` (macOS: `~/Library/Application Support/FileHub/`)
 - **VS Code extensions manager**: a section of the settings dialog. It discovers extensions
   installed under `.vscode`, `.vscode-insiders`, `.vscode-oss`, `.cursor` and `.windsurf`, lets you
   enable or disable them for FileHub, and shows their language / theme / snippet / grammar
@@ -210,6 +219,12 @@ FluentUI-CodeHub widgets used: `FANavigationView` (sidebar), `FABreadcrumbBar` (
   packages FileHub installed. Listings and licence links are surfaced in the details pane.
   FileHub is not affiliated with Microsoft; the Gallery API has no public SLA. No extension
   package is bundled with FileHub, and search terms are sent to Microsoft
+- **Context menus that know what was clicked**: a file or folder gets Open, Open with (code
+  editor / Office / quick look / system default), Open in new tab, cut / copy / paste, rename or
+  batch rename, delete, compress, extract (archives only), copy path / name, reveal and "open in
+  terminal"; empty space gets New folder, paste, refresh, Sort by and View submenus with a tick on
+  the active entry, show hidden files, select all, terminal and settings. Items carry icons and
+  shortcut hints, and right-clicking a multi-selection keeps the whole selection
 - **Delete always moves items to the recycle bin** (Windows Shell, macOS `~/.Trash`, Linux
   `gio trash`). Nothing is silently deleted permanently
 - **Every location is a virtual path**: the local disk, an archive, a NAS share and an S3 bucket

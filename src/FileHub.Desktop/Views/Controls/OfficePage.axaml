@@ -25,11 +25,13 @@
                theme's light foreground. -->
           <TextBox Text="{Binding PlainText, Mode=TwoWay}"
                    BorderThickness="0" Background="Transparent" Padding="4,3"
-                   FontSize="14" TextWrapping="Wrap" AcceptsReturn="True"
+                   FontSize="{Binding $parent[UserControl].DataContext.BodyFontSize}"
+                   TextWrapping="Wrap" AcceptsReturn="True"
                    Foreground="#1B1B1B" CaretBrush="#1B1B1B"
                    IsVisible="{Binding IsEditing}"
                    GotFocus="OnParagraphGotFocus" LostFocus="OnParagraphLostFocus" />
-          <TextBlock Text="{Binding DisplayText}" TextWrapping="Wrap" FontSize="14"
+          <TextBlock Text="{Binding DisplayText}" TextWrapping="Wrap"
+                     FontSize="{Binding $parent[UserControl].DataContext.BodyFontSize}"
                      Foreground="#1B1B1B"
                      Margin="4,3" IsVisible="{Binding !IsEditing}"
                      PointerPressed="OnParagraphDisplayPressed" />
@@ -280,13 +282,39 @@
                    HorizontalAlignment="Center" TextWrapping="Wrap" />
       </StackPanel>
 
-      <!-- Word: page canvas -->
+      <!-- Word: page canvas. A ruler sits directly above the sheet and disappears when the
+           "show ruler" preference is off; the sheet width follows the paper/wide preference. -->
       <ScrollViewer IsVisible="{Binding IsWord}" HorizontalScrollBarVisibility="Disabled">
-        <Border Background="White" Margin="24" Padding="48,40" MaxWidth="860"
-                MinHeight="520" HorizontalAlignment="Stretch"
-                BorderThickness="1" BorderBrush="#D0D0D0">
-          <ItemsControl ItemsSource="{Binding Blocks}" />
-        </Border>
+        <Grid RowDefinitions="Auto,Auto" Margin="24,20,24,24">
+          <Border Grid.Row="0" Height="22" IsVisible="{Binding ShowRuler}"
+                  MaxWidth="{Binding PageMaxWidth}" HorizontalAlignment="Stretch"
+                  Background="#F7F7F7" BorderBrush="#D0D0D0" BorderThickness="1,1,1,0">
+            <ItemsControl ItemsSource="{Binding RulerMarks}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <UniformGrid Rows="1" />
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <Grid>
+                    <Border Width="1" Height="6" Background="#9A9A9A"
+                            HorizontalAlignment="Left" VerticalAlignment="Bottom" />
+                    <TextBlock Text="{Binding}" FontSize="8" Foreground="#5A5A5A"
+                               Margin="3,2,0,0" VerticalAlignment="Top" />
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </Border>
+
+          <Border Grid.Row="1" Background="White" Padding="48,40"
+                  MaxWidth="{Binding PageMaxWidth}"
+                  MinHeight="520" HorizontalAlignment="Stretch"
+                  BorderThickness="1" BorderBrush="#D0D0D0">
+            <ItemsControl ItemsSource="{Binding Blocks}" />
+          </Border>
+        </Grid>
       </ScrollViewer>
 
       <!-- Excel: worksheet grid -->
@@ -330,7 +358,8 @@
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
                       <DataTemplate>
-                        <Border Width="110" Height="26" BorderThickness="0,0,1,1"
+                        <Border Width="110" Height="26"
+                                BorderThickness="{Binding $parent[UserControl].DataContext.ShowGridLines, Converter={x:Static loc:BoolToGridThicknessConverter.Instance}}"
                                 BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
                                 Background="{Binding FillColor, Converter={x:Static loc:StringToBrushConverter.Instance}}">
                           <TextBox Text="{Binding EditingText, Mode=TwoWay}" BorderThickness="0"

@@ -23,6 +23,23 @@ public sealed class FileEntryViewModel : ViewModelBase
     public FileEntry Model { get; }
 
     public string Name => Model.Name;
+
+    /// <summary>
+    /// Name as rendered in the list. "Show file extensions" is off by default only when the user
+    /// turns it off; the real name is still used for rename, copy path and open.
+    /// </summary>
+    public string DisplayName
+    {
+        get
+        {
+            if (IsDirectory || Preferences.Current.ShowFileExtensions) return Name;
+            var dot = Name.LastIndexOf('.');
+            return dot > 0 ? Name[..dot] : Name;
+        }
+    }
+
+    public void RaiseDisplayNameChanged() => OnPropertyChanged(nameof(DisplayName));
+
     public string FullPath => Model.FullPath;
     public string SizeText => Model.SizeText;
     public string Kind => Model.IsDirectory

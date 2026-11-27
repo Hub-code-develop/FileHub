@@ -12,6 +12,9 @@ public partial class App : Application
 
     public override void OnFrameworkInitializationCompleted()
     {
+        // Apply the saved theme before the first window is realized, otherwise a dark-theme user
+        // sees a light flash on every launch.
+        SetTheme(FileHub.Desktop.Services.Preferences.Current.ThemeMode);
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             desktop.MainWindow = new MainWindow();

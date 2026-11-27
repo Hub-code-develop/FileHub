@@ -2,21 +2,72 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:ui="using:FluentAvalonia.UI.Controls"
         xmlns:loc="using:FileHub.Desktop.Services"
+        xmlns:c="using:FileHub.Desktop.Views"
         xmlns:t="using:FileHub.Desktop.Views.Controls"
         x:Class="FileHub.Desktop.Views.SettingsDialog"
         Title="{x:Static loc:Strings.LblSettings}"
-        Width="960" Height="680" MinWidth="820" MinHeight="560"
+        Width="1040" Height="740" MinWidth="900" MinHeight="620"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
         Background="{DynamicResource SystemControlBackgroundAltHighBrush}">
 
   <!--
-    Settings is a modal dialog, not a workspace page: preferences are window-scoped and the
-    extension manager is just one section inside it. The left rail switches between the sections;
-    every value writes straight through to the shell, so there is no OK/Apply step.
+    Settings is a modal dialog, not a workspace page. Layout follows the VS Code settings window:
+    a section rail on the left, grouped rows on the right, values that apply immediately.
+    Every row is a SettingRow (title + hint + control) so the pages stay skimmable.
   -->
+  <Window.Resources>
+    <ControlTheme x:Key="{x:Type c:SettingRow}" TargetType="c:SettingRow">
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border Padding="0,9" BorderThickness="0,0,0,1"
+                  BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24">
+              <StackPanel Spacing="2" VerticalAlignment="Center">
+                <TextBlock Text="{TemplateBinding Title}" FontSize="13" />
+                <TextBlock Text="{TemplateBinding Hint}" FontSize="11" Opacity="0.6"
+                           TextWrapping="Wrap" MaxWidth="560" HorizontalAlignment="Left"
+                           IsVisible="{TemplateBinding Hint, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+              </StackPanel>
+              <ContentPresenter Grid.Column="1" Content="{TemplateBinding Content}"
+                                VerticalAlignment="Center" />
+            </Grid>
+          </Border>
+        </ControlTemplate>
+      </Setter>
+    </ControlTheme>
+
+  </Window.Resources>
+
+  <Window.Styles>
+    <Style Selector="TextBlock.groupHeader">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Opacity" Value="0.7" />
+      <Setter Property="Margin" Value="0,20,0,2" />
+    </Style>
+
+    <Style Selector="TextBlock.sectionLead">
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="Opacity" Value="0.6" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+      <Setter Property="Margin" Value="0,2,0,4" />
+    </Style>
+
+    <Style Selector="ComboBox.settingChoice">
+      <Setter Property="MinWidth" Value="210" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="HorizontalAlignment" Value="Right" />
+    </Style>
+
+    <Style Selector="NumericUpDown.settingNumber">
+      <Setter Property="Width" Value="118" />
+      <Setter Property="FontSize" Value="12" />
+    </Style>
+  </Window.Styles>
+
   <Grid RowDefinitions="*,Auto">
 
-    <Grid Grid.Row="0" ColumnDefinitions="228,Auto,*">
+    <Grid Grid.Row="0" ColumnDefinitions="240,Auto,*">
 
       <!-- Left rail -->
       <Grid Grid.Column="0" RowDefinitions="Auto,*">
@@ -37,8 +88,20 @@
           </ListBoxItem>
           <ListBoxItem Padding="10,9">
             <StackPanel Orientation="Horizontal" Spacing="10">
-              <ui:FASymbolIcon Symbol="ViewAll" FontSize="14" VerticalAlignment="Center" />
-              <TextBlock Text="{x:Static loc:Strings.SettingsNavAppearance}" VerticalAlignment="Center" />
+              <ui:FASymbolIcon Symbol="OpenFolder" FontSize="14" VerticalAlignment="Center" />
+              <TextBlock Text="{x:Static loc:Strings.SettingsNavFiles}" VerticalAlignment="Center" />
+            </StackPanel>
+          </ListBoxItem>
+          <ListBoxItem Padding="10,9">
+            <StackPanel Orientation="Horizontal" Spacing="10">
+              <ui:FASymbolIcon Symbol="Code" FontSize="14" VerticalAlignment="Center" />
+              <TextBlock Text="{x:Static loc:Strings.SettingsNavCode}" VerticalAlignment="Center" />
+            </StackPanel>
+          </ListBoxItem>
+          <ListBoxItem Padding="10,9">
+            <StackPanel Orientation="Horizontal" Spacing="10">
+              <ui:FASymbolIcon Symbol="Document" FontSize="14" VerticalAlignment="Center" />
+              <TextBlock Text="{x:Static loc:Strings.SettingsNavOffice}" VerticalAlignment="Center" />
             </StackPanel>
           </ListBoxItem>
           <ListBoxItem Padding="10,9">
@@ -59,79 +122,224 @@
       <Border Grid.Column="1" Width="1" Background="{DynamicResource SystemControlForegroundBaseLowBrush}" />
 
       <!-- Section host. Exactly one child is visible; OnSectionChanged switches them. -->
-      <Grid Grid.Column="2" Margin="24,18,24,14">
+      <Grid Grid.Column="2" Margin="28,18,28,12">
 
         <!-- General -->
         <ScrollViewer x:Name="GeneralSection" VerticalScrollBarVisibility="Auto">
-          <StackPanel Spacing="2" MaxWidth="680" HorizontalAlignment="Left">
-            <TextBlock Text="{x:Static loc:Strings.SettingsViewSection}" FontSize="12"
-                       FontWeight="SemiBold" Opacity="0.7" Margin="0,0,0,6" />
+          <StackPanel MaxWidth="780" HorizontalAlignment="Left">
+            <TextBlock Text="{x:Static loc:Strings.SettingsGeneralHint}" Classes="sectionLead" />
 
-            <Grid ColumnDefinitions="*,Auto" Margin="0,6">
-              <StackPanel Spacing="2">
-                <TextBlock Text="{x:Static loc:Strings.SettingsShowHidden}" FontSize="13" />
-                <TextBlock Text="{x:Static loc:Strings.SettingsShowHiddenHint}" FontSize="11"
-                           Opacity="0.6" TextWrapping="Wrap" />
-              </StackPanel>
-              <ToggleSwitch Grid.Column="1" VerticalAlignment="Center"
-                            IsChecked="{Binding ShowHiddenFiles, Mode=TwoWay}" />
-            </Grid>
+            <TextBlock Text="{x:Static loc:Strings.SettingsThemeSection}" Classes="groupHeader" />
+            <c:SettingRow Title="{x:Static loc:Strings.SettingsAppearanceTheme}"
+                          Hint="{x:Static loc:Strings.SettingsThemeHint}">
+              <ComboBox Classes="settingChoice" ItemsSource="{Binding ThemeOptions}"
+                        SelectedIndex="{Binding ThemeIndex, Mode=TwoWay}" />
+            </c:SettingRow>
 
-            <Grid ColumnDefinitions="*,Auto" Margin="0,6">
-              <StackPanel Spacing="2">
-                <TextBlock Text="{x:Static loc:Strings.SettingsSidebar}" FontSize="13" />
-                <TextBlock Text="{x:Static loc:Strings.SettingsSidebarHint}" FontSize="11"
-                           Opacity="0.6" TextWrapping="Wrap" />
-              </StackPanel>
-              <ToggleSwitch Grid.Column="1" VerticalAlignment="Center"
-                            IsChecked="{Binding ShowSidebar, Mode=TwoWay}" />
-            </Grid>
+            <TextBlock Text="{x:Static loc:Strings.SettingsLanguageSection}" Classes="groupHeader" />
+            <c:SettingRow Title="{x:Static loc:Strings.SettingsLanguage}" Hint="{Binding LanguageHint}">
+              <Button Padding="14,5" Content="{Binding LanguageLabel}" Click="OnChangeLanguage" />
+            </c:SettingRow>
 
-            <Grid ColumnDefinitions="*,Auto" Margin="0,6">
-              <StackPanel Spacing="2">
-                <TextBlock Text="{x:Static loc:Strings.SettingsDetailsPane}" FontSize="13" />
-                <TextBlock Text="{x:Static loc:Strings.SettingsDetailsPaneHint}" FontSize="11"
-                           Opacity="0.6" TextWrapping="Wrap" />
-              </StackPanel>
-              <ToggleSwitch Grid.Column="1" VerticalAlignment="Center"
-                            IsChecked="{Binding ShowDetailsPane, Mode=TwoWay}" />
-            </Grid>
-
-            <Grid ColumnDefinitions="*,Auto" Margin="0,6">
-              <StackPanel Spacing="2">
-                <TextBlock Text="{x:Static loc:Strings.DualPane}" FontSize="13" />
-                <TextBlock Text="{x:Static loc:Strings.SettingsDualPaneHint}" FontSize="11"
-                           Opacity="0.6" TextWrapping="Wrap" />
-              </StackPanel>
-              <ToggleSwitch Grid.Column="1" VerticalAlignment="Center"
-                            IsChecked="{Binding DualPane, Mode=TwoWay}" />
-            </Grid>
-
-            <TextBlock Text="{x:Static loc:Strings.SettingsLanguageSection}" FontSize="12"
-                       FontWeight="SemiBold" Opacity="0.7" Margin="0,18,0,6" />
-
-            <Grid ColumnDefinitions="*,Auto" Margin="0,6">
-              <StackPanel Spacing="2">
-                <TextBlock Text="{x:Static loc:Strings.SettingsLanguage}" FontSize="13" />
-                <TextBlock Text="{Binding LanguageHint}" FontSize="11" Opacity="0.6"
-                           TextWrapping="Wrap" />
-              </StackPanel>
-              <Button Grid.Column="1" VerticalAlignment="Center" Padding="14,5"
-                      Content="{Binding LanguageLabel}" Click="OnChangeLanguage" />
-            </Grid>
+            <TextBlock Text="{x:Static loc:Strings.SettingsWindowSection}" Classes="groupHeader" />
+            <c:SettingRow Title="{x:Static loc:Strings.SettingsSidebar}"
+                          Hint="{x:Static loc:Strings.SettingsSidebarHint}">
+              <ToggleSwitch IsChecked="{Binding ShowSidebar, Mode=TwoWay}" />
+            </c:SettingRow>
+            <c:SettingRow Title="{x:Static loc:Strings.SettingsDetailsPane}"
+                          Hint="{x:Static loc:Strings.SettingsDetailsPaneHint}">
+              <ToggleSwitch IsChecked="{Binding ShowDetailsPane, Mode=TwoWay}" />
+            </c:SettingRow>
+            <c:SettingRow Title="{x:Static loc:Strings.DualPane}"
+                          Hint="{x:Static loc:Strings.SettingsDualPaneHint}">
+              <ToggleSwitch IsChecked="{Binding DualPane, Mode=TwoWay}" />
+            </c:SettingRow>
           </StackPanel>
         </ScrollViewer>
 
-        <!-- Appearance -->
-        <ScrollViewer x:Name="AppearanceSection" VerticalScrollBarVisibility="Auto" IsVisible="False">
-          <StackPanel Spacing="2" MaxWidth="680" HorizontalAlignment="Left">
-            <TextBlock Text="{x:Static loc:Strings.SettingsAppearanceTheme}" FontSize="12"
-                       FontWeight="SemiBold" Opacity="0.7" Margin="0,0,0,6" />
-            <ComboBox ItemsSource="{Binding ThemeOptions}"
-                      SelectedIndex="{Binding ThemeIndex, Mode=TwoWay}"
-                      MinWidth="220" HorizontalAlignment="Left" Margin="0,4,0,6" />
-            <TextBlock Text="{x:Static loc:Strings.SettingsThemeHint}" FontSize="11" Opacity="0.6"
-                       TextWrapping="Wrap" MaxWidth="520" HorizontalAlignment="Left" />
+        <!-- File manager -->
+        <ScrollViewer x:Name="FilesSection" VerticalScrollBarVisibility="Auto" IsVisible="False">
+          <StackPanel MaxWidth="780" HorizontalAlignment="Left">
+            <TextBlock Text="{x:Static loc:Strings.SettingsFilesHint}" Classes="sectionLead" />
+
+            <TextBlock Text="{x:Static loc:Strings.SettingsFilesListSection}" Classes="groupHeader" />
+            <c:SettingRow Title="{x:Static loc:Strings.SettingsShowHidden}"
+                          Hint="{x:Static loc:Strings.SettingsShowHiddenHint}">
+              <ToggleSwitch IsChecked="{Binding ShowHiddenFiles, Mode=TwoWay}" />
+            </c:SettingRow>
+            <c:SettingRow Title="{x:Static loc:Strings.SettingsShowExtensions}"
+                          Hint="{x:Static loc:Strings.SettingsShowExtensionsHint}">
+              <ToggleSwitch IsChecked="{Binding ShowFileExtensions, Mode=TwoWay}" />
+            </c:SettingRow>
+            <c:SettingRow Title="{x:Static loc:Strings.SettingsFoldersFirst}"
+                          Hint="{x:Static loc:Strings.SettingsFoldersFirstHint}">
+              <ToggleSwitch IsChecked="{Binding FoldersFirst, Mode=TwoWay}" />
+            </c:SettingRow>
+            <c:SettingRow Title="{x:Static loc:Strings.SettingsThumbnails}"
+                          Hint="{x:Static loc:Strings.SettingsThumbnailsHint}">
+              <ToggleSwitch IsChecked="{Binding ShowThumbnails, Mode=TwoWay}" />
+            </c:SettingRow>
+
+            <TextBlock Text="{x:Static loc:Strings.SettingsFilesSortSection}" Classes="groupHeader" />
+            <c:SettingRow Title="{x:Static loc:Strings.SettingsDefaultView}"
+                          Hint="{x:Static loc:Strings.SettingsDefaultViewHint}">
+              <ToggleSwitch IsChecked="{Binding DefaultGridView, Mode=TwoWay}" />
+            </c:SettingRow>
+            <c:SettingRow Title="{x:Static loc:Strings.SettingsSortDefault}"
+                          Hint="{x:Static loc:Strings.SettingsSortDefaultHint}">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <ComboBox Classes="settingChoice" MinWidth="150" ItemsSource="{Binding FileSortOptions}"
+                          SelectedIndex="{Binding SortIndex, Mode=TwoWay}" />
+                <ToggleButton Padding="10,4" FontSize="12"
+                              Content="{x:Static loc:Strings.SettingsSortDescending}"
+                              IsChecked="{Binding SortDescending, Mode=TwoWay}" />
+              </StackPanel>
+            </c:SettingRow>
+
+            <TextBlock Text="{x:Static loc:Strings.SettingsFilesDeleteSection}" Classes="groupHeader" />
+            <c:SettingRow Title="{x:Static loc:Strings.SettingsConfirmDelete}"
+                          Hint="{x:Static loc:Strings.SettingsConfirmDeleteHint}">
+              <ToggleSwitch IsChecked="{Binding ConfirmDelete, Mode=TwoWay}" />
+            </c:SettingRow>
+          </StackPanel>
+        </ScrollViewer>
+
+        <!-- Code editor -->
+        <ScrollViewer x:Name="CodeSection" VerticalScrollBarVisibility="Auto" IsVisible="False">
+          <StackPanel MaxWidth="780" HorizontalAlignment="Left">
+            <TextBlock Text="{x:Static loc:Strings.SettingsCodeHint}" Classes="sectionLead" />
+
+            <TextBlock Text="{x:Static loc:Strings.SettingsCodeFontSection}" Classes="groupHeader" />
+            <c:SettingRow Title="{x:Static loc:Strings.SettingsCodeFontFamily}"
+                          Hint="{x:Static loc:Strings.SettingsCodeFontFamilyHint}">
+              <TextBox Width="240" FontSize="12" Text="{Binding CodeFontFamily, Mode=TwoWay}" />
+            </c:SettingRow>
+            <c:SettingRow Title="{x:Static loc:Strings.SettingsCodeFontSize}"
+                          Hint="{x:Static loc:Strings.SettingsCodeFontSizeHint}">
+              <NumericUpDown Classes="settingNumber" Minimum="8" Maximum="48" Increment="1"
+                             Value="{Binding CodeFontSize, Mode=TwoWay}" />
+            </c:SettingRow>
+
+            <TextBlock Text="{x:Static loc:Strings.SettingsCodeIndentSection}" Classes="groupHeader" />
+            <c:SettingRow Title="{x:Static loc:Strings.SettingsCodeTabSize}"
+                          Hint="{x:Static loc:Strings.SettingsCodeTabSizeHint}">
+              <NumericUpDown Classes="settingNumber" Minimum="1" Maximum="8" Increment="1"
+                             Value="{Binding CodeTabSize, Mode=TwoWay}" />
+            </c:SettingRow>
+            <c:SettingRow Title="{x:Static loc:Strings.SettingsCodeInsertSpaces}"
+                          Hint="{x:Static loc:Strings.SettingsCodeInsertSpacesHint}">
+              <ToggleSwitch IsChecked="{Binding CodeInsertSpaces, Mode=TwoWay}" />
+            </c:SettingRow>
+
+            <TextBlock Text="{x:Static loc:Strings.SettingsCodeViewSection}" Classes="groupHeader" />
+            <c:SettingRow Title="{x:Static loc:Strings.SettingsCodeWordWrap}"
+                          Hint="{x:Static loc:Strings.SettingsCodeWordWrapHint}">
+              <ComboBox Classes="settingChoice" ItemsSource="{Binding CodeWrapOptions}"
+                        SelectedIndex="{Binding CodeWrapIndex, Mode=TwoWay}" />
+            </c:SettingRow>
+            <c:SettingRow Title="{x:Static loc:Strings.SettingsCodeLineNumbers}"
+                          Hint="{x:Static loc:Strings.SettingsCodeLineNumbersHint}">
+              <ComboBox Classes="settingChoice" ItemsSource="{Binding CodeLineNumberOptions}"
+                        SelectedIndex="{Binding CodeLineNumbersIndex, Mode=TwoWay}" />
+            </c:SettingRow>
+            <c:SettingRow Title="{x:Static loc:Strings.SettingsCodeWhitespace}"
+                          Hint="{x:Static loc:Strings.SettingsCodeWhitespaceHint}">
+              <ComboBox Classes="settingChoice" ItemsSource="{Binding CodeWhitespaceOptions}"
+                        SelectedIndex="{Binding CodeWhitespaceIndex, Mode=TwoWay}" />
+            </c:SettingRow>
+            <c:SettingRow Title="{x:Static loc:Strings.SettingsCodeMinimap}"
+                          Hint="{x:Static loc:Strings.SettingsCodeMinimapHint}">
+              <ToggleSwitch IsChecked="{Binding CodeMinimap, Mode=TwoWay}" />
+            </c:SettingRow>
+            <c:SettingRow Title="{x:Static loc:Strings.SettingsCodeBrackets}"
+                          Hint="{x:Static loc:Strings.SettingsCodeBracketsHint}">
+              <ToggleSwitch IsChecked="{Binding CodeBracketPairs, Mode=TwoWay}" />
+            </c:SettingRow>
+            <c:SettingRow Title="{x:Static loc:Strings.SettingsCodeCursor}"
+                          Hint="{x:Static loc:Strings.SettingsCodeCursorHint}">
+              <ComboBox Classes="settingChoice" ItemsSource="{Binding CodeCursorOptions}"
+                        SelectedIndex="{Binding CodeCursorIndex, Mode=TwoWay}" />
+            </c:SettingRow>
+            <c:SettingRow Title="{x:Static loc:Strings.SettingsCodeSmooth}"
+                          Hint="{x:Static loc:Strings.SettingsCodeSmoothHint}">
+              <ToggleSwitch IsChecked="{Binding CodeSmoothScrolling, Mode=TwoWay}" />
+            </c:SettingRow>
+
+            <TextBlock Text="{x:Static loc:Strings.SettingsCodeSaveSection}" Classes="groupHeader" />
+            <c:SettingRow Title="{x:Static loc:Strings.SettingsCodeAutoSave}"
+                          Hint="{x:Static loc:Strings.SettingsCodeAutoSaveHint}">
+              <ComboBox Classes="settingChoice" MinWidth="170" ItemsSource="{Binding CodeAutoSaveOptions}"
+                        SelectedIndex="{Binding CodeAutoSaveIndex, Mode=TwoWay}" />
+            </c:SettingRow>
+            <c:SettingRow Title="{x:Static loc:Strings.SettingsCodeAutoSaveDelay}"
+                          Hint="{x:Static loc:Strings.SettingsCodeAutoSaveDelayHint}">
+              <NumericUpDown Classes="settingNumber" Minimum="200" Maximum="10000" Increment="100"
+                             Value="{Binding CodeAutoSaveDelay, Mode=TwoWay}" />
+            </c:SettingRow>
+            <c:SettingRow Title="{x:Static loc:Strings.SettingsCodeTheme}"
+                          Hint="{x:Static loc:Strings.SettingsCodeThemeHint}">
+              <ComboBox Classes="settingChoice" ItemsSource="{Binding CodeThemeOptions}"
+                        SelectedItem="{Binding CodeTheme, Mode=TwoWay}" />
+            </c:SettingRow>
+          </StackPanel>
+        </ScrollViewer>
+
+        <!-- Office -->
+        <ScrollViewer x:Name="OfficeSection" VerticalScrollBarVisibility="Auto" IsVisible="False">
+          <StackPanel MaxWidth="780" HorizontalAlignment="Left">
+            <TextBlock Text="{x:Static loc:Strings.SettingsOfficeHint}" Classes="sectionLead" />
+
+            <TextBlock Text="{x:Static loc:Strings.SettingsOfficeDocSection}" Classes="groupHeader" />
+            <c:SettingRow Title="{x:Static loc:Strings.SettingsOfficeDefaultKind}"
+                          Hint="{x:Static loc:Strings.SettingsOfficeDefaultKindHint}">
+              <ComboBox Classes="settingChoice" MinWidth="150" ItemsSource="{Binding OfficeKindOptions}"
+                        SelectedIndex="{Binding OfficeKindIndex, Mode=TwoWay}" />
+            </c:SettingRow>
+            <c:SettingRow Title="{x:Static loc:Strings.SettingsOfficeFontSize}"
+                          Hint="{x:Static loc:Strings.SettingsOfficeFontSizeHint}">
+              <NumericUpDown Classes="settingNumber" Minimum="8" Maximum="72" Increment="1"
+                             Value="{Binding OfficeFontSize, Mode=TwoWay}" />
+            </c:SettingRow>
+            <c:SettingRow Title="{x:Static loc:Strings.SettingsOfficeZoom}"
+                          Hint="{x:Static loc:Strings.SettingsOfficeZoomHint}">
+              <NumericUpDown Classes="settingNumber" Minimum="50" Maximum="200" Increment="10"
+                             Value="{Binding OfficeZoom, Mode=TwoWay}" />
+            </c:SettingRow>
+
+            <TextBlock Text="{x:Static loc:Strings.SettingsOfficeViewSection}" Classes="groupHeader" />
+            <c:SettingRow Title="{x:Static loc:Strings.SettingsOfficeRuler}"
+                          Hint="{x:Static loc:Strings.SettingsOfficeRulerHint}">
+              <ToggleSwitch IsChecked="{Binding OfficeShowRuler, Mode=TwoWay}" />
+            </c:SettingRow>
+            <c:SettingRow Title="{x:Static loc:Strings.SettingsOfficeWidePage}"
+                          Hint="{x:Static loc:Strings.SettingsOfficeWidePageHint}">
+              <ToggleSwitch IsChecked="{Binding OfficeWidePage, Mode=TwoWay}" />
+            </c:SettingRow>
+            <c:SettingRow Title="{x:Static loc:Strings.SettingsOfficeGridLines}"
+                          Hint="{x:Static loc:Strings.SettingsOfficeGridLinesHint}">
+              <ToggleSwitch IsChecked="{Binding OfficeGridLines, Mode=TwoWay}" />
+            </c:SettingRow>
+            <c:SettingRow Title="{x:Static loc:Strings.SettingsOfficeTrackChanges}"
+                          Hint="{x:Static loc:Strings.SettingsOfficeTrackChangesHint}">
+              <ToggleSwitch IsChecked="{Binding OfficeTrackChanges, Mode=TwoWay}" />
+            </c:SettingRow>
+
+            <TextBlock Text="{x:Static loc:Strings.SettingsOfficeSaveSection}" Classes="groupHeader" />
+            <c:SettingRow Title="{x:Static loc:Strings.SettingsOfficeAutoSave}"
+                          Hint="{x:Static loc:Strings.SettingsOfficeAutoSaveHint}">
+              <ToggleSwitch IsChecked="{Binding OfficeAutoSave, Mode=TwoWay}" />
+            </c:SettingRow>
+            <c:SettingRow Title="{x:Static loc:Strings.SettingsOfficeAutoSaveInterval}"
+                          Hint="{x:Static loc:Strings.SettingsOfficeAutoSaveIntervalHint}">
+              <NumericUpDown Classes="settingNumber" Minimum="10" Maximum="3600" Increment="10"
+                             Value="{Binding OfficeAutoSaveSeconds, Mode=TwoWay}" />
+            </c:SettingRow>
+            <c:SettingRow Title="{x:Static loc:Strings.SettingsOfficeMacroSecurity}"
+                          Hint="{x:Static loc:Strings.SettingsOfficeMacroSecurityHint}">
+              <ComboBox Classes="settingChoice" MinWidth="170"
+                        ItemsSource="{Binding MacroSecurityOptions}"
+                        SelectedIndex="{Binding MacroSecurityIndex, Mode=TwoWay}" />
+            </c:SettingRow>
           </StackPanel>
         </ScrollViewer>
 
@@ -186,10 +394,12 @@
     <!-- Footer -->
     <Border Grid.Row="1" Padding="20,10" BorderThickness="0,1,0,0"
             BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
-      <Grid ColumnDefinitions="*,Auto">
+      <Grid ColumnDefinitions="*,Auto,Auto">
         <TextBlock Text="{Binding BuildLabel}" FontSize="11" Opacity="0.55"
                    VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-        <Button Grid.Column="1" Content="{x:Static loc:Strings.DlgClose}" MinWidth="96"
+        <Button Grid.Column="1" Content="{x:Static loc:Strings.SettingsReset}"
+                Command="{Binding ResetCommand}" Padding="14,5" Margin="0,0,8,0" />
+        <Button Grid.Column="2" Content="{x:Static loc:Strings.DlgClose}" MinWidth="96"
                 Click="OnClose" />
       </Grid>
     </Border>

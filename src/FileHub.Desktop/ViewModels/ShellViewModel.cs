@@ -63,15 +63,28 @@ public sealed class ShellViewModel : ViewModelBase
 
     private ShellViewModel()
     {
+        // Window chrome state survives a restart. Tabs and the second pane are not restored as
+        // "open windows" beyond the session file — only these two layout switches.
+        var prefs = Preferences.Current;
+        _isSidebarOpen = prefs.ShowSidebar;
+        _isDetailsPaneOpen = prefs.ShowDetailsPane;
+
         NewTabCommand = new RelayCommand(_ => AddTab());
         OpenSettingsCommand = new RelayCommand(_ => _ = SettingsDialog.ShowAsync(this));
         CloseWorkspacePageCommand = new RelayCommand(_ => CloseWorkspacePage());
         ToggleDetailsPaneCommand = new RelayCommand(_ =>
         {
             IsDetailsPaneOpen = !IsDetailsPaneOpen;
+            Preferences.Current.ShowDetailsPane = IsDetailsPaneOpen;
+            Preferences.Current.Save();
             foreach (var tab in Tabs) tab.RaiseDetailsPaneChanged();
         });
-        ToggleSidebarCommand = new RelayCommand(_ => IsSidebarOpen = !IsSidebarOpen);
+        ToggleSidebarCommand = new RelayCommand(_ =>
+        {
+            IsSidebarOpen = !IsSidebarOpen;
+            Preferences.Current.ShowSidebar = IsSidebarOpen;
+            Preferences.Current.Save();
+        });
         CycleLanguageCommand = new RelayCommand(_ =>
         {
             Loc.SetLanguage(Loc.NextLanguage());
@@ -327,6 +340,29 @@ public sealed class ShellViewModel : ViewModelBase
         return target;
     }
 
+    /// <summary>
+    /// Pushes the persisted preferences into every live surface. The settings dialog calls this
+    /// after each change, so a toggle is visible immediately in the open tabs, the editor and any
+    /// document that is already open.
+    /// </summary>
+    public void ApplyPreferences()
+    {
+        ApplyFilesPreferences();
+        ApplyCodePreferences();
+        ApplyOfficePreferences();
+    }
+
+    /// <summary>Re-sorts / re-lists the open tabs after a file-manager preference changed.</summary>
+    public void ApplyFilesPreferences()
+    {
+        foreach (var tab in Tabs) tab.ApplyFileListPreferences();
+        SecondPane?.ApplyFileListPreferences();
+    }
+
+    public void ApplyCodePreferences() => _codeEditor?.ApplyPreferences();
+
+    public void ApplyOfficePreferences() => _office?.ApplyPreferences();
+
     public void CloseWorkspacePage()
     {
         // Leaving document mode with unsaved edits is the second place data could vanish.
@@ -364,6 +400,28 @@ public sealed class ShellViewModel : ViewModelBase
             return;
         }
         IsDualPaneOpen = false;
+    }
+
+    /// <summary>Opens the quick look overlay for one entry (context menu "Preview").</summary>
+    public async Task OpenQuickLookAsync(string path)
+    {
+        var tab = ActiveTab;
+        var entry = tab.Entries.FirstOrDefault(x =>
+            string.Equals(x.FullPath, path, StringComparison.OrdinalIgnoreCase));
+        if (entry is null) return;
+        if (QuickLook.IsOpen) QuickLook.Close();
+        await QuickLook.ShowAsync(tab.Entries.ToList(), entry).ConfigureAwait(true);
+    }
+
+    /// <summary>
+    /// Hands a path to the OS default handler, materializing archive / remote / web entries first.
+    /// Separate from OpenFileAsync so "Open with system default" stays available for a source
+    /// file that would otherwise open in the built-in editor.
+    /// </summary>
+    public async Task OpenWithSystemAsync(string path)
+    {
+        var local = await MaterializeAsync(path).ConfigureAwait(true);
+        await Task.Run(() => Process.Start(new ProcessStartInfo(local) { UseShellExecute = true }));
     }
 
     /// <summary>Space toggles quick look for the focused entry; Space again closes it.</summary>
