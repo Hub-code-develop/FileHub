@@ -335,6 +335,54 @@ snippets are read.
 
 ---
 
+## Open XML SDK (DocumentFormat.OpenXml)
+
+- **Project:** https://github.com/dotnet/Open-XML-SDK
+- **Package:** `DocumentFormat.OpenXml` 3.3.0 (NuGet)
+- **License:** The MIT License (MIT)
+- **Copyright:** Copyright (c) .NET Foundation and Contributors
+- **Status:** **Binary dependency.** Used by `src/FileHub.Office` to read and write
+  `docx` / `xlsx` / `pptx` without COM automation or an Office installation.
+
+### What it is used for
+
+The built-in Office page reads document paragraphs, worksheet cells and slide outlines through
+the Open XML SDK, and writes back light edits (Word text/formatting and Excel cell values).
+No Microsoft Office code or binaries are bundled. This is an independent implementation using a
+published open file format; it is not a port of Microsoft Office source code.
+
+Slides are shown as a read-only outline. Complex OOXML features (macros, Track Changes, pivot
+tables, charts, embedded objects, custom XML) are outside the scope of this lightweight editor
+and may be simplified when a file is saved. FileHub is **not** affiliated with or endorsed by
+Microsoft. "Microsoft Office", "Word", "Excel" and "PowerPoint" are trademarks of Microsoft
+Corporation.
+
+### The MIT License (MIT)
+
+Copyright (c) .NET Foundation and Contributors
+
+All rights reserved.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+---
+
 ## Fonts and icons
 
 FileHub uses the Segoe Fluent Icons / Symbol icon font through FluentAvalonia's `FASymbolIcon`.

@@ -66,6 +66,9 @@
           <Button Classes="tabAction" ToolTip.Tip="{x:Static loc:Strings.ExtensionsTab}"
                   Content="{x:Static loc:Strings.ExtensionsTab}"
                   Command="{Binding OpenExtensionsCommand}" />
+          <Button Classes="tabAction" ToolTip.Tip="{x:Static loc:Strings.OfficeTab}"
+                  Content="{x:Static loc:Strings.OfficeTab}"
+                  Command="{Binding OpenOfficeCommand}" />
           <Button Classes="tabAction" ToolTip.Tip="{x:Static loc:Strings.ToggleTheme}"
                   Command="{Binding ToggleThemeCommand}">
             <ui:FASymbolIcon Symbol="Settings" FontSize="14" />
@@ -122,6 +125,7 @@
             Background="{DynamicResource SystemControlBackgroundAltHighBrush}">
         <t:CodeEditorPage IsVisible="{Binding IsCodePageOpen}" />
         <t:ExtensionsPage IsVisible="{Binding IsExtensionsPageOpen}" />
+        <t:OfficePage IsVisible="{Binding IsOfficePageOpen}" />
       </Grid>
     </Grid>
 

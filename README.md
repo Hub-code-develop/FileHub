@@ -167,6 +167,12 @@ FluentUI-CodeHub widgets used: `FANavigationView` (sidebar), `FABreadcrumbBar` (
   local Monaco editor with syntax highlighting, language auto-detection, Ctrl+S save, an
   encoding-preserving writer, a dirty marker and a cursor readout. All assets are bundled, so
   editing works offline
+- **Built-in Office page**: double-click a `.docx` / `.xlsx` / `.pptx` (or press Office in the tab
+  strip) to open a Microsoft-Office-style ribbon workspace. Word paragraphs can be edited with
+  bold / italic / underline and heading styles; Excel worksheets render as an editable cell grid;
+  PowerPoint slides appear as a read-only outline. Ctrl+S saves Word and Excel changes back to
+  the original file. Powered by the Open XML SDK - no Office installation, no COM, works
+  cross-platform. Complex OOXML features may be simplified on save; see THIRD-PARTY-NOTICES.md
 - **VS Code extensions page**: discovers extensions installed under `.vscode`,
   `.vscode-insiders`, `.vscode-oss`, `.cursor` and `.windsurf`, lets you enable or disable them
   for FileHub, and shows their language / theme / snippet / grammar contributions. Enabled
@@ -321,12 +327,15 @@ FileHub/
     ├── FileHub.Code/      logic only, code editing + VS Code contribution data
     │   ├── Models/        ExtensionInfo / ExtensionLanguage / ExtensionTheme / ExtensionSnippet
     │   └── Services/      CodeFileService / CodeLanguageService / ExtensionDiscoveryService / MonacoThemeConverter
+    ├── FileHub.Office/    logic only, Office documents (Open XML SDK 3.3.0, MIT)
+    │   ├── Models/        OfficeDocument / WordParagraph / ExcelSheet / PowerPointSlide
+    │   └── Services/      OfficeDocumentService (load / save / create blank documents)
     └── FileHub.Desktop/   Avalonia application
         ├── App.axaml      theme entry point
         ├── Assets/Monaco/ bundled monaco-editor 0.52.2 min/vs assets (MIT)
         ├── Styles/        application styles
-        ├── ViewModels/    ShellViewModel (tabs + pages) / MainViewModel / CodeEditorViewModel / ExtensionsViewModel
-        ├── Views/         MainWindow / Views/Controls (Files App layout ports + editor + extensions)
+        ├── ViewModels/    ShellViewModel (tabs + pages) / MainViewModel / CodeEditorViewModel / ExtensionsViewModel / OfficeViewModel
+        ├── Views/         MainWindow / Views/Controls (Files App layout ports + editor + extensions + Office ribbon)
         └── Services/      LocalizationService / DialogService / ThumbnailService / DragDropPayload / MonacoAssetServer
 ```
 

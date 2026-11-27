@@ -35,6 +35,7 @@
   <ItemGroup>
     <ProjectReference Include="..\FileHub.Files\FileHub.Files.csproj" />
     <ProjectReference Include="..\FileHub.Code\FileHub.Code.csproj" />
+    <ProjectReference Include="..\FileHub.Office\FileHub.Office.csproj" />
     <!-- WinUI 3 控件样式的源码移植版（MIT，微软版权）。 -->
     <ProjectReference Include="..\WinUI3.Fluent\WinUI3.Fluent.csproj" />
   </ItemGroup>

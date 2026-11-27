@@ -23,7 +23,8 @@ public enum WorkspacePageKind
 {
     Files,
     Code,
-    Extensions
+    Extensions,
+    Office
 }
 
 /// <summary>
@@ -43,6 +44,7 @@ public sealed class ShellViewModel : ViewModelBase
     private ExtensionDiscoveryService? _extensionDiscovery;
     private CodeEditorViewModel? _codeEditor;
     private ExtensionsViewModel? _extensions;
+    private OfficeViewModel? _office;
 
     /// <summary>Paths of the most recently closed tabs, newest first (Files: reopen closed tab).</summary>
     private readonly List<string> _closedTabPaths = [];
@@ -57,6 +59,7 @@ public sealed class ShellViewModel : ViewModelBase
             _ = Extensions;
             WorkspacePage = WorkspacePageKind.Extensions;
         });
+        OpenOfficeCommand = new RelayCommand(_ => WorkspacePage = WorkspacePageKind.Office);
         CloseWorkspacePageCommand = new RelayCommand(_ => CloseWorkspacePage());
         ToggleDetailsPaneCommand = new RelayCommand(_ =>
         {
@@ -113,6 +116,7 @@ public sealed class ShellViewModel : ViewModelBase
     public ICommand CycleLanguageCommand { get; }
     public ICommand OpenCodeEditorCommand { get; }
     public ICommand OpenExtensionsCommand { get; }
+    public ICommand OpenOfficeCommand { get; }
     public ICommand CloseWorkspacePageCommand { get; }
 
     /// <summary>Full-area overlay: Files, the Monaco editor, or the VS Code extensions page.</summary>
@@ -125,22 +129,51 @@ public sealed class ShellViewModel : ViewModelBase
             OnPropertyChanged(nameof(IsWorkspacePageOpen));
             OnPropertyChanged(nameof(IsCodePageOpen));
             OnPropertyChanged(nameof(IsExtensionsPageOpen));
+            OnPropertyChanged(nameof(IsOfficePageOpen));
         }
     }
 
     public bool IsWorkspacePageOpen => WorkspacePage != WorkspacePageKind.Files;
     public bool IsCodePageOpen => WorkspacePage == WorkspacePageKind.Code;
     public bool IsExtensionsPageOpen => WorkspacePage == WorkspacePageKind.Extensions;
+    public bool IsOfficePageOpen => WorkspacePage == WorkspacePageKind.Office;
 
     public ExtensionDiscoveryService ExtensionDiscovery => _extensionDiscovery ??= new ExtensionDiscoveryService();
     public CodeEditorViewModel CodeEditor => _codeEditor ??= new CodeEditorViewModel(ExtensionDiscovery) { Shell = this };
     public ExtensionsViewModel Extensions => _extensions ??= new ExtensionsViewModel(ExtensionDiscovery, CodeEditor) { Shell = this };
+    public OfficeViewModel Office => _office ??= new OfficeViewModel { Shell = this };
 
     /// <summary>Opens a source file in the Monaco editor page.</summary>
     public async Task OpenCodeFileAsync(string path)
     {
         await CodeEditor.OpenAsync(path);
         WorkspacePage = WorkspacePageKind.Code;
+    }
+
+    /// <summary>Opens a Word / Excel / PowerPoint file in the built-in Office page.</summary>
+    public async Task OpenOfficeFileAsync(string path)
+    {
+        await Office.OpenAsync(path);
+        WorkspacePage = WorkspacePageKind.Office;
+    }
+
+    /// <summary>
+    /// Unified file-open dispatch: Office documents go to the built-in ribbon page, source files
+    /// to Monaco, everything else to the OS default application.
+    /// </summary>
+    public async Task OpenFileAsync(string path)
+    {
+        if (FileHub.Office.Services.OfficeDocumentService.IsOfficeFile(path))
+        {
+            await OpenOfficeFileAsync(path);
+            return;
+        }
+        if (FileHub.Code.Services.CodeLanguageService.IsCodeFile(path))
+        {
+            await OpenCodeFileAsync(path);
+            return;
+        }
+        await Task.Run(() => Process.Start(new ProcessStartInfo(path) { UseShellExecute = true }));
     }
 
     public void CloseWorkspacePage()
@@ -311,8 +344,9 @@ public sealed class ShellViewModel : ViewModelBase
     /// </summary>
     private static UiServices CreateUiServices() => new()
     {
-        OpenFileAsync = path => Task.Run(() =>
-            Process.Start(new ProcessStartInfo(path) { UseShellExecute = true })),
+        // Route through the shell's dispatcher so Office documents and source files open in
+        // built-in pages no matter which entry point was used (double-click, Enter or context menu).
+        OpenFileAsync = path => Current.OpenFileAsync(path),
         PromptAsync = (title, message, initial, primary) => WithWindow(
             w => new DialogService(w).PromptAsync(title, message, initial, primary),
             Task.FromResult<string?>(null)),

@@ -493,6 +493,12 @@ public partial class MainWindow : Window
             args.Handled = true;
             return;
         }
+        if (_shell.IsOfficePageOpen && workspaceCtrl && args.Key == Key.S)
+        {
+            if (_shell.Office.SaveCommand.CanExecute(null)) _shell.Office.SaveCommand.Execute(null);
+            args.Handled = true;
+            return;
+        }
 
         // Hotkeys are resolved through the same CommandManager the toolbar and context menu
         // use, mirroring Files App's CommandManager[HotKey] lookup.

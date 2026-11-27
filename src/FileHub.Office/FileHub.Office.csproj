@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>FileHub.Office</RootNamespace>
+  </PropertyGroup>
+
+  <!--
+    Open XML SDK (MIT, Microsoft) - the same OOXML engine OfficeIMO / ClosedXML build on.
+    COM-free and cross-platform, so docx/xlsx/pptx work on macOS and Linux without Office.
+    See THIRD-PARTY-NOTICES.md for the full licence and copyright.
+  -->
+  <ItemGroup>
+    <PackageReference Include="DocumentFormat.OpenXml" Version="3.3.0" />
+  </ItemGroup>
+
+</Project>

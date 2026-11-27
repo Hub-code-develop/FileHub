@@ -133,6 +133,11 @@ macOS 优先读系统语言偏好是故意的：从 Finder 启动的 GUI 应用�
 - **Monaco 代码编辑器**：双击源代码文件（或点标签栏的「代码」）即可打开本地 Monaco 编辑器，
   支持语法高亮、语言自动识别、Ctrl+S 保存、保留原编码写入、未保存标记与光标位置显示。
   所有资源都随应用打包，离线也能写代码。
+- **内置 Office 页面**：双击 `.docx` / `.xlsx` / `.pptx`（或点标签栏「Office」）即可打开 Microsoft Office
+  风格的功能区工作区。Word 段落可编辑并支持粗体 / 斜体 / 下划线和标题样式；Excel 工作表渲染为可编辑的
+  单元格网格；PowerPoint 幻灯片以只读大纲展示。Ctrl+S 把 Word / Excel 的修改写回原文件。
+  底层是 Open XML SDK，无需安装 Office、不用 COM，跨平台可用。复杂 OOXML 特性保存时可能被简化，
+  详见 THIRD-PARTY-NOTICES.md。
 - **VS Code 扩展页面**：扫描 `.vscode`、`.vscode-insiders`、`.vscode-oss`、`.cursor`、`.windsurf`
   下已安装的扩展，可为 FileHub 单独启用 / 禁用，并展示语言、主题、代码片段和语法贡献。
   启用的扩展会向 Monaco 提供文件关联、配色主题和补全片段；**不会执行扩展的 JavaScript**。
@@ -271,12 +276,15 @@ FileHub/
     ├── FileHub.Code/      纯逻辑，代码编辑与 VS Code 贡献数据
     │   ├── Models/        ExtensionInfo / ExtensionLanguage / ExtensionTheme / ExtensionSnippet
     │   └── Services/      CodeFileService / CodeLanguageService / ExtensionDiscoveryService / MonacoThemeConverter
+    ├── FileHub.Office/    纯逻辑，Office 文档（Open XML SDK 3.3.0，MIT）
+    │   ├── Models/        OfficeDocument / WordParagraph / ExcelSheet / PowerPointSlide
+    │   └── Services/      OfficeDocumentService（读取 / 保存 / 新建空白文档）
     └── FileHub.Desktop/   Avalonia 应用
         ├── App.axaml      主题入口
         ├── Assets/Monaco/ 随包分发的 monaco-editor 0.52.2 min/vs 资源（MIT）
         ├── Styles/        应用样式
-        ├── ViewModels/    ShellViewModel（标签与页面）/ MainViewModel / CodeEditorViewModel / ExtensionsViewModel
-        ├── Views/         MainWindow / Views/Controls（Files 布局移植 + 编辑器 + 扩展页）
+        ├── ViewModels/    ShellViewModel（标签与页面）/ MainViewModel / CodeEditorViewModel / ExtensionsViewModel / OfficeViewModel
+        ├── Views/         MainWindow / Views/Controls（Files 布局移植 + 编辑器 + 扩展页 + Office 功能区）
         └── Services/      LocalizationService / DialogService / ThumbnailService / DragDropPayload / MonacoAssetServer
 ```
 
