@@ -176,9 +176,21 @@ FluentUI-CodeHub widgets used: `FANavigationView` (sidebar), `FABreadcrumbBar` (
     live status aggregates.
   - **PowerPoint**: slide thumbnails, an editable 16:9 canvas with text boxes, add/duplicate/
     delete/reorder slides, layouts and speaker notes.
+  - **Advanced OOXML panel**: Word multi-level numbering definitions (decimal, letters, Roman,
+    bullets, start values, restart rules, legal style), tracked changes (w:ins / w:del /
+    w:rPrChange) with accept / reject, Excel charts (column, bar, line, pie, area) rendered natively,
+    pivot tables with Sum / Count / Average / Min / Max aggregation, embedded OLE objects that can
+    be extracted, VBA module source inspection, and FileHub-native macro record / replay.
+  - **WPS native formats**: opens Kingsoft WPS Writer `.wps` / `.wpt`, Spreadsheet `.et` / `.ett`
+    and Presentation `.dps` / `.dpt`. Three containers are supported: OOXML packages saved with a
+    WPS extension, legacy OLE/BIFF/WPS binaries (text, shared strings, cell records and slide text
+    are decoded), and RTF-based Writer documents. A decoded document is edited as a temporary
+    OOXML copy and Save As produces a `.docx` / `.xlsx` / `.pptx` file; the original WPS file is
+    never overwritten with OOXML bytes.
   Ctrl+S writes changes back to the original file. Powered by the Open XML SDK - no Office
-  installation, no COM, cross-platform. Complex OOXML features may be simplified on save; see
-  THIRD-PARTY-NOTICES.md
+  installation, no COM, cross-platform. VBA code is never executed; macro recording replays
+  FileHub editor actions only. Advanced OOXML features outside our implementation (VBA execution,
+  macros with dialogs, pivot charts, OLE activation) are documented in THIRD-PARTY-NOTICES.md
 - **VS Code extensions page**: discovers extensions installed under `.vscode`,
   `.vscode-insiders`, `.vscode-oss`, `.cursor` and `.windsurf`, lets you enable or disable them
   for FileHub, and shows their language / theme / snippet / grammar contributions. Enabled

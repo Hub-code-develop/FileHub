@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:loc="using:FileHub.Desktop.Services"
              xmlns:m="using:FileHub.Office.Models"
+             xmlns:c="using:FileHub.Desktop.Views.Controls"
              x:Class="FileHub.Desktop.Views.Controls.OfficePage">
 
   <!--
@@ -10,6 +11,7 @@
   -->
   <UserControl.Resources>
     <loc:ByteArrayToImageConverter x:Key="OfficeImageConverter" />
+    <loc:StringListConverter x:Key="OfficeRowConverter" />
   </UserControl.Resources>
 
   <UserControl.DataTemplates>
@@ -81,8 +83,12 @@
                        TextTrimming="CharacterEllipsis" />
             <TextBlock Text="*" IsVisible="{Binding IsDirty}" Foreground="#D13438" FontSize="15" />
           </StackPanel>
-          <TextBlock Text="{Binding FilePath}" Opacity="0.6" FontSize="11"
-                     TextTrimming="CharacterEllipsis" />
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <TextBlock Text="{Binding FilePath}" Opacity="0.6" FontSize="11"
+                       TextTrimming="CharacterEllipsis" />
+            <TextBlock Text="{Binding SourceFormat}" FontSize="11" Foreground="#2B579A"
+                       IsVisible="{Binding IsDecodedSource}" />
+          </StackPanel>
         </StackPanel>
         <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="10" Margin="12,0,0,0">
           <TextBlock Text="{Binding ActiveTab}" Opacity="0.55" FontSize="12" />
@@ -220,7 +226,7 @@
     </Border>
 
     <!-- Document canvas -->
-    <Grid Grid.Row="4">
+    <Grid Grid.Row="4" RowDefinitions="*,Auto">
 
       <!-- Empty state -->
       <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8"
@@ -362,6 +368,207 @@
           </Border>
         </ScrollViewer>
       </Grid>
+
+    <!-- Advanced OOXML panel: revisions, numbering, charts, pivots, macros and embedded objects -->
+    <Border Grid.Row="1" Classes="paneSurface" BorderThickness="0,1,0,0"
+            BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+            Padding="10,6" MaxHeight="280" IsVisible="{Binding IsAdvancedPanelOpen}">
+      <DockPanel>
+        <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,6">
+          <TextBlock Grid.Column="0" Text="{x:Static loc:Strings.OfficeRichDisclaimer}"
+                     FontSize="11" Opacity="0.6" TextTrimming="CharacterEllipsis" />
+          <Button Grid.Column="1" Content="{x:Static loc:Strings.OfficeAdvancedPanel}"
+                  Command="{Binding ToggleAdvancedPanelCommand}" Padding="8,2" FontSize="11" />
+        </Grid>
+        <TabControl SelectedIndex="{Binding AdvancedPanelIndex}" FontSize="11">
+          <TabItem Header="{x:Static loc:Strings.OfficeRevisionsTab}">
+            <DockPanel Margin="4">
+              <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="6" Margin="0,0,0,6">
+                <Button Content="{Binding TrackChangesLabel}"
+                        Command="{Binding ToggleTrackChangesCommand}" FontSize="11" />
+                <Button Content="{x:Static loc:Strings.OfficeAccept}" Command="{Binding AcceptRevisionCommand}"
+                        CommandParameter="{Binding SelectedRevision}" FontSize="11" />
+                <Button Content="{x:Static loc:Strings.OfficeReject}" Command="{Binding RejectRevisionCommand}"
+                        CommandParameter="{Binding SelectedRevision}" FontSize="11" />
+                <Button Content="{x:Static loc:Strings.OfficeAcceptAll}" Command="{Binding AcceptAllRevisionsCommand}" FontSize="11" />
+                <Button Content="{x:Static loc:Strings.OfficeRejectAll}" Command="{Binding RejectAllRevisionsCommand}" FontSize="11" />
+              </StackPanel>
+              <ScrollViewer>
+                <ItemsControl ItemsSource="{Binding Revisions}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                      <Border Padding="4,2" BorderThickness="0,0,0,1"
+                              BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                          <TextBlock Text="{Binding Kind}" Width="90" Foreground="#2B579A" />
+                          <TextBlock Text="{Binding Author}" Width="90" Opacity="0.7" />
+                          <TextBlock Text="{Binding Text}" TextTrimming="CharacterEllipsis" MaxWidth="420" />
+                        </StackPanel>
+                      </Border>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </ScrollViewer>
+            </DockPanel>
+          </TabItem>
+          <TabItem Header="{x:Static loc:Strings.OfficeNumberingTab}">
+            <ScrollViewer>
+              <ItemsControl ItemsSource="{Binding NumberingDefinitions}" Margin="4">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate>
+                    <Border Padding="6,3" Margin="0,0,0,4"
+                            BorderThickness="1" CornerRadius="3"
+                            BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
+                      <StackPanel Spacing="2">
+                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                        <TextBlock Text="{Binding LevelsSummary}" Opacity="0.75" TextWrapping="Wrap" />
+                      </StackPanel>
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </ScrollViewer>
+          </TabItem>
+          <TabItem Header="{x:Static loc:Strings.OfficeChartsTab}">
+            <ScrollViewer>
+              <ItemsControl ItemsSource="{Binding Charts}" Margin="4">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate>
+                    <Border Padding="6" Margin="0,0,0,6" BorderThickness="1" CornerRadius="3"
+                            BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
+                      <DockPanel>
+                        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8">
+                          <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                          <TextBlock Text="{Binding Type}" Opacity="0.6" />
+                          <Button Content="{x:Static loc:Strings.OfficeDeleteMacro}"
+                                  Command="{Binding $parent[UserControl].DataContext.DeleteChartCommand}"
+                                  CommandParameter="{Binding}" FontSize="10" Padding="6,1" />
+                        </StackPanel>
+                        <c:ChartPreviewControl Chart="{Binding}" Height="140" />
+                      </DockPanel>
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </ScrollViewer>
+          </TabItem>
+          <TabItem Header="{x:Static loc:Strings.OfficePivotsTab}">
+            <DockPanel Margin="4">
+              <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="6" Margin="0,0,0,6">
+                <TextBlock Text="{x:Static loc:Strings.OfficeSource}" VerticalAlignment="Center" />
+                <TextBox Text="{Binding PivotRange, Mode=TwoWay}" Width="100" FontSize="11" />
+                <TextBox Text="{Binding PivotRowField, Mode=TwoWay}" Width="90" FontSize="11" PlaceholderText="Row" />
+                <TextBox Text="{Binding PivotColumnField, Mode=TwoWay}" Width="90" FontSize="11" PlaceholderText="Column" />
+                <TextBox Text="{Binding PivotValueField, Mode=TwoWay}" Width="90" FontSize="11" PlaceholderText="Value" />
+                <ComboBox ItemsSource="{Binding PivotAggregations}" SelectedItem="{Binding PivotAggregation}"
+                          Width="90" FontSize="11" />
+                <Button Content="{x:Static loc:Strings.OfficePivotCreate}" Command="{Binding CreatePivotCommand}" FontSize="11" />
+              </StackPanel>
+              <ScrollViewer>
+                <ItemsControl ItemsSource="{Binding PivotTables}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                      <Border Padding="6" Margin="0,0,0,6" BorderThickness="1" CornerRadius="3"
+                              BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
+                        <StackPanel Spacing="4">
+                          <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding Aggregation}" Opacity="0.6" />
+                            <Button Content="{x:Static loc:Strings.OfficePivotRefresh}"
+                                    Command="{Binding $parent[UserControl].DataContext.RecalculatePivotCommand}"
+                                    CommandParameter="{Binding}" FontSize="10" Padding="6,1" />
+                          </StackPanel>
+                          <ItemsControl ItemsSource="{Binding Grid}">
+                            <ItemsControl.ItemTemplate>
+                              <DataTemplate>
+                                <TextBlock Text="{Binding Converter={StaticResource OfficeRowConverter}}"
+                                           FontFamily="Menlo, Consolas, monospace" FontSize="10" />
+                              </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                          </ItemsControl>
+                        </StackPanel>
+                      </Border>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </ScrollViewer>
+            </DockPanel>
+          </TabItem>
+          <TabItem Header="{x:Static loc:Strings.OfficeMacrosTab}">
+            <DockPanel Margin="4">
+              <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,6">
+                <Button Content="{Binding RecordingLabel}" Command="{Binding ToggleMacroRecordingCommand}" FontSize="11" />
+                <TextBlock Text="{Binding VbaWarning}" Foreground="#D13438" FontSize="11"
+                           TextTrimming="CharacterEllipsis" IsVisible="{Binding HasVbaProject}" />
+                <TextBlock Text="{x:Static loc:Strings.OfficeMacroSecurity}" FontSize="11" Margin="12,0,0,0" />
+                <ComboBox ItemsSource="{Binding MacroSecurityLevels}" SelectedItem="{Binding MacroSecurity}"
+                          Width="100" FontSize="11" />
+              </StackPanel>
+              <ScrollViewer>
+                <StackPanel Spacing="8">
+                  <ItemsControl ItemsSource="{Binding MacroRecordings}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate>
+                        <Border Padding="4" BorderThickness="0,0,0,1"
+                                BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
+                          <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="{Binding Name}" Width="140" />
+                            <TextBlock Text="{Binding Actions.Count}" Width="60" Opacity="0.6" />
+                            <Button Content="{x:Static loc:Strings.OfficeRunMacro}"
+                                    Command="{Binding $parent[UserControl].DataContext.RunMacroCommand}"
+                                    CommandParameter="{Binding}" FontSize="10" Padding="6,1" />
+                            <Button Content="{x:Static loc:Strings.OfficeDeleteMacro}"
+                                    Command="{Binding $parent[UserControl].DataContext.DeleteMacroCommand}"
+                                    CommandParameter="{Binding}" FontSize="10" Padding="6,1" />
+                          </StackPanel>
+                        </Border>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                  <ItemsControl ItemsSource="{Binding MacroModules}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate>
+                        <Border Padding="6" Margin="0,0,0,4" BorderThickness="1" CornerRadius="3"
+                                BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
+                          <StackPanel Spacing="4">
+                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                            <TextBox Text="{Binding Source, Mode=OneWay}" AcceptsReturn="True" IsReadOnly="True"
+                                     MaxHeight="90" FontFamily="Menlo, Consolas, monospace" FontSize="10" />
+                          </StackPanel>
+                        </Border>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </StackPanel>
+              </ScrollViewer>
+            </DockPanel>
+          </TabItem>
+          <TabItem Header="{x:Static loc:Strings.OfficeObjectsTab}">
+            <ScrollViewer>
+              <ItemsControl ItemsSource="{Binding EmbeddedObjects}" Margin="4">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate>
+                    <Border Padding="4" BorderThickness="0,0,0,1"
+                            BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
+                      <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock Text="{Binding Name}" Width="160" />
+                        <TextBlock Text="{Binding ProgId}" Width="120" Opacity="0.7" />
+                        <TextBlock Text="{Binding ExtractedFileName}" Opacity="0.6"
+                                   TextTrimming="CharacterEllipsis" MaxWidth="260" />
+                        <Button Content="{x:Static loc:Strings.OfficeExtract}"
+                                Command="{Binding $parent[UserControl].DataContext.ExtractObjectCommand}"
+                                CommandParameter="{Binding}" FontSize="10" Padding="6,1" />
+                      </StackPanel>
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </ScrollViewer>
+          </TabItem>
+        </TabControl>
+      </DockPanel>
+    </Border>
+
     </Grid>
 
     <!-- Status bar -->

@@ -71,6 +71,13 @@ public sealed class OfficeViewModel : ViewModelBase
     private bool _isBold;
     private bool _isItalic;
     private bool _isUnderline;
+    private bool _isRecording;
+    private bool _isAdvancedPanelOpen = true;
+    private int _advancedPanelIndex;
+    private MacroRecording? _currentMacro;
+    private readonly List<string> _lastParagraphTexts = new();
+    private readonly Dictionary<ICommand, string> _commandKeys = new();
+    private readonly Dictionary<string, ICommand> _commandsByKey = new();
 
     public OfficeViewModel()
     {
@@ -125,6 +132,55 @@ public sealed class OfficeViewModel : ViewModelBase
         ZoomInCommand = new RelayCommand(_ => Zoom = Math.Min(240, Zoom + 10));
         ZoomOutCommand = new RelayCommand(_ => Zoom = Math.Max(50, Zoom - 10));
         ZoomResetCommand = new RelayCommand(_ => Zoom = 100);
+
+        ToggleTrackChangesCommand = new RelayCommand(_ => ToggleTrackChanges());
+        AcceptRevisionCommand = new RelayCommand(p => AcceptRevision(p as WordRevision));
+        RejectRevisionCommand = new RelayCommand(p => RejectRevision(p as WordRevision));
+        AcceptAllRevisionsCommand = new RelayCommand(_ => AcceptAllRevisions());
+        RejectAllRevisionsCommand = new RelayCommand(_ => RejectAllRevisions());
+        ApplyNumberingCommand = new RelayCommand(p => ApplyNumbering(p?.ToString() ?? "2:0"));
+        PromoteListCommand = new RelayCommand(_ => ChangeListLevel(-1));
+        DemoteListCommand = new RelayCommand(_ => ChangeListLevel(1));
+        InsertChartCommand = new RelayCommand(p => InsertChart(p?.ToString() ?? "Column"));
+        DeleteChartCommand = new RelayCommand(p => DeleteChart(p as OfficeChart));
+        CreatePivotCommand = new RelayCommand(_ => CreatePivot());
+        RecalculatePivotCommand = new RelayCommand(p => RecalculatePivot(p as PivotTableModel));
+        ExtractObjectCommand = new RelayCommand(p => ExtractObject(p as OfficeEmbeddedObject));
+        ToggleMacroRecordingCommand = new RelayCommand(_ => ToggleMacroRecording());
+        RunMacroCommand = new RelayCommand(p => RunMacro(p as MacroRecording));
+        DeleteMacroCommand = new RelayCommand(p => DeleteMacro(p as MacroRecording));
+        ToggleAdvancedPanelCommand = new RelayCommand(_ => IsAdvancedPanelOpen = !IsAdvancedPanelOpen);
+
+        Register("New", CreateNewCommand);
+        Register("Save", SaveCommand);
+        Register("SaveAs", SaveAsCommand);
+        Register("ExportHtml", ExportHtmlCommand);
+        Register("Undo", UndoCommand);
+        Register("Redo", RedoCommand);
+        Register("AddParagraph", AddParagraphCommand);
+        Register("DeleteParagraph", DeleteParagraphCommand);
+        Register("AddTable", AddTableCommand);
+        Register("InsertImage", InsertImageCommand);
+        Register("InsertHyperlink", InsertHyperlinkCommand);
+        Register("Bold", ToggleBoldCommand);
+        Register("Italic", ToggleItalicCommand);
+        Register("Underline", ToggleUnderlineCommand);
+        Register("Find", FindNextCommand);
+        Register("Replace", ReplaceAllCommand);
+        Register("InsertRow", InsertRowCommand);
+        Register("DeleteRow", DeleteRowCommand);
+        Register("InsertColumn", InsertColumnCommand);
+        Register("DeleteColumn", DeleteColumnCommand);
+        Register("AddSheet", AddSheetCommand);
+        Register("DeleteSheet", DeleteSheetCommand);
+        Register("RenameSheet", RenameSheetCommand);
+        Register("Recalculate", RecalculateCommand);
+        Register("AddSlide", AddSlideCommand);
+        Register("DuplicateSlide", DuplicateSlideCommand);
+        Register("DeleteSlide", DeleteSlideCommand);
+        Register("AddTextBox", AddTextBoxCommand);
+        Register("ZoomIn", ZoomInCommand);
+        Register("ZoomOut", ZoomOutCommand);
     }
 
     // Cross-page services supplied by the view (no Window dependency in the ViewModel).
@@ -186,6 +242,24 @@ public sealed class OfficeViewModel : ViewModelBase
     public ICommand ZoomOutCommand { get; }
     public ICommand ZoomResetCommand { get; }
 
+    public ICommand ToggleTrackChangesCommand { get; }
+    public ICommand AcceptRevisionCommand { get; }
+    public ICommand RejectRevisionCommand { get; }
+    public ICommand AcceptAllRevisionsCommand { get; }
+    public ICommand RejectAllRevisionsCommand { get; }
+    public ICommand ApplyNumberingCommand { get; }
+    public ICommand PromoteListCommand { get; }
+    public ICommand DemoteListCommand { get; }
+    public ICommand InsertChartCommand { get; }
+    public ICommand DeleteChartCommand { get; }
+    public ICommand CreatePivotCommand { get; }
+    public ICommand RecalculatePivotCommand { get; }
+    public ICommand ExtractObjectCommand { get; }
+    public ICommand ToggleMacroRecordingCommand { get; }
+    public ICommand RunMacroCommand { get; }
+    public ICommand DeleteMacroCommand { get; }
+    public ICommand ToggleAdvancedPanelCommand { get; }
+
     public ObservableCollection<WordBlock> Blocks { get; } = new();
     public ObservableCollection<ExcelGridRow> GridRows { get; } = new();
     public ObservableCollection<string> ColumnHeaders { get; } = new();
@@ -199,10 +273,28 @@ public sealed class OfficeViewModel : ViewModelBase
     public ObservableCollection<string> FillColors { get; } = new() { "", "FFF2CC", "DDEBF7", "E2EFDA", "FCE4D6" };
     public ObservableCollection<string> LayoutOptions { get; } = new() { "TitleOnly", "Title", "Blank", "TitleAndContent" };
     public ObservableCollection<string> NewDocumentKinds { get; } = new() { "Word", "Excel", "PowerPoint" };
+    public ObservableCollection<PivotAggregation> PivotAggregations { get; } = new()
+    {
+        PivotAggregation.Sum, PivotAggregation.Count, PivotAggregation.Average,
+        PivotAggregation.Min, PivotAggregation.Max
+    };
+    public ObservableCollection<MacroSecurityLevel> MacroSecurityLevels { get; } = new()
+    {
+        MacroSecurityLevel.Disabled, MacroSecurityLevel.Prompt, MacroSecurityLevel.Enabled
+    };
+    public ObservableCollection<WordRevision> Revisions { get; } = new();
+    public ObservableCollection<NumberingDefinition> NumberingDefinitions { get; } = new();
+    public ObservableCollection<OfficeChart> Charts { get; } = new();
+    public ObservableCollection<PivotTableModel> PivotTables { get; } = new();
+    public ObservableCollection<OfficeEmbeddedObject> EmbeddedObjects { get; } = new();
+    public ObservableCollection<MacroModule> MacroModules { get; } = new();
+    public ObservableCollection<MacroRecording> MacroRecordings { get; } = new();
 
     public bool HasDocument => _document is not null;
-    public string FilePath => _document?.Path ?? string.Empty;
-    public string FileName => _document?.FileName ?? string.Empty;
+    public string FilePath => _document is { IsDecoded: true } ? _document.SourcePath : _document?.Path ?? string.Empty;
+    public string FileName => _document?.DisplayFileName ?? string.Empty;
+    public bool IsDecodedSource => _document?.IsDecoded ?? false;
+    public string SourceFormat => _document?.SourceFormat ?? string.Empty;
     public bool IsWord => Kind == OfficeDocumentKind.Word;
     public bool IsExcel => Kind == OfficeDocumentKind.Excel;
     public bool IsPowerPoint => Kind == OfficeDocumentKind.PowerPoint;
@@ -258,6 +350,37 @@ public sealed class OfficeViewModel : ViewModelBase
     public bool IsItalic { get => _isItalic; set { if (Set(ref _isItalic, value)) ApplyItalic(value); } }
     public bool IsUnderline { get => _isUnderline; set { if (Set(ref _isUnderline, value)) ApplyUnderline(value); } }
 
+    public bool TrackChanges
+    {
+        get => _document?.TrackChangesEnabled ?? false;
+        set
+        {
+            if (_document is null || _document.TrackChangesEnabled == value) return;
+            _document.TrackChangesEnabled = value;
+            OnPropertyChanged();
+            RebuildRibbon();
+        }
+    }
+
+    public bool IsAdvancedPanelOpen { get => _isAdvancedPanelOpen; set => Set(ref _isAdvancedPanelOpen, value); }
+    public int AdvancedPanelIndex { get => _advancedPanelIndex; set => Set(ref _advancedPanelIndex, value); }
+    public bool IsRecording { get => _isRecording; private set { if (Set(ref _isRecording, value)) OnPropertyChanged(nameof(RecordingLabel)); } }
+    public string RecordingLabel => IsRecording ? Loc.T("OfficeMacroStop") : Loc.T("OfficeMacroRecord");
+    public string VbaWarning => _document?.MacroProject.Warning ?? string.Empty;
+    public bool HasVbaProject => _document?.MacroProject.HasVbaProject ?? false;
+    public string PivotRange { get; set; } = "A1:D20";
+    public string PivotRowField { get; set; } = string.Empty;
+    public string PivotColumnField { get; set; } = string.Empty;
+    public string PivotValueField { get; set; } = string.Empty;
+    public PivotAggregation PivotAggregation { get; set; } = PivotAggregation.Sum;
+    public MacroSecurityLevel MacroSecurity
+    {
+        get => MacroService.SecurityLevel;
+        set { MacroService.SecurityLevel = value; OnPropertyChanged(); }
+    }
+
+    public string TrackChangesLabel => TrackChanges ? Loc.T("OfficeTrackingOn") : Loc.T("OfficeTrackingOff");
+    public WordRevision? SelectedRevision { get; set; }
     public WordParagraph? SelectedParagraph { get; set; }
     public ExcelCell? SelectedCell { get; set; }
     public PowerPointShape? SelectedShape { get; set; }
@@ -280,10 +403,14 @@ public sealed class OfficeViewModel : ViewModelBase
             ActiveTab = "Home";
             SyncFromDocument();
             IsDirty = false;
-            Status = Loc.F("OfficeOpened", FileName);
+            Status = doc.IsDecoded
+                ? Loc.F("OfficeWpsDecoded", doc.SourceFormat)
+                : Loc.F("OfficeOpened", FileName);
             OnPropertyChanged(nameof(HasDocument));
             OnPropertyChanged(nameof(FileName));
             OnPropertyChanged(nameof(FilePath));
+            OnPropertyChanged(nameof(IsDecodedSource));
+            OnPropertyChanged(nameof(SourceFormat));
             RaiseCommands();
         }
         catch (Exception ex)
@@ -317,12 +444,20 @@ public sealed class OfficeViewModel : ViewModelBase
         RecalculateSilently();
         UpdateStatistics();
         RefreshFormatState();
+        SyncAdvancedCollections();
         RebuildRibbon();
     }
 
     private void Save()
     {
         if (_document is null || IsBusy) return;
+        if (_document.IsDecoded)
+        {
+            // A decoded WPS binary is backed by a temporary OOXML file; never overwrite the
+            // original WPS container with OOXML bytes. Force an explicit Save As instead.
+            SaveAs();
+            return;
+        }
         try
         {
             OfficeDocumentService.Save(_document);
@@ -340,15 +475,23 @@ public sealed class OfficeViewModel : ViewModelBase
         if (_document is null || PickSavePathAsync is null) return;
         try
         {
+            var decoded = _document.IsDecoded;
             var ext = Path.GetExtension(_document.Path);
-            var path = await PickSavePathAsync(FileName, ext);
+            var suggested = decoded && !string.IsNullOrEmpty(_document.SourcePath)
+                ? WpsFormatService.SuggestedFileName(_document.SourcePath)
+                : FileName;
+            var path = await PickSavePathAsync(suggested, ext);
             if (string.IsNullOrWhiteSpace(path)) return;
             if (!string.Equals(path, _document.Path, StringComparison.OrdinalIgnoreCase))
                 File.Copy(_document.Path, path, true);
             _document.Path = path;
+            _document.SourcePath = string.Empty;
+            _document.SourceFormat = string.Empty;
             Save();
             OnPropertyChanged(nameof(FileName));
             OnPropertyChanged(nameof(FilePath));
+            OnPropertyChanged(nameof(IsDecodedSource));
+            OnPropertyChanged(nameof(SourceFormat));
         }
         catch (Exception ex)
         {
@@ -449,10 +592,51 @@ public sealed class OfficeViewModel : ViewModelBase
     public void MarkDirty()
     {
         IsDirty = true;
+        if (IsWord && _document is not null)
+        {
+            var paragraphs = _document.Paragraphs.ToList();
+            if (_lastParagraphTexts.Count == paragraphs.Count)
+            {
+                for (var i = 0; i < paragraphs.Count; i++)
+                {
+                    var current = paragraphs[i].PlainText;
+                    if (_lastParagraphTexts[i] == current) continue;
+                    RevisionService.RecordChange(_document, i, _lastParagraphTexts[i], current);
+                    _lastParagraphTexts[i] = current;
+                }
+            }
+            WordNumberingService.RefreshLabels(_document);
+        }
+        SyncAdvancedCollections();
         RecalculateSilently();
         UpdateStatistics();
         RefreshFormatState();
         RaiseCommands();
+    }
+
+    private void SyncAdvancedCollections()
+    {
+        Revisions.Clear();
+        NumberingDefinitions.Clear();
+        Charts.Clear();
+        PivotTables.Clear();
+        EmbeddedObjects.Clear();
+        MacroModules.Clear();
+        MacroRecordings.Clear();
+        if (_document is null) return;
+        foreach (var revision in _document.Revisions) Revisions.Add(revision);
+        foreach (var definition in _document.NumberingDefinitions) NumberingDefinitions.Add(definition);
+        foreach (var chart in _document.Charts) Charts.Add(chart);
+        foreach (var pivot in _document.PivotTables) PivotTables.Add(pivot);
+        foreach (var embedded in _document.EmbeddedObjects) EmbeddedObjects.Add(embedded);
+        foreach (var module in _document.MacroProject.Modules) MacroModules.Add(module);
+        foreach (var recording in MacroService.LoadRecordings()) MacroRecordings.Add(recording);
+        _lastParagraphTexts.Clear();
+        _lastParagraphTexts.AddRange(_document.Paragraphs.Select(p => p.PlainText));
+        OnPropertyChanged(nameof(TrackChanges));
+        OnPropertyChanged(nameof(TrackChangesLabel));
+        OnPropertyChanged(nameof(HasVbaProject));
+        OnPropertyChanged(nameof(VbaWarning));
     }
 
     private void RaiseCommands()
@@ -1059,7 +1243,8 @@ public sealed class OfficeViewModel : ViewModelBase
             Item(Loc.T("OfficeSaveAs"), SaveAsCommand),
             Item(Loc.T("OfficeExportHtml"), ExportHtmlCommand),
             Item(Loc.T("OfficeUndo"), UndoCommand),
-            Item(Loc.T("OfficeRedo"), RedoCommand));
+            Item(Loc.T("OfficeRedo"), RedoCommand),
+            Item(Loc.T("OfficeAdvancedPanel"), ToggleAdvancedPanelCommand));
 
         switch (Kind, ActiveTab)
         {
@@ -1078,6 +1263,12 @@ public sealed class OfficeViewModel : ViewModelBase
                     Item(Loc.T("OfficeBullets"), SetListCommand, "Bullet"),
                     Item(Loc.T("OfficeNumbering"), SetListCommand, "Number"),
                     Item(Loc.T("OfficeNoList"), SetListCommand, "None"));
+                AddGroup(Loc.T("OfficeMultilevel"),
+                    Item("1", ApplyNumberingCommand, "2:0"),
+                    Item("1.1", ApplyNumberingCommand, "2:1"),
+                    Item("1.1.1", ApplyNumberingCommand, "2:2"),
+                    Item("←", PromoteListCommand),
+                    Item("→", DemoteListCommand));
                 break;
             case (OfficeDocumentKind.Word, "Insert"):
                 AddGroup(Loc.T("OfficeTabInsert"),
@@ -1095,6 +1286,12 @@ public sealed class OfficeViewModel : ViewModelBase
                 AddGroup(Loc.T("OfficeTabReview"),
                     Item(Loc.T("OfficeFind"), FindNextCommand),
                     Item(Loc.T("OfficeReplace"), ReplaceAllCommand));
+                AddGroup(Loc.T("OfficeRevisions"),
+                    Item(Loc.T("OfficeTrackChanges"), ToggleTrackChangesCommand, toggle: true),
+                    Item(Loc.T("OfficeAccept"), AcceptRevisionCommand),
+                    Item(Loc.T("OfficeReject"), RejectRevisionCommand),
+                    Item(Loc.T("OfficeAcceptAll"), AcceptAllRevisionsCommand),
+                    Item(Loc.T("OfficeRejectAll"), RejectAllRevisionsCommand));
                 break;
 
             case (OfficeDocumentKind.Excel, "Home"):
@@ -1117,6 +1314,12 @@ public sealed class OfficeViewModel : ViewModelBase
                     Item(Loc.T("OfficeRenameSheet"), RenameSheetCommand),
                     Item(Loc.T("OfficeInsertRow"), InsertRowCommand),
                     Item(Loc.T("OfficeInsertColumn"), InsertColumnCommand));
+                AddGroup(Loc.T("OfficeCharts"),
+                    Item(Loc.T("OfficeChartColumn"), InsertChartCommand, "Column"),
+                    Item(Loc.T("OfficeChartBar"), InsertChartCommand, "Bar"),
+                    Item(Loc.T("OfficeChartLine"), InsertChartCommand, "Line"),
+                    Item(Loc.T("OfficeChartPie"), InsertChartCommand, "Pie"),
+                    Item(Loc.T("OfficeChartArea"), InsertChartCommand, "Area"));
                 break;
             case (OfficeDocumentKind.Excel, "Formulas"):
                 AddGroup(Loc.T("OfficeTabFormulas"),
@@ -1133,6 +1336,9 @@ public sealed class OfficeViewModel : ViewModelBase
                     Item(Loc.T("OfficeRenameSheet"), RenameSheetCommand),
                     Item(Loc.T("OfficeDeleteSheet"), DeleteSheetCommand),
                     Item(Loc.T("OfficeRecalculate"), RecalculateCommand));
+                AddGroup(Loc.T("OfficePivotTables"),
+                    Item(Loc.T("OfficePivotCreate"), CreatePivotCommand),
+                    Item(Loc.T("OfficePivotRefresh"), RecalculatePivotCommand));
                 break;
 
             case (OfficeDocumentKind.PowerPoint, "Home"):
@@ -1165,14 +1371,226 @@ public sealed class OfficeViewModel : ViewModelBase
         UpdateRibbonChecks();
     }
 
-    private RibbonItem Item(string label, ICommand command, object? parameter = null, bool toggle = false) => new()
+    private void Register(string key, ICommand command)
     {
-        Label = label,
-        Command = command,
-        Parameter = parameter,
-        IsToggle = toggle,
-        ToolTip = label
-    };
+        _commandKeys[command] = key;
+        _commandsByKey[key] = command;
+    }
+
+    private RibbonItem Item(string label, ICommand command, object? parameter = null, bool toggle = false)
+    {
+        var key = _commandKeys.TryGetValue(command, out var registered) ? registered : label;
+        return new RibbonItem
+        {
+            Label = label,
+            Command = new RecordingCommand(key, parameter, command, this),
+            Parameter = parameter,
+            IsToggle = toggle,
+            ToolTip = label
+        };
+    }
+
+    private void RecordAction(string key, object? parameter)
+    {
+        if (!IsRecording || _currentMacro is null) return;
+        _currentMacro.Actions.Add(new MacroAction
+        {
+            Kind = key,
+            Parameter = parameter?.ToString() ?? string.Empty
+        });
+    }
+
+    private void ToggleTrackChanges()
+    {
+        if (_document is null) return;
+        _document.TrackChangesEnabled = !_document.TrackChangesEnabled;
+        OnPropertyChanged(nameof(TrackChanges));
+        OnPropertyChanged(nameof(TrackChangesLabel));
+        RebuildRibbon();
+        Status = _document.TrackChangesEnabled ? Loc.T("OfficeTrackingOn") : Loc.T("OfficeTrackingOff");
+    }
+
+    private void AcceptRevision(WordRevision? revision)
+    {
+        if (_document is null || revision is null) return;
+        RevisionService.Accept(_document, revision);
+        MarkDirty();
+    }
+
+    private void RejectRevision(WordRevision? revision)
+    {
+        if (_document is null || revision is null) return;
+        RevisionService.Reject(_document, revision);
+        SyncFromDocument();
+        MarkDirty();
+    }
+
+    private void AcceptAllRevisions()
+    {
+        if (_document is null) return;
+        RevisionService.AcceptAll(_document);
+        MarkDirty();
+    }
+
+    private void RejectAllRevisions()
+    {
+        if (_document is null) return;
+        RevisionService.RejectAll(_document);
+        SyncFromDocument();
+        MarkDirty();
+    }
+
+    private void ApplyNumbering(string spec)
+    {
+        if (!IsWord || _document is null || SelectedParagraph is null) return;
+        var parts = spec.Split(':');
+        var numberId = int.TryParse(parts.ElementAtOrDefault(0), out var id) ? id : 2;
+        var level = int.TryParse(parts.ElementAtOrDefault(1), out var l) ? l : 0;
+        PushUndo();
+        WordNumberingService.Apply(_document, SelectedParagraph, numberId, level);
+        MarkDirty();
+    }
+
+    private void ChangeListLevel(int delta)
+    {
+        if (!IsWord || SelectedParagraph is null) return;
+        PushUndo();
+        if (SelectedParagraph.ListKind == WordListKind.None)
+            SelectedParagraph.ListKind = WordListKind.Number;
+        SelectedParagraph.ListLevel = Math.Clamp(SelectedParagraph.ListLevel + delta, 0, 8);
+        if (_document is not null) WordNumberingService.RefreshLabels(_document);
+        MarkDirty();
+    }
+
+    private void InsertChart(string type)
+    {
+        if (!IsExcel || _document is null || ActiveSheet is null) return;
+        var cells = ActiveSheet.Cells.Where(c => !string.IsNullOrEmpty(c.Display)).ToList();
+        if (cells.Count == 0) { Status = Loc.T("OfficeChartNoData"); return; }
+        var minRow = cells.Min(c => c.Row);
+        var maxRow = cells.Max(c => c.Row);
+        var minCol = cells.Min(c => c.Column);
+        var maxCol = cells.Max(c => c.Column);
+        var range = $"{ExcelSheet.CellReference(minRow, minCol)}:{ExcelSheet.CellReference(maxRow, maxCol)}";
+        var parsed = Enum.TryParse<OfficeChartType>(type, true, out var chartType) ? chartType : OfficeChartType.Column;
+        var chart = ChartService.CreateFromRange(_document, ActiveSheet.Name, range, parsed,
+            $"{parsed} {_document.Charts.Count + 1}");
+        _document.Charts.Add(chart);
+        MarkDirty();
+        Status = Loc.F("OfficeChartCreated", chart.Name);
+    }
+
+    private void DeleteChart(OfficeChart? chart)
+    {
+        if (_document is null || chart is null) return;
+        ChartService.Delete(_document, chart);
+        _document.Charts.Remove(chart);
+        MarkDirty();
+    }
+
+    private void CreatePivot()
+    {
+        if (!IsExcel || _document is null || ActiveSheet is null) return;
+        var pivot = PivotService.CreateFromRange(_document, ActiveSheet.Name, PivotRange,
+            PivotRowField, PivotColumnField, PivotValueField, PivotAggregation);
+        _document.PivotTables.Add(pivot);
+        MarkDirty();
+        Status = Loc.F("OfficePivotCreated", pivot.Name);
+    }
+
+    private void RecalculatePivot(PivotTableModel? pivot)
+    {
+        if (_document is null || pivot is null) return;
+        PivotService.Recalculate(pivot, _document);
+        MarkDirty();
+    }
+
+    private async void ExtractObject(OfficeEmbeddedObject? embedded)
+    {
+        if (embedded is null || ShowInfoAsync is null) return;
+        try
+        {
+            var path = OleObjectService.Extract(embedded);
+            await ShowInfoAsync(Loc.T("OfficeObjects"), $"{embedded.Name}\n{path}");
+        }
+        catch (Exception ex)
+        {
+            Status = Loc.F("OfficeOpenFailed", ex.Message);
+        }
+    }
+
+    private void ToggleMacroRecording()
+    {
+        if (IsRecording)
+        {
+            IsRecording = false;
+            if (_currentMacro is { } completed && completed.Actions.Count > 0)
+            {
+                MacroService.SaveRecording(completed);
+                Status = Loc.F("OfficeMacroSaved", completed.Name);
+            }
+            _currentMacro = null;
+            SyncAdvancedCollections();
+            return;
+        }
+        _currentMacro = new MacroRecording { Name = $"Macro {MacroService.LoadRecordings().Count + 1}" };
+        IsRecording = true;
+        Status = Loc.T("OfficeMacroRecording");
+    }
+
+    private void RunMacro(MacroRecording? macro)
+    {
+        if (macro is null) return;
+        var wasRecording = IsRecording;
+        IsRecording = false;
+        try
+        {
+            foreach (var action in macro.Actions)
+            {
+                if (!_commandsByKey.TryGetValue(action.Kind, out var command)) continue;
+                object? parameter = action.Parameter;
+                if (int.TryParse(action.Parameter, out var number)) parameter = number;
+                if (command.CanExecute(parameter)) command.Execute(parameter);
+            }
+            Status = Loc.F("OfficeMacroRan", macro.Name);
+        }
+        finally
+        {
+            IsRecording = wasRecording;
+        }
+    }
+
+    private void DeleteMacro(MacroRecording? macro)
+    {
+        if (macro is null) return;
+        MacroService.DeleteRecording(macro.Name);
+        SyncAdvancedCollections();
+    }
+
+    private sealed class RecordingCommand : ICommand
+    {
+        private readonly ICommand _inner;
+        private readonly OfficeViewModel _owner;
+        private readonly string _key;
+        private readonly object? _parameter;
+
+        public RecordingCommand(string key, object? parameter, ICommand inner, OfficeViewModel owner)
+        {
+            _key = key;
+            _parameter = parameter;
+            _inner = inner;
+            _owner = owner;
+            inner.CanExecuteChanged += (_, _) => CanExecuteChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        public event EventHandler? CanExecuteChanged;
+        public bool CanExecute(object? parameter) => _inner.CanExecute(parameter);
+        public void Execute(object? parameter)
+        {
+            _owner.RecordAction(_key, _parameter ?? parameter);
+            _inner.Execute(parameter);
+        }
+    }
 
     private void AddGroup(string name, params RibbonItem[] items)
     {
@@ -1192,6 +1610,7 @@ public sealed class OfficeViewModel : ViewModelBase
                 "B" => IsBold,
                 "I" => IsItalic,
                 "U" => IsUnderline,
+                "TrackChanges" => TrackChanges,
                 _ => false
             };
             if (item.IsChecked != value) item.IsChecked = value;

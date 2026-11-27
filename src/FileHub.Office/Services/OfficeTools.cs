@@ -41,6 +41,38 @@ public static class OfficeTools
             copy.Sheets.Add(sheetCopy);
         }
         foreach (var slide in source.Slides) copy.Slides.Add(slide.Clone());
+
+        foreach (var definition in source.NumberingDefinitions)
+        {
+            var clone = new NumberingDefinition
+            {
+                NumberId = definition.NumberId, AbstractId = definition.AbstractId,
+                Name = definition.Name, IsLegal = definition.IsLegal
+            };
+            foreach (var level in definition.Levels)
+                clone.Levels.Add(new NumberingLevel
+                {
+                    Index = level.Index, Format = level.Format, Text = level.Text,
+                    Start = level.Start, RestartAfterLevel = level.RestartAfterLevel,
+                    LeftIndent = level.LeftIndent, HangingIndent = level.HangingIndent,
+                    BulletChar = level.BulletChar, FontName = level.FontName
+                });
+            copy.NumberingDefinitions.Add(clone);
+        }
+        foreach (var revision in source.Revisions) copy.Revisions.Add(revision.Clone());
+        foreach (var pair in source.NumberingCounters)
+            copy.NumberingCounters[pair.Key] = (int[])pair.Value.Clone();
+        copy.TrackChangesEnabled = source.TrackChangesEnabled;
+        copy.OriginalParagraphs.AddRange(source.OriginalParagraphs);
+        foreach (var chart in source.Charts) copy.Charts.Add(chart);
+        foreach (var pivot in source.PivotTables) copy.PivotTables.Add(pivot);
+        foreach (var embedded in source.EmbeddedObjects) copy.EmbeddedObjects.Add(embedded);
+        copy.MacroProject.HasVbaProject = source.MacroProject.HasVbaProject;
+        copy.MacroProject.ProjectName = source.MacroProject.ProjectName;
+        copy.MacroProject.Version = source.MacroProject.Version;
+        copy.MacroProject.Warning = source.MacroProject.Warning;
+        foreach (var module in source.MacroProject.Modules) copy.MacroProject.Modules.Add(module);
+        copy.PreserveVbaProject = source.PreserveVbaProject;
         return copy;
     }
 

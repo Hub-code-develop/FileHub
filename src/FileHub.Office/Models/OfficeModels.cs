@@ -37,6 +37,8 @@ public sealed class WordRun
     public double FontSize { get; set; }          // points; 0 = inherit from style
     public string ColorHex { get; set; } = string.Empty; // RRGGBB without '#'
     public string Hyperlink { get; set; } = string.Empty;
+    /// <summary>Non-zero when this run is a pending tracked insertion.</summary>
+    public int RevisionId { get; set; }
 
     public WordRun Clone() => new()
     {
@@ -47,7 +49,8 @@ public sealed class WordRun
         FontName = FontName,
         FontSize = FontSize,
         ColorHex = ColorHex,
-        Hyperlink = Hyperlink
+        Hyperlink = Hyperlink,
+        RevisionId = RevisionId
     };
 }
 
@@ -68,6 +71,10 @@ public sealed class WordParagraph : WordBlock, INotifyPropertyChanged
     public WordAlignment Alignment { get; set; } = WordAlignment.Left;
     public WordListKind ListKind { get; set; } = WordListKind.None;
     public int ListLevel { get; set; }
+    /// <summary>The numbering instance (numId) this paragraph belongs to.</summary>
+    public int NumberId { get; set; }
+    /// <summary>Resolved multi-level label, e.g. "2.1."; empty when not numbered.</summary>
+    public string NumberLabel { get; set; } = string.Empty;
     public double LeftIndent { get; set; }       // points
     public double SpaceBefore { get; set; }      // points
     public double SpaceAfter { get; set; }       // points
@@ -107,9 +114,10 @@ public sealed class WordParagraph : WordBlock, INotifyPropertyChanged
             var text = PlainText;
             if (ListKind == WordListKind.None) return text;
             var indent = new string(' ', Math.Max(0, ListLevel) * 2);
-            return ListKind == WordListKind.Bullet
-                ? $"{indent}•  {text}"
-                : $"{indent}{ListLevel + 1}.  {text}";
+            var label = string.IsNullOrEmpty(NumberLabel)
+                ? (ListKind == WordListKind.Bullet ? "•" : $"{ListLevel + 1}.")
+                : NumberLabel;
+            return $"{indent}{label}  {text}";
         }
     }
 
@@ -121,6 +129,8 @@ public sealed class WordParagraph : WordBlock, INotifyPropertyChanged
             Alignment = Alignment,
             ListKind = ListKind,
             ListLevel = ListLevel,
+            NumberId = NumberId,
+            NumberLabel = NumberLabel,
             LeftIndent = LeftIndent,
             SpaceBefore = SpaceBefore,
             SpaceAfter = SpaceAfter
@@ -301,11 +311,17 @@ public sealed class PowerPointSlide
 }
 
 /// <summary>Normalised representation of any supported document.</summary>
-public sealed class OfficeDocument
+public sealed partial class OfficeDocument
 {
     public string Path { get; set; } = string.Empty;
     public OfficeDocumentKind Kind { get; set; }
     public string FileName => System.IO.Path.GetFileName(Path);
+    /// <summary>Original path when this document was decoded from a non-OOXML format such as WPS.</summary>
+    public string SourcePath { get; set; } = string.Empty;
+    /// <summary>Human readable source format, e.g. "WPS Writer (binary)".</summary>
+    public string SourceFormat { get; set; } = string.Empty;
+    public bool IsDecoded => !string.IsNullOrEmpty(SourcePath);
+    public string DisplayFileName => IsDecoded ? System.IO.Path.GetFileName(SourcePath) : FileName;
 
     // Word
     public List<WordBlock> Blocks { get; } = new();

@@ -140,8 +140,16 @@ macOS 优先读系统语言偏好是故意的：从 Finder 启动的 GUI 应用�
   - **Excel**：工作表标签、可滚动单元格网格、公式栏与公式引擎（`SUM`、`AVERAGE`、`IF`、单元格引用与区域）、
     单元格样式、行列增删与实时统计。
   - **PowerPoint**：幻灯片缩略图、可编辑的 16:9 画布与文本框、新建/复制/删除/排序幻灯片、版式与演讲者备注。
-  Ctrl+S 把修改写回原文件。底层是 Open XML SDK，无需安装 Office、不用 COM，跨平台可用。复杂 OOXML
-  特性保存时可能被简化，详见 THIRD-PARTY-NOTICES.md。
+  - **高级 OOXML 面板**：Word 多级编号定义（数字/字母/罗马/项目符号、起始值、重启规则、法律编号）、
+    修订记录（w:ins / w:del / w:rPrChange）与接受/拒绝、Excel 图表（柱形/条形/折线/饼图/面积图）原生预览、
+    数据透视表（求和/计数/平均值/最值）、可提取的 OLE 嵌入对象、VBA 模块源码查看，以及 FileHub 原生宏录制/回放。
+  - **WPS 自有格式**：可打开金山 WPS 文字 `.wps` / `.wpt`、表格 `.et` / `.ett`、演示 `.dps` / `.dpt`。
+    支持三类容器：改扩展名的 OOXML 包、传统 OLE/BIFF/WPS 二进制（解码正文、共享字符串、单元格记录与
+    幻灯片文本）、以及 RTF 形式的文字文档。解码后以临时 OOXML 副本编辑，另存为会生成 `.docx` / `.xlsx` /
+    `.pptx`，**绝不会把 OOXML 字节覆盖回原 WPS 文件**。
+  Ctrl+S 把修改写回原文件。底层是 Open XML SDK，无需安装 Office、不用 COM，跨平台可用。VBA 代码从不执行；
+  宏录制只回放 FileHub 的编辑操作。未覆盖的高级特性（VBA 执行、带对话框的宏、数据透视图、OLE 激活等）
+  详见 THIRD-PARTY-NOTICES.md。
 - **VS Code 扩展页面**：扫描 `.vscode`、`.vscode-insiders`、`.vscode-oss`、`.cursor`、`.windsurf`
   下已安装的扩展，可为 FileHub 单独启用 / 禁用，并展示语言、主题、代码片段和语法贡献。
   启用的扩展会向 Monaco 提供文件关联、配色主题和补全片段；**不会执行扩展的 JavaScript**。

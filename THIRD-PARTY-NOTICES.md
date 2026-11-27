@@ -351,12 +351,30 @@ formulas and styles, and PowerPoint slides/shapes/notes through the Open XML SDK
 Office code or binaries are bundled. This is an independent implementation using a published
 open file format; it is not a port of Microsoft Office source code.
 
-Complex OOXML features (macros, Track Changes, pivot tables, charts, embedded OLE objects,
-custom XML, advanced numbering definitions) are outside the scope of this implementation and may
-be simplified when a file is saved. Inline formatting in Word is stored at run level in the file;
-the plain-text editor displays each paragraph using its leading run style. FileHub is **not**
-affiliated with or endorsed by Microsoft. "Microsoft Office", "Word", "Excel" and "PowerPoint"
-are trademarks of Microsoft Corporation.
+FileHub additionally reads and writes advanced OOXML structures: Word multi-level numbering,
+tracked insertions/deletions/format changes, Excel charts and pivot caches, and embedded OLE
+packages. VBA projects are detected; compressed VBA module sources are decompressed and displayed
+for inspection, and the vbaProject part is retained on save. FileHub does **not** contain a VBA
+interpreter: VBA code is never executed. The macro recorder stores a replayable list of FileHub
+editor actions in the user profile; it is not a VBA macro recorder and produces no VBA code.
+
+WPS support is an independent, best-effort decoder for Kingsoft WPS native containers. It is not
+a port of WPS source code and no Kingsoft binaries are bundled. OOXML packages with a WPS
+extension are read directly; legacy OLE binaries are parsed through a minimal CFB/BIFF reader and
+text/paragraph/slide reconstruction; RTF Writer documents are reduced to plain paragraphs. Complex
+WPS layout, tables, images, charts, macros and encryption are not decoded. FileHub is **not**
+affiliated with or endorsed by Kingsoft. "WPS", "WPS Writer", "WPS Spreadsheet" and "WPS
+Presentation" are trademarks of Kingsoft Corporation.
+
+Within the implemented subset, complex layouts may still be simplified on save. In particular:
+OLE objects are extracted but never activated in place; pivot tables cover the common row/column
+aggregations rather than the full ExcelPivotTable feature set; charts cover the five common types;
+fields outside the editor model (custom XML, advanced style hierarchies, pivot charts, slicers,
+form controls, digital signatures) are preserved by the Open XML package when untouched but may be
+lost if their owning part is rewritten. Inline formatting in Word is stored at run level; the
+plain-text editor displays each paragraph using its leading run style. FileHub is **not** affiliated
+with or endorsed by Microsoft. "Microsoft Office", "Word", "Excel" and "PowerPoint" are trademarks
+of Microsoft Corporation.
 
 ### The MIT License (MIT)
 

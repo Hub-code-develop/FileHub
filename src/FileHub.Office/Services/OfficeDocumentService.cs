@@ -29,12 +29,16 @@ public static partial class OfficeDocumentService
             ".docx" or ".docm" => OfficeDocumentKind.Word,
             ".xlsx" or ".xlsm" => OfficeDocumentKind.Excel,
             ".pptx" or ".pptm" => OfficeDocumentKind.PowerPoint,
+            ".wps" or ".wpt" => OfficeDocumentKind.Word,
+            ".et" or ".ett" => OfficeDocumentKind.Excel,
+            ".dps" or ".dpt" => OfficeDocumentKind.PowerPoint,
             _ => OfficeDocumentKind.Unknown
         };
     }
 
     public static OfficeDocument Load(string path)
     {
+        if (WpsFormatService.IsWpsFile(path)) return WpsFormatService.Load(path);
         var kind = Detect(path);
         var doc = new OfficeDocument { Path = path, Kind = kind };
         switch (kind)
@@ -44,6 +48,13 @@ public static partial class OfficeDocumentService
             case OfficeDocumentKind.PowerPoint: LoadPowerPoint(doc); break;
             default: throw new NotSupportedException($"Unsupported Office file: {path}");
         }
+        if (kind == OfficeDocumentKind.Excel)
+        {
+            ChartService.Read(doc);
+            PivotService.Read(doc);
+        }
+        OleObjectService.Read(doc);
+        MacroService.Read(doc);
         return doc;
     }
 
@@ -56,6 +67,12 @@ public static partial class OfficeDocumentService
             case OfficeDocumentKind.PowerPoint: SavePowerPoint(doc); break;
             default: throw new NotSupportedException("Unknown document type.");
         }
+        if (doc.Kind == OfficeDocumentKind.Excel)
+        {
+            ChartService.Write(doc);
+            PivotService.Write(doc);
+        }
+        OleObjectService.Sync(doc);
     }
 
     public static void CreateNew(string path, OfficeDocumentKind kind)
@@ -103,6 +120,11 @@ public static partial class OfficeDocumentService
 
         if (doc.Blocks.Count == 0)
             doc.Blocks.Add(new WordParagraph());
+
+        WordNumberingService.Read(doc, main);
+        WordNumberingService.EnsureDefaults(doc);
+        WordNumberingService.RefreshLabels(doc);
+        RevisionService.Read(doc, main);
     }
 
     private static WordBlock ReadWordParagraph(W.Paragraph paragraph, W.Numbering? numbering,
@@ -129,6 +151,7 @@ public static partial class OfficeDocumentService
                 var level = (int)(numberingProps.NumberingLevelReference?.Val?.Value ?? 0);
                 result.ListLevel = level;
                 var numId = numberingProps.NumberingId?.Val?.Value;
+                result.NumberId = numId ?? 0;
                 result.ListKind = IsBullet(numbering, numId, level) ? WordListKind.Bullet : WordListKind.Number;
             }
         }
@@ -252,6 +275,8 @@ public static partial class OfficeDocumentService
             if (section is not null) body.InsertBefore(element, section);
             else body.AppendChild(element);
         }
+        WordNumberingService.Write(doc, main);
+        RevisionService.Write(doc, main);
         main.Document.Save();
     }
 
@@ -277,7 +302,12 @@ public static partial class OfficeDocumentService
             });
             props.AppendChild(new W.NumberingProperties(
                 new W.NumberingLevelReference { Val = model.ListLevel },
-                new W.NumberingId { Val = model.ListKind == WordListKind.Bullet ? 1 : 2 }));
+                new W.NumberingId
+                {
+                    Val = model.NumberId > 0
+                        ? model.NumberId
+                        : model.ListKind == WordListKind.Bullet ? 1 : 2
+                }));
         }
         else if (model.LeftIndent != 0)
         {
@@ -297,6 +327,16 @@ public static partial class OfficeDocumentService
         foreach (var runModel in model.Runs)
         {
             var run = CreateRun(runModel);
+            OpenXmlElement container = paragraph;
+            if (runModel.RevisionId > 0)
+            {
+                container = new W.InsertedRun
+                {
+                    Author = RevisionService.Author,
+                    Date = new DocumentFormat.OpenXml.DateTimeValue(DateTime.UtcNow),
+                    Id = runModel.RevisionId.ToString()
+                };
+            }
             if (!string.IsNullOrWhiteSpace(runModel.Hyperlink) &&
                 Uri.TryCreate(runModel.Hyperlink, UriKind.Absolute, out var uri))
             {
@@ -308,12 +348,13 @@ public static partial class OfficeDocumentService
                     Text = runModel.Text,
                     Space = SpaceProcessingModeValues.Preserve
                 });
-                paragraph.AppendChild(new W.Hyperlink(linkRun) { Id = relationship.Id });
+                container.AppendChild(new W.Hyperlink(linkRun) { Id = relationship.Id });
             }
             else
             {
-                paragraph.AppendChild(run);
+                container.AppendChild(run);
             }
+            if (container != paragraph) paragraph.AppendChild(container);
         }
         if (model.Runs.Count == 0) paragraph.AppendChild(new W.Run());
         return paragraph;
