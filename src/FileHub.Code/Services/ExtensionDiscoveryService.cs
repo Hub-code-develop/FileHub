@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using FileHub.Code.Models;
 
@@ -141,15 +142,16 @@ public sealed class ExtensionDiscoveryService
         if (string.IsNullOrWhiteSpace(name)) return null;
 
         var contributes = rootJson.TryGetProperty("contributes", out var c) && c.ValueKind == JsonValueKind.Object ? c : default;
+        var folder = Path.GetDirectoryName(manifestPath)!;
 
         return new ExtensionInfo
         {
             Id = name,
-            DisplayName = ReadString(rootJson, "displayName"),
-            Description = ReadString(rootJson, "description"),
+            DisplayName = ReadLocalized(rootJson, "displayName", folder),
+            Description = ReadLocalized(rootJson, "description", folder),
             Version = ReadString(rootJson, "version"),
             Publisher = ReadPublisher(rootJson),
-            Folder = Path.GetDirectoryName(manifestPath)!,
+            Folder = folder,
             SourceRoot = root,
             Languages = ReadLanguages(contributes),
             Grammars = ReadGrammars(contributes),
@@ -161,6 +163,56 @@ public sealed class ExtensionDiscoveryService
 
     private static string ReadString(JsonElement obj, string name)
         => obj.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() ?? string.Empty : string.Empty;
+
+    /// <summary>
+    /// VS Code manifests store displayName/description as "%key%" placeholders and keep the text in
+    /// package.nls.json (or package.nls.&lt;locale&gt;.json). Reading the raw string is why the
+    /// extension list used to show "%displayName%" and "%extension.title%" as titles.
+    /// </summary>
+    private static string ReadLocalized(JsonElement obj, string name, string folder)
+    {
+        var value = ReadString(obj, name);
+        if (value.Length < 3 || value[0] != '%' || value[^1] != '%') return value;
+
+        var key = value[1..^1];
+        foreach (var file in NlsCandidates(folder))
+        {
+            try
+            {
+                if (!File.Exists(file)) continue;
+                using var doc = JsonDocument.Parse(File.ReadAllBytes(file));
+                if (doc.RootElement.ValueKind != JsonValueKind.Object) continue;
+                if (doc.RootElement.TryGetProperty(key, out var text) && text.ValueKind == JsonValueKind.String)
+                    return text.GetString() ?? value;
+            }
+            catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
+            {
+                // A broken translation file must not hide the extension.
+            }
+        }
+
+        // Unresolved: the raw key is still better than an empty label, and it shows the problem.
+        return value;
+    }
+
+    private static IEnumerable<string> NlsCandidates(string folder)
+    {
+        var culture = CultureInfo.CurrentUICulture;
+        var name = culture.Name.ToLowerInvariant();
+        var language = culture.TwoLetterISOLanguageName.ToLowerInvariant();
+
+        if (name.Length > 0) yield return Path.Combine(folder, $"package.nls.{name}.json");
+        if (language.Length > 0 && language != name) yield return Path.Combine(folder, $"package.nls.{language}.json");
+
+        // VS Code ships Simplified Chinese as zh-cn, not zh-hans.
+        if (language == "zh")
+        {
+            var traditional = name.Contains("hant") || name.Contains("tw") || name.Contains("hk");
+            yield return Path.Combine(folder, traditional ? "package.nls.zh-tw.json" : "package.nls.zh-cn.json");
+        }
+
+        yield return Path.Combine(folder, "package.nls.json");
+    }
 
     private static string ReadPublisher(JsonElement obj)
     {

@@ -85,7 +85,6 @@ public partial class MainWindow : Window
                 break;
             case nameof(ShellViewModel.IsFilesChromeVisible):
             case nameof(ShellViewModel.IsCodePageOpen):
-            case nameof(ShellViewModel.IsExtensionsPageOpen):
             case nameof(ShellViewModel.IsOfficePageOpen):
                 ApplyShellVisibility();
                 break;
@@ -108,7 +107,6 @@ public partial class MainWindow : Window
         StatusBar.IsVisible = chrome;
 
         CodeEditorView.IsVisible = _shell.IsCodePageOpen;
-        ExtensionsView.IsVisible = _shell.IsExtensionsPageOpen;
         DocumentView.IsVisible = _shell.IsOfficePageOpen;
     }
 
@@ -131,7 +129,7 @@ public partial class MainWindow : Window
         InnerContent.DataContext = _boundTab;
         NavToolbar.DataContext = _boundTab;
         StatusBar.DataContext = _boundTab;
-        Sidebar.SettingsItem.Command = _boundTab.ToggleThemeCommand;
+        Sidebar.SettingsItem.Command = _shell.OpenSettingsCommand;
         Breadcrumb.ItemsSource = _boundTab.Breadcrumbs;
         SyncAddressMode();
 
@@ -623,6 +621,14 @@ public partial class MainWindow : Window
 
         var workspaceCtrl = args.KeyModifiers.HasFlag(KeyModifiers.Control) ||
                             args.KeyModifiers.HasFlag(KeyModifiers.Meta);
+
+        // Settings dialog, the shortcut every other desktop app uses for it.
+        if (workspaceCtrl && args.Key == Key.OemComma)
+        {
+            _shell.OpenSettingsCommand.Execute(null);
+            args.Handled = true;
+            return;
+        }
         if (_shell.IsCodePageOpen && workspaceCtrl && args.Key == Key.S)
         {
             if (_shell.CodeEditor.SaveCommand.CanExecute(null)) _shell.CodeEditor.SaveCommand.Execute(null);
@@ -643,7 +649,7 @@ public partial class MainWindow : Window
         var alt = args.KeyModifiers.HasFlag(KeyModifiers.Alt);
         var shift = args.KeyModifiers.HasFlag(KeyModifiers.Shift);
 
-        // Tab management works on every page, including the code/extension workspace.
+        // Tab management works on every page, including the code editor.
         if (ctrl && !alt && args.Key == Key.Tab)
         {
             if (shift) _shell.ActivatePreviousTab(); else _shell.ActivateNextTab();

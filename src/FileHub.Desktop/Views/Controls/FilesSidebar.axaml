@@ -25,7 +25,7 @@
         <Border Classes="sidebarDivider" />
         <c:SidebarItem x:Name="_settingsItem" Symbol="Settings"
                        Text="{x:Static loc:Strings.LblSettings}"
-                       ToolTip.Tip="{x:Static loc:Strings.ToggleTheme}" />
+                       ToolTip.Tip="{x:Static loc:Strings.SettingsTooltip}" />
         <TextBlock x:Name="_buildLabel"
                    Text="{x:Static loc:BuildInfo.DisplayLabel}"
                    ToolTip.Tip="{x:Static loc:BuildInfo.DetailText}"

@@ -1,0 +1,197 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="using:FluentAvalonia.UI.Controls"
+        xmlns:loc="using:FileHub.Desktop.Services"
+        xmlns:t="using:FileHub.Desktop.Views.Controls"
+        x:Class="FileHub.Desktop.Views.SettingsDialog"
+        Title="{x:Static loc:Strings.LblSettings}"
+        Width="960" Height="680" MinWidth="820" MinHeight="560"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
+        Background="{DynamicResource SystemControlBackgroundAltHighBrush}">
+
+  <!--
+    Settings is a modal dialog, not a workspace page: preferences are window-scoped and the
+    extension manager is just one section inside it. The left rail switches between the sections;
+    every value writes straight through to the shell, so there is no OK/Apply step.
+  -->
+  <Grid RowDefinitions="*,Auto">
+
+    <Grid Grid.Row="0" ColumnDefinitions="228,Auto,*">
+
+      <!-- Left rail -->
+      <Grid Grid.Column="0" RowDefinitions="Auto,*">
+        <StackPanel Grid.Row="0" Margin="20,18,16,10" Spacing="2">
+          <TextBlock Text="{x:Static loc:Strings.LblSettings}" FontSize="20" FontWeight="SemiBold" />
+          <TextBlock Text="{x:Static loc:Strings.SettingsSubtitle}" FontSize="11" Opacity="0.6"
+                     TextWrapping="Wrap" />
+        </StackPanel>
+
+        <ListBox x:Name="Nav" Grid.Row="1" Margin="10,0,10,10" SelectedIndex="0"
+                 Background="Transparent" BorderThickness="0"
+                 SelectionChanged="OnSectionChanged">
+          <ListBoxItem Padding="10,9">
+            <StackPanel Orientation="Horizontal" Spacing="10">
+              <ui:FASymbolIcon Symbol="Settings" FontSize="14" VerticalAlignment="Center" />
+              <TextBlock Text="{x:Static loc:Strings.SettingsNavGeneral}" VerticalAlignment="Center" />
+            </StackPanel>
+          </ListBoxItem>
+          <ListBoxItem Padding="10,9">
+            <StackPanel Orientation="Horizontal" Spacing="10">
+              <ui:FASymbolIcon Symbol="ViewAll" FontSize="14" VerticalAlignment="Center" />
+              <TextBlock Text="{x:Static loc:Strings.SettingsNavAppearance}" VerticalAlignment="Center" />
+            </StackPanel>
+          </ListBoxItem>
+          <ListBoxItem Padding="10,9">
+            <StackPanel Orientation="Horizontal" Spacing="10">
+              <ui:FASymbolIcon Symbol="Page" FontSize="14" VerticalAlignment="Center" />
+              <TextBlock Text="{x:Static loc:Strings.ExtensionsTab}" VerticalAlignment="Center" />
+            </StackPanel>
+          </ListBoxItem>
+          <ListBoxItem Padding="10,9">
+            <StackPanel Orientation="Horizontal" Spacing="10">
+              <ui:FASymbolIcon Symbol="ContactInfo" FontSize="14" VerticalAlignment="Center" />
+              <TextBlock Text="{x:Static loc:Strings.SettingsNavAbout}" VerticalAlignment="Center" />
+            </StackPanel>
+          </ListBoxItem>
+        </ListBox>
+      </Grid>
+
+      <Border Grid.Column="1" Width="1" Background="{DynamicResource SystemControlForegroundBaseLowBrush}" />
+
+      <!-- Section host. Exactly one child is visible; OnSectionChanged switches them. -->
+      <Grid Grid.Column="2" Margin="24,18,24,14">
+
+        <!-- General -->
+        <ScrollViewer x:Name="GeneralSection" VerticalScrollBarVisibility="Auto">
+          <StackPanel Spacing="2" MaxWidth="680" HorizontalAlignment="Left">
+            <TextBlock Text="{x:Static loc:Strings.SettingsViewSection}" FontSize="12"
+                       FontWeight="SemiBold" Opacity="0.7" Margin="0,0,0,6" />
+
+            <Grid ColumnDefinitions="*,Auto" Margin="0,6">
+              <StackPanel Spacing="2">
+                <TextBlock Text="{x:Static loc:Strings.SettingsShowHidden}" FontSize="13" />
+                <TextBlock Text="{x:Static loc:Strings.SettingsShowHiddenHint}" FontSize="11"
+                           Opacity="0.6" TextWrapping="Wrap" />
+              </StackPanel>
+              <ToggleSwitch Grid.Column="1" VerticalAlignment="Center"
+                            IsChecked="{Binding ShowHiddenFiles, Mode=TwoWay}" />
+            </Grid>
+
+            <Grid ColumnDefinitions="*,Auto" Margin="0,6">
+              <StackPanel Spacing="2">
+                <TextBlock Text="{x:Static loc:Strings.SettingsSidebar}" FontSize="13" />
+                <TextBlock Text="{x:Static loc:Strings.SettingsSidebarHint}" FontSize="11"
+                           Opacity="0.6" TextWrapping="Wrap" />
+              </StackPanel>
+              <ToggleSwitch Grid.Column="1" VerticalAlignment="Center"
+                            IsChecked="{Binding ShowSidebar, Mode=TwoWay}" />
+            </Grid>
+
+            <Grid ColumnDefinitions="*,Auto" Margin="0,6">
+              <StackPanel Spacing="2">
+                <TextBlock Text="{x:Static loc:Strings.SettingsDetailsPane}" FontSize="13" />
+                <TextBlock Text="{x:Static loc:Strings.SettingsDetailsPaneHint}" FontSize="11"
+                           Opacity="0.6" TextWrapping="Wrap" />
+              </StackPanel>
+              <ToggleSwitch Grid.Column="1" VerticalAlignment="Center"
+                            IsChecked="{Binding ShowDetailsPane, Mode=TwoWay}" />
+            </Grid>
+
+            <Grid ColumnDefinitions="*,Auto" Margin="0,6">
+              <StackPanel Spacing="2">
+                <TextBlock Text="{x:Static loc:Strings.DualPane}" FontSize="13" />
+                <TextBlock Text="{x:Static loc:Strings.SettingsDualPaneHint}" FontSize="11"
+                           Opacity="0.6" TextWrapping="Wrap" />
+              </StackPanel>
+              <ToggleSwitch Grid.Column="1" VerticalAlignment="Center"
+                            IsChecked="{Binding DualPane, Mode=TwoWay}" />
+            </Grid>
+
+            <TextBlock Text="{x:Static loc:Strings.SettingsLanguageSection}" FontSize="12"
+                       FontWeight="SemiBold" Opacity="0.7" Margin="0,18,0,6" />
+
+            <Grid ColumnDefinitions="*,Auto" Margin="0,6">
+              <StackPanel Spacing="2">
+                <TextBlock Text="{x:Static loc:Strings.SettingsLanguage}" FontSize="13" />
+                <TextBlock Text="{Binding LanguageHint}" FontSize="11" Opacity="0.6"
+                           TextWrapping="Wrap" />
+              </StackPanel>
+              <Button Grid.Column="1" VerticalAlignment="Center" Padding="14,5"
+                      Content="{Binding LanguageLabel}" Click="OnChangeLanguage" />
+            </Grid>
+          </StackPanel>
+        </ScrollViewer>
+
+        <!-- Appearance -->
+        <ScrollViewer x:Name="AppearanceSection" VerticalScrollBarVisibility="Auto" IsVisible="False">
+          <StackPanel Spacing="2" MaxWidth="680" HorizontalAlignment="Left">
+            <TextBlock Text="{x:Static loc:Strings.SettingsAppearanceTheme}" FontSize="12"
+                       FontWeight="SemiBold" Opacity="0.7" Margin="0,0,0,6" />
+            <ComboBox ItemsSource="{Binding ThemeOptions}"
+                      SelectedIndex="{Binding ThemeIndex, Mode=TwoWay}"
+                      MinWidth="220" HorizontalAlignment="Left" Margin="0,4,0,6" />
+            <TextBlock Text="{x:Static loc:Strings.SettingsThemeHint}" FontSize="11" Opacity="0.6"
+                       TextWrapping="Wrap" MaxWidth="520" HorizontalAlignment="Left" />
+          </StackPanel>
+        </ScrollViewer>
+
+        <!-- Extensions: the extension manager, without its page chrome. -->
+        <Grid x:Name="ExtensionsSection" RowDefinitions="Auto,*" IsVisible="False">
+          <TextBlock Grid.Row="0" Text="{x:Static loc:Strings.SettingsExtensionsHint}"
+                     FontSize="11" Opacity="0.6" TextWrapping="Wrap" Margin="0,0,0,8" />
+          <t:ExtensionsPage x:Name="ExtensionsHost" Grid.Row="1" />
+        </Grid>
+
+        <!-- About -->
+        <ScrollViewer x:Name="AboutSection" VerticalScrollBarVisibility="Auto" IsVisible="False">
+          <StackPanel Spacing="10" MaxWidth="620" HorizontalAlignment="Left">
+            <StackPanel Orientation="Horizontal" Spacing="12">
+              <ui:FASymbolIcon Symbol="Folder" FontSize="34" VerticalAlignment="Center" />
+              <StackPanel Spacing="2" VerticalAlignment="Center">
+                <TextBlock Text="FileHub" FontSize="20" FontWeight="SemiBold" />
+                <TextBlock Text="{Binding BuildLabel}" FontSize="12" Opacity="0.65" />
+              </StackPanel>
+            </StackPanel>
+
+            <TextBlock Text="{x:Static loc:Strings.SettingsAboutBody}" FontSize="12"
+                       TextWrapping="Wrap" LineHeight="20" Opacity="0.85" />
+
+            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="4"
+                  ColumnSpacing="14" Margin="0,4,0,0">
+              <TextBlock Grid.Row="0" Grid.Column="0" Text="{x:Static loc:Strings.SettingsAboutVersion}"
+                         FontSize="12" Opacity="0.6" />
+              <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding VersionText}" FontSize="12" />
+              <TextBlock Grid.Row="1" Grid.Column="0" Text="{x:Static loc:Strings.SettingsAboutBuild}"
+                         FontSize="12" Opacity="0.6" />
+              <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding BuildDetail}" FontSize="12"
+                         TextWrapping="Wrap" />
+              <TextBlock Grid.Row="2" Grid.Column="0" Text="{x:Static loc:Strings.SettingsAboutLicense}"
+                         FontSize="12" Opacity="0.6" />
+              <TextBlock Grid.Row="2" Grid.Column="1" Text="MIT" FontSize="12" />
+            </Grid>
+
+            <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,6,0,0">
+              <Button Content="{x:Static loc:Strings.SettingsOpenProject}"
+                      Command="{Binding OpenProjectCommand}" Padding="14,5" />
+              <Button Content="{x:Static loc:Strings.SettingsOpenNotices}"
+                      Command="{Binding OpenNoticesCommand}" Padding="14,5" />
+              <Button Content="{x:Static loc:Strings.SettingsOpenLicense}"
+                      Command="{Binding OpenLicenseCommand}" Padding="14,5" />
+            </StackPanel>
+          </StackPanel>
+        </ScrollViewer>
+      </Grid>
+    </Grid>
+
+    <!-- Footer -->
+    <Border Grid.Row="1" Padding="20,10" BorderThickness="0,1,0,0"
+            BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock Text="{Binding BuildLabel}" FontSize="11" Opacity="0.55"
+                   VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+        <Button Grid.Column="1" Content="{x:Static loc:Strings.DlgClose}" MinWidth="96"
+                Click="OnClose" />
+      </Grid>
+    </Border>
+  </Grid>
+</Window>

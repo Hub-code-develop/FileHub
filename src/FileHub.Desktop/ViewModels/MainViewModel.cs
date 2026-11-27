@@ -220,6 +220,27 @@ public sealed class MainViewModel : ViewModelBase
     public string StatusText { get => _statusText; private set => Set(ref _statusText, value); }
     public string SelectionText { get => _selectionText; private set => Set(ref _selectionText, value); }
     public string PlatformText { get => _platformText; private set => Set(ref _platformText, value); }
+    /// <summary>
+    /// "system", "light" or "dark". The settings dialog writes this directly; the tab-strip button
+    /// cycles it. Theme is application-wide, so the label is only a per-tab mirror of it.
+    /// </summary>
+    public string ThemeMode
+    {
+        get => _themeMode;
+        set
+        {
+            var mode = value is "light" or "dark" ? value : "system";
+            if (!Set(ref _themeMode, mode)) return;
+            ThemeLabel = mode switch
+            {
+                "light" => Loc.T("ThemeLight"),
+                "dark" => Loc.T("ThemeDark"),
+                _ => Loc.T("ThemeSystem")
+            };
+            _ui.SetTheme(mode);
+        }
+    }
+
     public string ThemeLabel { get => _themeLabel; private set => Set(ref _themeLabel, value); }
     public string SortIndicator { get => _sortIndicator; private set => Set(ref _sortIndicator, value); }
     public bool CanGoBack { get => _canGoBack; private set => Set(ref _canGoBack, value); }
@@ -897,11 +918,7 @@ public sealed class MainViewModel : ViewModelBase
     }
 
     private void ToggleTheme()
-    {
-        _themeMode = _themeMode switch { "system" => "light", "light" => "dark", _ => "system" };
-        ThemeLabel = _themeMode switch { "light" => Loc.T("ThemeLight"), "dark" => Loc.T("ThemeDark"), _ => Loc.T("ThemeSystem") };
-        _ui.SetTheme(_themeMode);
-    }
+        => ThemeMode = _themeMode switch { "system" => "light", "light" => "dark", _ => "system" };
 
     public void SetSelection(IEnumerable<FileEntryViewModel> items)
     {

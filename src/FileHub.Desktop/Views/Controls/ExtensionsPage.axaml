@@ -8,7 +8,9 @@
 
     <Border Grid.Row="0" Classes="paneSurface" Padding="12,8">
       <Grid ColumnDefinitions="Auto,Auto,*,Auto" VerticalAlignment="Center">
-        <Button Grid.Column="0" Content="{x:Static loc:Strings.ClosePage}"
+        <!-- Hidden when the page is hosted inside the settings dialog: there is no page to close
+             and the dialog already carries the section title. -->
+        <Button x:Name="_closeButton" Grid.Column="0" Content="{x:Static loc:Strings.ClosePage}"
                 Command="{Binding CloseCommand}" Padding="10,4" />
         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" Margin="12,0,0,0">
           <ToggleButton Content="{x:Static loc:Strings.MktInstalledTab}"
@@ -18,7 +20,7 @@
                         IsChecked="{Binding IsMarketplaceMode, Mode=TwoWay}"
                         Command="{Binding ShowMarketplaceCommand}" Padding="10,4" />
         </StackPanel>
-        <TextBlock Grid.Column="2" Text="{x:Static loc:Strings.ExtTitle}"
+        <TextBlock x:Name="_title" Grid.Column="2" Text="{x:Static loc:Strings.ExtTitle}"
                    Margin="12,0,0,0" FontSize="15" FontWeight="SemiBold" />
         <TextBlock Grid.Column="3" Text="{Binding CountText}" FontSize="12" Opacity="0.7" />
       </Grid>

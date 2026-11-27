@@ -130,9 +130,9 @@ macOS 优先读系统语言偏好是故意的：从 Finder 启动的 GUI 应用�
   从 Finder / 资源管理器拖入的文件按复制导入。重名自动加序号，绝不覆盖。
 - **实时目录监视**：当前目录里外部新建 / 删除 / 重命名会自动刷新列表（合并事件、280 毫秒防抖），
   并保留当前选择。无法监视的卷仍可用 F5 手动刷新。
-- **Monaco 代码编辑器**：双击源代码文件（或点标签栏的「代码」）即可打开本地 Monaco 编辑器，
-  支持语法高亮、语言自动识别、Ctrl+S 保存、保留原编码写入、未保存标记与光标位置显示。
-  所有资源都随应用打包，离线也能写代码。
+- **Monaco 代码编辑器**：双击源代码文件即可打开本地 Monaco 编辑器，支持语法高亮、语言自动识别、
+  Ctrl+S 保存、保留原编码写入、未保存标记与光标位置显示。所有资源都随应用打包，离线也能写代码。
+  与文档模式一样，标签栏里没有「代码」按钮：编辑器只会因为你打开了文件而出现。
 - **内置 Office 工作套件**：双击 `.docx` / `.xlsx` / `.pptx` 即可进入文档模式 —— 标签栏、导航栏、
   命令栏和状态栏自动收起，文档占据窗口，侧边栏保留为文件浏览器。没有单独的「Office」按钮需要按，
   打开文档就是进入文档模式的唯一入口；点「文件」或 Ctrl+W 回到原文件夹。内含三款真正可编辑的组件：
@@ -151,9 +151,13 @@ macOS 优先读系统语言偏好是故意的：从 Finder 启动的 GUI 应用�
   Ctrl+S 把修改写回原文件。底层是 Open XML SDK，无需安装 Office、不用 COM，跨平台可用。VBA 代码从不执行；
   宏录制只回放 FileHub 的编辑操作。未覆盖的高级特性（VBA 执行、带对话框的宏、数据透视图、OLE 激活等）
   详见 THIRD-PARTY-NOTICES.md。
-- **VS Code 扩展页面**：扫描 `.vscode`、`.vscode-insiders`、`.vscode-oss`、`.cursor`、`.windsurf`
-  下已安装的扩展，可为 FileHub 单独启用 / 禁用，并展示语言、主题、代码片段和语法贡献。
-  启用的扩展会向 Monaco 提供文件关联、配色主题和补全片段；**不会执行扩展的 JavaScript**。
+- **设置弹窗**：点标签栏的齿轮（或侧栏底部的「设置」）打开模态设置窗口，不再占用一个工作区页面。
+  常规（隐藏文件、侧栏、详细信息窗格、双栏）、外观（跟随系统 / 浅色 / 深色主题）、扩展、关于
+  （版本、构建通道、许可与第三方声明）都在同一处，改动立即生效，没有「确定 / 应用」步骤。
+- **VS Code 扩展管理器**：设置弹窗中的一个分区。扫描 `.vscode`、`.vscode-insiders`、`.vscode-oss`、
+  `.cursor`、`.windsurf` 下已安装的扩展，可为 FileHub 单独启用 / 禁用，并展示语言、主题、代码片段和
+  语法贡献。启用的扩展会向 Monaco 提供文件关联、配色主题和补全片段；**不会执行扩展的 JavaScript**。
+  标题写成 `%key%` 占位符的清单会用 `package.nls(.locale).json` 解析出真实名称。
 - **Visual Studio Marketplace 官方商店标签**：搜索 Microsoft 公共 Gallery，展示版本 / 发布者 /
   评分 / 安装量，按需下载 VSIX 并安装到 FileHub 自己的扩展目录（不碰 VS Code 管理的元数据）。
   卸载只移除 FileHub 安装的包；详情面板可打开商店页面与许可证链接。FileHub 与 Microsoft
@@ -331,7 +335,7 @@ FileHub/
         ├── Assets/Monaco/ 随包分发的 monaco-editor 0.52.2 min/vs 资源（MIT）
         ├── Styles/        应用样式
         ├── ViewModels/    ShellViewModel（标签与页面）/ MainViewModel / CodeEditorViewModel / ExtensionsViewModel / OfficeViewModel
-        ├── Views/         MainWindow / Views/Controls（Files 布局移植 + 编辑器 + 扩展页 + Office 功能区）
+        ├── Views/         MainWindow / SettingsDialog（设置弹窗）/ Views/Controls（Files 布局移植 + 编辑器 + Office 功能区）
         └── Services/      LocalizationService / DialogService / ThumbnailService / DragDropPayload /
                            MonacoAssetServer / FileInspectionService / PluginHost
 ```

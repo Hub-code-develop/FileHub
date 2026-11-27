@@ -163,10 +163,10 @@ FluentUI-CodeHub widgets used: `FANavigationView` (sidebar), `FABreadcrumbBar` (
 - **Live directory watcher**: external creates, deletes and renames in the current folder refresh
   the list automatically (coalesced, 280 ms debounce), preserving the current selection. Manual
   refresh (F5) remains available for volumes that cannot be watched
-- **Monaco code editor**: double-click a source file (or press Code in the tab strip) to open a
-  local Monaco editor with syntax highlighting, language auto-detection, Ctrl+S save, an
-  encoding-preserving writer, a dirty marker and a cursor readout. All assets are bundled, so
-  editing works offline
+- **Monaco code editor**: double-click a source file to open a local Monaco editor with syntax
+  highlighting, language auto-detection, Ctrl+S save, an encoding-preserving writer, a dirty
+  marker and a cursor readout. All assets are bundled, so editing works offline. Like document
+  mode there is no "Code" button in the tab strip: the editor appears because you opened a file
 - **Built-in Office suite**: double-click a `.docx` / `.xlsx` / `.pptx` and the file manager gets
   out of the way - tab strip, navigation toolbar, command bar and status bar collapse, the document
   takes the window, and the sidebar stays as a file browser. There is no separate "Office" button
@@ -194,11 +194,16 @@ FluentUI-CodeHub widgets used: `FANavigationView` (sidebar), `FABreadcrumbBar` (
   installation, no COM, cross-platform. VBA code is never executed; macro recording replays
   FileHub editor actions only. Advanced OOXML features outside our implementation (VBA execution,
   macros with dialogs, pivot charts, OLE activation) are documented in THIRD-PARTY-NOTICES.md
-- **VS Code extensions page**: discovers extensions installed under `.vscode`,
-  `.vscode-insiders`, `.vscode-oss`, `.cursor` and `.windsurf`, lets you enable or disable them
-  for FileHub, and shows their language / theme / snippet / grammar contributions. Enabled
-  extensions supply file associations, colour themes and completion snippets to Monaco.
-  Extension JavaScript is **not** executed
+- **Settings dialog**: the gear in the tab strip (or Settings in the sidebar footer) opens a modal
+  settings window instead of a workspace page. General (hidden files, sidebar, details pane, dual
+  pane), Appearance (system / light / dark theme), Extensions and About (version, build channel,
+  licence and third-party notices) live in one place, and every change applies immediately
+- **VS Code extensions manager**: a section of the settings dialog. It discovers extensions
+  installed under `.vscode`, `.vscode-insiders`, `.vscode-oss`, `.cursor` and `.windsurf`, lets you
+  enable or disable them for FileHub, and shows their language / theme / snippet / grammar
+  contributions. Enabled extensions supply file associations, colour themes and completion
+  snippets to Monaco. Extension JavaScript is **not** executed. Manifests that store their title
+  as a `%key%` placeholder are resolved against `package.nls(.locale).json`
 - **Visual Studio Marketplace tab**: searches Microsoft's public gallery, shows version /
   publisher / rating / install count, downloads the VSIX on request and installs it into
   FileHub's own extension folder (never into VS Code's managed metadata). Uninstall removes only
@@ -406,7 +411,7 @@ FileHub/
         ├── Assets/Monaco/ bundled monaco-editor 0.52.2 min/vs assets (MIT)
         ├── Styles/        application styles
         ├── ViewModels/    ShellViewModel (tabs + pages) / MainViewModel / CodeEditorViewModel / ExtensionsViewModel / OfficeViewModel
-        ├── Views/         MainWindow / Views/Controls (Files App layout ports + editor + extensions + Office ribbon)
+        ├── Views/         MainWindow / SettingsDialog (modal settings) / Views/Controls (Files App layout ports + editor + Office ribbon)
         └── Services/      LocalizationService / DialogService / ThumbnailService / DragDropPayload /
                            MonacoAssetServer / FileInspectionService / PluginHost
 ```

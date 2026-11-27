@@ -21,12 +21,15 @@ using FileHub.Files.Vfs;
 
 namespace FileHub.Desktop.ViewModels;
 
-/// <summary>Which full-area page is shown on top of the Files workspace.</summary>
+/// <summary>
+/// Which full-area page is shown on top of the Files workspace. Both pages are document modes
+/// opened by a double-click on a matching file: there is no entry button for either of them.
+/// Settings and extensions live in the settings dialog instead.
+/// </summary>
 public enum WorkspacePageKind
 {
     Files,
     Code,
-    Extensions,
     Office
 }
 
@@ -61,13 +64,9 @@ public sealed class ShellViewModel : ViewModelBase
     private ShellViewModel()
     {
         NewTabCommand = new RelayCommand(_ => AddTab());
-        OpenCodeEditorCommand = new RelayCommand(_ => WorkspacePage = WorkspacePageKind.Code);
-        OpenExtensionsCommand = new RelayCommand(_ =>
-        {
-            _ = Extensions;
-            WorkspacePage = WorkspacePageKind.Extensions;
-        });
-        CloseWorkspacePageCommand = new RelayCommand(_ => CloseWorkspacePage());        ToggleDetailsPaneCommand = new RelayCommand(_ =>
+        OpenSettingsCommand = new RelayCommand(_ => _ = SettingsDialog.ShowAsync(this));
+        CloseWorkspacePageCommand = new RelayCommand(_ => CloseWorkspacePage());
+        ToggleDetailsPaneCommand = new RelayCommand(_ =>
         {
             IsDetailsPaneOpen = !IsDetailsPaneOpen;
             foreach (var tab in Tabs) tab.RaiseDetailsPaneChanged();
@@ -201,8 +200,7 @@ public sealed class ShellViewModel : ViewModelBase
     public ICommand ToggleDetailsPaneCommand { get; }
     public ICommand ToggleSidebarCommand { get; }
     public ICommand CycleLanguageCommand { get; }
-    public ICommand OpenCodeEditorCommand { get; }
-    public ICommand OpenExtensionsCommand { get; }
+    public ICommand OpenSettingsCommand { get; }
     public ICommand CloseWorkspacePageCommand { get; }
     public ICommand ToggleTransferPaneCommand { get; }
     public ICommand ToggleDualPaneCommand { get; }
@@ -214,7 +212,7 @@ public sealed class ShellViewModel : ViewModelBase
     public ICommand PauseJobCommand { get; }
     public ICommand ClearTransfersCommand { get; }
 
-    /// <summary>Full-area overlay: Files, the Monaco editor, or the VS Code extensions page.</summary>
+    /// <summary>Full-area overlay: Files, the Monaco editor, or the Office document page.</summary>
     public WorkspacePageKind WorkspacePage
     {
         get => _workspacePage;
@@ -223,7 +221,6 @@ public sealed class ShellViewModel : ViewModelBase
             if (!Set(ref _workspacePage, value)) return;
             OnPropertyChanged(nameof(IsWorkspacePageOpen));
             OnPropertyChanged(nameof(IsCodePageOpen));
-            OnPropertyChanged(nameof(IsExtensionsPageOpen));
             OnPropertyChanged(nameof(IsOfficePageOpen));
             OnPropertyChanged(nameof(IsFilesChromeVisible));
             RaiseDualPaneState();
@@ -232,7 +229,6 @@ public sealed class ShellViewModel : ViewModelBase
 
     public bool IsWorkspacePageOpen => WorkspacePage != WorkspacePageKind.Files;
     public bool IsCodePageOpen => WorkspacePage == WorkspacePageKind.Code;
-    public bool IsExtensionsPageOpen => WorkspacePage == WorkspacePageKind.Extensions;
     public bool IsOfficePageOpen => WorkspacePage == WorkspacePageKind.Office;
 
     /// <summary>
@@ -463,8 +459,7 @@ public sealed class ShellViewModel : ViewModelBase
             new PaletteItem("Deep search in this folder", "Search", "find recursive search grep", () => { tab.DeepSearchCommand.Execute(null); return Task.CompletedTask; }),
             new PaletteItem("Undo", "Edit", "undo revert", () => StepUndoAsync(true)),
             new PaletteItem("Redo", "Edit", "redo repeat", () => StepUndoAsync(false)),
-            new PaletteItem("Open code editor", "Workspace", "monaco code editor source", () => { WorkspacePage = WorkspacePageKind.Code; return Task.CompletedTask; }),
-            new PaletteItem("Open extensions", "Workspace", "vs code extensions marketplace", () => { WorkspacePage = WorkspacePageKind.Extensions; return Task.CompletedTask; }),
+            new PaletteItem("Open settings", "Settings", "settings preferences theme language extensions about", () => { OpenSettingsCommand.Execute(null); return Task.CompletedTask; }),
             new PaletteItem("Back to files", "Workspace", "close document back to files escape", () => { CloseWorkspacePage(); return Task.CompletedTask; })
         };
 

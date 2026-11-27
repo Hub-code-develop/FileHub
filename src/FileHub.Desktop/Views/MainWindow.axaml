@@ -60,14 +60,10 @@
           <Button Classes="tabAction" Content="{Binding LanguageLabel}"
                   ToolTip.Tip="{Binding LanguageTooltip}"
                   Command="{Binding CycleLanguageCommand}" />
-          <Button Classes="tabAction" ToolTip.Tip="{x:Static loc:Strings.CodeTab}"
-                  Content="{x:Static loc:Strings.CodeTab}"
-                  Command="{Binding OpenCodeEditorCommand}" />
-          <Button Classes="tabAction" ToolTip.Tip="{x:Static loc:Strings.ExtensionsTab}"
-                  Content="{x:Static loc:Strings.ExtensionsTab}"
-                  Command="{Binding OpenExtensionsCommand}" />
-          <Button Classes="tabAction" ToolTip.Tip="{x:Static loc:Strings.ToggleTheme}"
-                  Command="{Binding ToggleThemeCommand}">
+          <!-- No "Code" or "Extensions" button: the editor opens with a source file, and the
+               extension manager now lives in the settings dialog. -->
+          <Button Classes="tabAction" ToolTip.Tip="{x:Static loc:Strings.LblSettings}"
+                  Command="{Binding OpenSettingsCommand}">
             <ui:FASymbolIcon Symbol="Settings" FontSize="14" />
           </Button>
         </StackPanel>
@@ -129,13 +125,13 @@
       </Grid>
 
       <!-- Each page replaces its own DataContext in code-behind (OfficePage -> OfficeViewModel,
-           CodeEditorPage -> CodeEditorViewModel, ExtensionsPage -> ExtensionsViewModel), so their
-           visibility is applied from code in ApplyShellVisibility(); a binding here would resolve
-           against the page's own view model. Without that, all three stacks up at once. -->
+           CodeEditorPage -> CodeEditorViewModel), so their visibility is applied from code in
+           ApplyShellVisibility(); a binding here would resolve against the page's own view model.
+           Without that, both pages stack up at once. The extension manager moved into the
+           settings dialog, so it is no longer part of this grid. -->
       <Grid Grid.Column="2" IsVisible="{Binding IsWorkspacePageOpen}"
             Background="{DynamicResource SystemControlBackgroundAltHighBrush}">
         <t:CodeEditorPage x:Name="CodeEditorView" />
-        <t:ExtensionsPage x:Name="ExtensionsView" />
         <t:OfficePage x:Name="DocumentView" />
       </Grid>
 
