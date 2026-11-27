@@ -1,0 +1,168 @@
+name: Publish stable release
+
+# Stable channel: semantic version vX.Y.Z, created only by manual dispatch. The workflow creates
+# and pushes the tag itself (MChub pattern) so the tag always points at the commit that was built.
+#
+# concurrency: never cancel a release mid-publish - that leaves a half-uploaded release.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version like 1.2.3 (empty = bump patch of latest vX.Y.Z tag)"
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  contents: write
+  packages: read
+
+concurrency:
+  group: publish-release
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Resolve version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      tag: ${{ steps.meta.outputs.tag }}
+      version_title: ${{ steps.meta.outputs.version_title }}
+      commit: ${{ steps.meta.outputs.commit }}
+      build_time: ${{ steps.meta.outputs.build_time }}
+      prev_tag: ${{ steps.meta.outputs.prev_tag }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve version
+        id: meta
+        shell: bash
+        run: |
+          set -euo pipefail
+          INPUT_VERSION="${{ github.event.inputs.version }}"
+          PREV_TAG="$(git tag -l --sort=-v:refname 'v*' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n1 || true)"
+
+          if [ -n "$INPUT_VERSION" ]; then
+            if ! printf '%s' "$INPUT_VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+              echo "::error::version must look like 1.2.3 (three numeric components)"
+              exit 1
+            fi
+            VERSION="$INPUT_VERSION"
+          elif [ -n "$PREV_TAG" ]; then
+            BASE="${PREV_TAG#v}"
+            MAJOR="$(printf '%s' "$BASE" | cut -d. -f1)"
+            MINOR="$(printf '%s' "$BASE" | cut -d. -f2)"
+            PATCH="$(printf '%s' "$BASE" | cut -d. -f3)"
+            VERSION="${MAJOR}.${MINOR}.$((PATCH + 1))"
+          else
+            VERSION="1.0.0"
+          fi
+
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=v${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "version_title=v${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "commit=$(git rev-parse --short=7 HEAD)" >> "$GITHUB_OUTPUT"
+          echo "build_time=$(TZ='Asia/Shanghai' date -Iseconds)" >> "$GITHUB_OUTPUT"
+          echo "prev_tag=${PREV_TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Create and push version tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git rev-parse -q --verify "refs/tags/v${{ steps.meta.outputs.version }}" >/dev/null; then
+            echo "Tag v${{ steps.meta.outputs.version }} already exists; skipping creation."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git tag "v${{ steps.meta.outputs.version }}"
+            git push origin "v${{ steps.meta.outputs.version }}"
+          fi
+
+  build:
+    needs: prepare
+    uses: ./.github/workflows/build-artifacts.yml
+    with:
+      version: ${{ needs.prepare.outputs.version }}
+      version_title: ${{ needs.prepare.outputs.version_title }}
+      channel: stable
+      commit: ${{ needs.prepare.outputs.commit }}
+      build_time: ${{ needs.prepare.outputs.build_time }}
+      run_id: ${{ github.run_id }}
+
+  publish:
+    name: Create GitHub release
+    needs: [prepare, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./FileHub.Release/
+          merge-multiple: true
+
+      - name: Build release notes
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${{ needs.prepare.outputs.version }}"
+          TAG="v${VERSION}"
+          PREV="${{ needs.prepare.outputs.prev_tag }}"
+          {
+            echo "# FileHub ${TAG}"
+            echo
+            echo "Released: ${{ needs.prepare.outputs.build_time }}"
+            echo
+            echo "Commit: \`${{ needs.prepare.outputs.commit }}\`"
+            echo
+            if [ -n "$PREV" ]; then
+              echo "## Changes since ${PREV}"
+              echo
+              bash .github/scripts/generate-changelog.sh
+              echo
+              echo "**Full comparison**: https://github.com/${{ github.repository }}/compare/${PREV}...${TAG}"
+            else
+              echo "## Changes"
+              echo
+              bash .github/scripts/generate-changelog.sh
+            fi
+            echo
+            echo "## Downloads"
+            echo
+            echo "All builds are framework-dependent and require the **.NET 10 Runtime**."
+            echo
+            echo "| Platform | Asset |"
+            echo "| --- | --- |"
+            echo "| Windows x64 | \`FileHub.win.x64.${VERSION}.zip\` |"
+            echo "| Linux x64 | \`FileHub.linux.x64.${VERSION}.tar.gz\` |"
+            echo "| macOS Apple Silicon | \`FileHub.osx.arm64.${VERSION}.dmg\` |"
+            echo "| macOS Intel | \`FileHub.osx.x64.${VERSION}.dmg\` |"
+            echo
+            echo "macOS builds are ad-hoc signed, not notarized. On first launch use"
+            echo "right-click -> Open if Gatekeeper blocks the app."
+          } > RELEASE_BODY.md
+          cat RELEASE_BODY.md
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ needs.prepare.outputs.tag }}
+          name: "FileHub ${{ needs.prepare.outputs.tag }}"
+          body_path: RELEASE_BODY.md
+          files: |
+            ./FileHub.Release/*.zip
+            ./FileHub.Release/*.tar.gz
+            ./FileHub.Release/*.dmg

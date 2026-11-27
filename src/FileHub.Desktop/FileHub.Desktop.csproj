@@ -23,6 +23,15 @@
     <PackageReference Include="Avalonia.Controls.WebView" Version="12.1.2" />
   </ItemGroup>
 
+  <!--
+    Build channel metadata. CI overwrites this JSON before compiling so a downloaded binary can
+    identify its own channel/version/commit; local builds keep the committed "dev" values.
+    LogicalName keeps the resource id stable regardless of folder layout.
+  -->
+  <ItemGroup>
+    <EmbeddedResource Include="Assets\version-ci.json" LogicalName="FileHub.Desktop.Assets.version-ci.json" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\FileHub.Files\FileHub.Files.csproj" />
     <ProjectReference Include="..\FileHub.Code\FileHub.Code.csproj" />

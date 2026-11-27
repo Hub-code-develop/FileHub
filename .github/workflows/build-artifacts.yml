@@ -1,0 +1,215 @@
+name: Build release artifacts (reusable)
+
+# Shared build job for the three publish channels. MChub keeps three near-identical publish
+# workflows; FileHub factors the common matrix out into one reusable workflow instead.
+#
+# Packaging is deliberately framework-dependent (needs .NET 10 Runtime installed). Rationale:
+#  - macOS 27 kills the stock CoreCLR Mach-exception path (EXC_GUARD / 0x8007000C). A
+#    self-contained macOS build would have to ship the CodeNet-patched dylibs, which is a
+#    separate distribution pipeline; see THIRD-PARTY-NOTICES.md and the user's MChub notes.
+#  - Framework-dependent keeps artifacts small and the publish jobs reproducible on all runners.
+#
+# Every package embeds a version-ci.json identifying its channel/version/commit (BuildInfo.cs).
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: "Assembly version passed to MSBuild (e.g. 1.2.3 or 0.42.3.7)"
+        required: true
+        type: string
+      version_title:
+        description: "Human-readable build title embedded in the binary"
+        required: true
+        type: string
+      channel:
+        description: "stable | nightly | preview"
+        required: true
+        type: string
+      commit:
+        description: "Short commit SHA"
+        required: true
+        type: string
+      build_time:
+        description: "ISO-8601 build time"
+        required: true
+        type: string
+      run_id:
+        description: "GitHub Actions run id"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.label }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # Written out in full on purpose: MChub hit a runtime bug where `include` keys do not
+        # merge into array-dimension combinations, leaving runtime empty.
+        include:
+          - os: windows-latest
+            rid: win-x64
+            label: win-x64
+          - os: ubuntu-latest
+            rid: linux-x64
+            label: linux-x64
+          - os: macos-latest
+            rid: osx-arm64
+            label: osx-arm64
+          - os: macos-15-intel
+            rid: osx-x64
+            label: osx-x64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # global.json pins 10.0.400; setup-dotnet reads it instead of guessing a version.
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      # CI overwrites the committed dev metadata before compilation. Embedded as a resource by
+      # FileHub.Desktop.csproj, so the resulting binary can report its own channel and commit.
+      - name: Write CI build metadata
+        shell: bash
+        run: |
+          mkdir -p src/FileHub.Desktop/Assets
+          printf '%s\n' '{"type":"${{ inputs.channel }}","version":"${{ inputs.version }}","version_title":"${{ inputs.version_title }}","commit":"${{ inputs.commit }}","build-time":"${{ inputs.build_time }}","action":"${{ inputs.run_id }}"}' > src/FileHub.Desktop/Assets/version-ci.json
+          cat src/FileHub.Desktop/Assets/version-ci.json
+
+      # CodeHub-FluentUI is shipped in the repo's local-feed; NuGet.Config is required on every
+      # job that restores. shell:bash keeps this identical on Windows (PowerShell mangles `\`).
+      - name: Restore
+        shell: bash
+        run: dotnet restore FileHub.slnx --configfile NuGet.Config
+
+      - name: Restore for RID
+        shell: bash
+        run: dotnet restore src/FileHub.Desktop/FileHub.Desktop.csproj --configfile NuGet.Config -r ${{ matrix.rid }}
+
+      # Solution-level build does not accept -r (NETSDK1134); publish the single project instead.
+      # -m:1 / no node reuse avoids MSB4166 on hosted runners.
+      - name: Publish
+        shell: bash
+        env:
+          DOTNET_CLI_USE_MSBUILD_SERVER: "0"
+          MSBUILDDISABLENODEREUSE: "1"
+        run: |
+          dotnet publish src/FileHub.Desktop/FileHub.Desktop.csproj -c Release --no-restore \
+            -r ${{ matrix.rid }} --self-contained false \
+            -p:Version=${{ inputs.version }} -p:DebugType=none -p:DebugSymbols=false \
+            -m:1 -nodeReuse:false -o publish
+
+      # Hard gate: the CodeNet arm64 SDK can silently skip Avalonia's XAML compiler, producing a
+      # binary that starts but throws "No precompiled XAML found". Check the compiler marker.
+      - name: Verify precompiled XAML
+        shell: bash
+        run: |
+          if grep -a -q '!XamlIlPopulate' publish/FileHub.dll; then
+            echo "OK: XAML precompiled into FileHub.dll"
+          else
+            echo "FAIL: no precompiled XAML in FileHub.dll" >&2
+            exit 1
+          fi
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Compress-Archive -Path "publish\*" -DestinationPath "FileHub.win.x64.${{ inputs.version }}.zip" -Force
+
+      - name: Package (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          tar -czf "FileHub.linux.x64.${{ inputs.version }}.tar.gz" -C publish .
+          ls -lh FileHub.linux.x64.*.tar.gz
+
+      # A minimal .app bundle: publish output goes to Contents/MacOS, and a tiny launcher picks
+      # up dotnet from PATH / the standard install / the user's CodeNet SDK. No BundleApp target
+      # needed, so this works with the stock SDK and both Intel and Apple Silicon runners.
+      - name: Package (macOS app bundle)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP="FileHub.app"
+          mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+          cp -R publish/. "$APP/Contents/MacOS/"
+
+          # CoreFoundation versions accept at most three components in practice; preview's
+          # fourth component (minute) is dropped here but stays in the assembly version.
+          PLIST_VERSION="$(printf '%s' '${{ inputs.version }}' | cut -d. -f1-3)"
+          cat > "$APP/Contents/Info.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>CFBundleName</key><string>FileHub</string>
+            <key>CFBundleDisplayName</key><string>FileHub</string>
+            <key>CFBundleIdentifier</key><string>hub.code.FileHub</string>
+            <key>CFBundleExecutable</key><string>FileHub.launcher</string>
+            <key>CFBundlePackageType</key><string>APPL</string>
+            <key>CFBundleVersion</key><string>${PLIST_VERSION}</string>
+            <key>CFBundleShortVersionString</key><string>${PLIST_VERSION}</string>
+            <key>LSMinimumSystemVersion</key><string>11.0</string>
+          </dict>
+          </plist>
+          PLIST
+
+          cat > "$APP/Contents/MacOS/FileHub.launcher" <<'LAUNCHER'
+          #!/bin/sh
+          HERE="$(cd "$(dirname "$0")" && pwd)"
+          if command -v dotnet >/dev/null 2>&1; then
+            DOTNET=dotnet
+          elif [ -x /usr/local/share/dotnet/dotnet ]; then
+            DOTNET=/usr/local/share/dotnet/dotnet
+          elif [ -x "$HOME/.dotnet/dotnet" ]; then
+            DOTNET="$HOME/.dotnet/dotnet"
+          elif [ -x "$HOME/dotnet-arm64/dotnet" ]; then
+            DOTNET="$HOME/dotnet-arm64/dotnet"
+          else
+            echo "FileHub requires the .NET 10 Runtime." >&2
+            exit 1
+          fi
+          cd "$HERE"
+          exec "$DOTNET" FileHub.dll "$@"
+          LAUNCHER
+          chmod +x "$APP/Contents/MacOS/FileHub.launcher"
+
+          # Ad-hoc signing is enough for Apple Silicon (arm64 binaries must be signed) but is NOT
+          # notarization: Finder downloads still need right-click -> Open on first launch.
+          # MChub hits a codesign failure on Vulkan `icd.d` bundles; flatten that directory first.
+          VULKAN_DIR="$APP/Contents/MacOS/runtimes/osx-x64/native/vulkan"
+          if [ -d "$VULKAN_DIR/icd.d" ] && [ ! -L "$VULKAN_DIR/icd.d" ]; then
+            mv "$VULKAN_DIR/icd.d" "$VULKAN_DIR/icd_d"
+            ln -s icd_d "$VULKAN_DIR/icd.d"
+          fi
+          codesign --force --deep --sign - "$APP"
+          codesign --verify --deep --verbose=2 "$APP"
+
+          ARCH="${{ matrix.rid }}"
+          ARCH="${ARCH#osx-}"
+          /usr/bin/ditto -c -k --keepParent "$APP" "FileHub.osx.${ARCH}.${{ inputs.version }}.app.zip"
+          hdiutil create -volname FileHub -srcfolder "$APP" -ov -format UDZO "FileHub.osx.${ARCH}.${{ inputs.version }}.dmg"
+          ls -lh FileHub.osx.${ARCH}.*
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: FileHub-${{ matrix.rid }}
+          path: |
+            *.zip
+            *.tar.gz
+            *.dmg
+          if-no-files-found: error
+          retention-days: 30

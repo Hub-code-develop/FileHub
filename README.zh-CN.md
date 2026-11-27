@@ -220,6 +220,36 @@ CodeNet **arm64** SDK（10.0.400）把 `Microsoft.CSharp.CurrentVersion.targets`
   防止「构建 0 错误但 XAML 没预编译」再次溜过去
 - 每个平台上传 `FileHub-<rid>-net10.0` artifact（保留 14 天）
 
+### 发布通道
+
+| 通道 | Workflow | 触发 | Tag | Release |
+| --- | --- | --- | --- | --- |
+| 正式版 | `publish-release.yml` | 手动触发（可填 `version`，留空则递增补丁号） | `vX.Y.Z`（由 workflow 创建） | 正式 |
+| 夜间构建 | `publish-nightly.yml` | 每天 UTC 20:00（北京时间 04:00）+ 手动 | `publish-nightly` | 预览，原地覆盖 |
+| 预览版 | `publish-preview.yml` | 每次 push 到 `main` + 手动 | `preview` | 预览，原地覆盖 |
+
+三者都调用共享的 `build-artifacts.yml` reusable workflow：构建 `win-x64`、`linux-x64`、
+`osx-arm64`、`osx-x64`，跑同一道 XAML 门禁，然后打包：
+
+| 平台 | 资产 |
+| --- | --- |
+| Windows x64 | `FileHub.win.x64.<version>.zip` |
+| Linux x64 | `FileHub.linux.x64.<version>.tar.gz` |
+| macOS Apple Silicon | `FileHub.osx.arm64.<version>.dmg`（另有 `.app.zip`） |
+| macOS Intel | `FileHub.osx.x64.<version>.dmg`（另有 `.app.zip`） |
+
+- 正式版用标准 SemVer；夜间/预览版用 `0.<天>.<时>.<分>`，从 2026-11-15 起按北京时间计数，
+  所以即使同一个 commit 构建两次，版本号也唯一且单调递增。
+- 版本、通道、commit 与构建时间作为资源嵌入程序（`Assets/version-ci.json`），鼠标悬停侧栏
+  「设置」下方即可看到。本地构建显示 `local-build`，无需额外配置。
+- 夜间版和预览版各只保留一个 Release，资产原地替换——绝不能删掉 tag 再重建，否则在删除与
+  重建之间 Release 链接会 404。
+- 定时任务如果过去 24 小时没有新提交会直接跳过，而不是取消 run，保持 Actions 历史干净。
+- 产物是 **framework-dependent**，需要先装 .NET 10 Runtime。这样可避免自带自包含 macOS
+  CoreCLR 在 macOS 27 上触发 EXC_GUARD 启动失败。macOS 包只做 ad-hoc 签名（未公证），
+  首次打开请右键 -> 打开。
+- 发版说明由 `git log` 相对最近正式版 tag 自动生成；PR 构建仍由 `build.yml` 覆盖。
+
 ## 结构
 
 ```text

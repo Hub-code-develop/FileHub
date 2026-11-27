@@ -1,0 +1,118 @@
+name: Publish preview build
+
+# Preview channel: one build per push to main (also manually dispatchable). Fixed tag `preview`
+# is updated in place, so there is always exactly one preview release with the newest assets.
+# This is the same fixed-tag pattern as MChub's publish-commit, renamed for clarity.
+#
+# Unlike nightly, previews are useful only as the latest snapshot: cancel an in-progress run when
+# a newer commit arrives.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  packages: read
+
+concurrency:
+  group: publish-preview
+  cancel-in-progress: true
+
+jobs:
+  prepare:
+    name: Resolve preview version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      version_title: ${{ steps.meta.outputs.version_title }}
+      commit: ${{ steps.meta.outputs.commit }}
+      build_time: ${{ steps.meta.outputs.build_time }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve preview version
+        id: meta
+        shell: bash
+        run: |
+          set -euo pipefail
+          START_EPOCH="$(TZ='Asia/Shanghai' date -d '2026-11-15 00:00:00' +%s)"
+          NOW_EPOCH="$(date +%s)"
+          TOTAL_MINUTES=$(( (NOW_EPOCH - START_EPOCH) / 60 ))
+          DAYS=$(( TOTAL_MINUTES / 1440 ))
+          HOURS=$(( (TOTAL_MINUTES % 1440) / 60 ))
+          MINUTES=$(( TOTAL_MINUTES % 60 ))
+          APP_VERSION="0.${DAYS}.${HOURS}.${MINUTES}"
+          COMMIT="$(git rev-parse --short=6 HEAD)"
+
+          echo "version=${APP_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "version_title=build-preview-${APP_VERSION}-${{ github.run_id }}-${COMMIT}" >> "$GITHUB_OUTPUT"
+          echo "commit=${COMMIT}" >> "$GITHUB_OUTPUT"
+          echo "build_time=$(TZ='Asia/Shanghai' date -Iseconds)" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: prepare
+    uses: ./.github/workflows/build-artifacts.yml
+    with:
+      version: ${{ needs.prepare.outputs.version }}
+      version_title: ${{ needs.prepare.outputs.version_title }}
+      channel: preview
+      commit: ${{ needs.prepare.outputs.commit }}
+      build_time: ${{ needs.prepare.outputs.build_time }}
+      run_id: ${{ github.run_id }}
+
+  publish:
+    name: Update preview release
+    needs: [prepare, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./FileHub.Release/
+          merge-multiple: true
+
+      - name: Build release notes
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo "# FileHub Preview"
+            echo
+            echo "Build: \`${{ needs.prepare.outputs.version_title }}\`"
+            echo "Built: ${{ needs.prepare.outputs.build_time }}"
+            echo "Commit: \`${{ needs.prepare.outputs.commit }}\`"
+            echo
+            echo "Per-commit preview build - may be unstable. Requires the **.NET 10 Runtime**."
+            echo
+            echo "## Changes since the latest stable release"
+            echo
+            bash .github/scripts/generate-changelog.sh
+          } > RELEASE_CHANGELOG.md
+          cat RELEASE_CHANGELOG.md
+
+      - name: Update preview release (in place)
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: preview
+          name: ${{ needs.prepare.outputs.version_title }}
+          target_commitish: ${{ github.sha }}
+          prerelease: true
+          body_path: RELEASE_CHANGELOG.md
+          files: |
+            ./FileHub.Release/*.zip
+            ./FileHub.Release/*.tar.gz
+            ./FileHub.Release/*.dmg

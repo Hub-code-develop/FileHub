@@ -266,6 +266,40 @@ net10.0, so do not change those versions independently.
   "0 errors but no precompiled XAML" failure mode
 - Each platform uploads a `FileHub-<rid>-net10.0` artifact (retained for 14 days)
 
+### Release channels
+
+| Channel | Workflow | Trigger | Tag | Release |
+| --- | --- | --- | --- | --- |
+| Stable | `publish-release.yml` | manual dispatch (optional `version`, default = bump patch) | `vX.Y.Z` (created by the workflow) | normal |
+| Nightly | `publish-nightly.yml` | daily 20:00 UTC (04:00 Shanghai) + manual | `publish-nightly` | prerelease, updated in place |
+| Preview | `publish-preview.yml` | every push to `main` + manual | `preview` | prerelease, updated in place |
+
+All three call the shared `build-artifacts.yml` reusable workflow, which builds `win-x64`,
+`linux-x64`, `osx-arm64` and `osx-x64`, applies the same XAML gate, and packages:
+
+| Platform | Asset |
+| --- | --- |
+| Windows x64 | `FileHub.win.x64.<version>.zip` |
+| Linux x64 | `FileHub.linux.x64.<version>.tar.gz` |
+| macOS Apple Silicon | `FileHub.osx.arm64.<version>.dmg` (+ `.app.zip`) |
+| macOS Intel | `FileHub.osx.x64.<version>.dmg` (+ `.app.zip`) |
+
+- Stable versions are plain SemVer; nightly/preview use `0.<days>.<hours>.<minutes>` counted
+  from 2026-11-15 in Asia/Shanghai time, so each build gets a unique, monotonically increasing
+  version even for the same commit.
+- The version, channel, commit and build time are embedded in the binary as a resource
+  (`Assets/version-ci.json`) and shown next to the sidebar's Settings entry on hover. Local
+  builds show `local-build`; no configuration is needed.
+- Nightly and preview keep a single release each. Assets are replaced in place - never delete
+  and recreate the tag, because that leaves a window where the release URL returns 404.
+- Scheduled nightly runs with no commits in the previous 24 hours are skipped rather than
+  cancelled, so the Actions history stays green.
+- Packages are **framework-dependent**: install the .NET 10 Runtime first. This avoids shipping
+  a self-contained macOS CoreCLR that would hit the macOS 27 EXC_GUARD launch failure. macOS
+  builds are ad-hoc signed (not notarized); on first launch use right-click -> Open.
+- Release notes are generated from `git log` against the latest stable tag; PR builds remain
+  covered by `build.yml`.
+
 ## Structure
 
 ```text

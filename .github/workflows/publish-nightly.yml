@@ -1,0 +1,144 @@
+name: Publish nightly build
+
+# Daily nightly channel. Fixed tag `publish-nightly` is updated in place: exactly one nightly
+# release exists at a time. MChub's comment is worth repeating here:
+#   NEVER delete the old release and recreate it. Between delete and create, GET /releases/tags/
+#   publish-nightly returns 404. action-gh-release updates an existing tag in place instead.
+#
+# Version is "0.<days since epoch>.<hours>.<minutes>" in Asia/Shanghai time, so it is always
+# monotonically increasing and unique even when the same commit is built twice.
+
+on:
+  schedule:
+    # UTC 20:00 = 04:00 the next day in Shanghai
+    - cron: "00 20 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  packages: read
+  actions: write
+
+concurrency:
+  group: publish-nightly
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Resolve nightly version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      version_title: ${{ steps.meta.outputs.version_title }}
+      commit: ${{ steps.meta.outputs.commit }}
+      build_time: ${{ steps.meta.outputs.build_time }}
+      has_changes: ${{ steps.meta.outputs.has_changes }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve nightly version
+        id: meta
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # Scheduled runs with no new commits are skipped instead of self-cancelling. MChub uses
+          # `gh run cancel` for this, which needs actions:write and leaves a cancelled run marker;
+          # a skipped downstream job keeps the history clean and green.
+          HAS_CHANGES="true"
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            SINCE="$(date -u -d '24 hours ago' +'%Y-%m-%dT%H:%M:%SZ')"
+            COUNT="$(git log --since="$SINCE" --oneline | wc -l)"
+            if [ "$COUNT" -eq 0 ]; then
+              HAS_CHANGES="false"
+              echo "No commits in the last 24 hours; skipping nightly build."
+            fi
+          fi
+          echo "has_changes=${HAS_CHANGES}" >> "$GITHUB_OUTPUT"
+
+          # FileHub repository creation date is the version epoch. Fixed timezone avoids runner
+          # timezone drift affecting the derived version.
+          START_EPOCH="$(TZ='Asia/Shanghai' date -d '2026-11-15 00:00:00' +%s)"
+          NOW_EPOCH="$(date +%s)"
+          TOTAL_MINUTES=$(( (NOW_EPOCH - START_EPOCH) / 60 ))
+          DAYS=$(( TOTAL_MINUTES / 1440 ))
+          HOURS=$(( (TOTAL_MINUTES % 1440) / 60 ))
+          MINUTES=$(( TOTAL_MINUTES % 60 ))
+          APP_VERSION="0.${DAYS}.${HOURS}.${MINUTES}"
+          COMMIT="$(git rev-parse --short=6 HEAD)"
+          BUILD_TIME="$(TZ='Asia/Shanghai' date -Iseconds)"
+
+          echo "version=${APP_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "version_title=build-nightly-${APP_VERSION}-${{ github.run_id }}-${COMMIT}" >> "$GITHUB_OUTPUT"
+          echo "commit=${COMMIT}" >> "$GITHUB_OUTPUT"
+          echo "build_time=${BUILD_TIME}" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: prepare
+    if: needs.prepare.outputs.has_changes == 'true'
+    uses: ./.github/workflows/build-artifacts.yml
+    with:
+      version: ${{ needs.prepare.outputs.version }}
+      version_title: ${{ needs.prepare.outputs.version_title }}
+      channel: nightly
+      commit: ${{ needs.prepare.outputs.commit }}
+      build_time: ${{ needs.prepare.outputs.build_time }}
+      run_id: ${{ github.run_id }}
+
+  publish:
+    name: Update nightly release
+    needs: [prepare, build]
+    if: needs.prepare.outputs.has_changes == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./FileHub.Release/
+          merge-multiple: true
+
+      - name: Build release notes
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo "# FileHub Nightly ${VERSION}"
+            echo
+            echo "Build: \`${{ needs.prepare.outputs.version_title }}\`"
+            echo "Built: ${{ needs.prepare.outputs.build_time }}"
+            echo "Commit: \`${{ needs.prepare.outputs.commit }}\`"
+            echo
+            echo "Automatic nightly build - may be unstable. Requires the **.NET 10 Runtime**."
+            echo
+            echo "## Changes since the latest stable release"
+            echo
+            bash .github/scripts/generate-changelog.sh
+          } > RELEASE_CHANGELOG.md
+          cat RELEASE_CHANGELOG.md
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+
+      - name: Update nightly release (in place)
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: publish-nightly
+          name: ${{ needs.prepare.outputs.version_title }}
+          target_commitish: ${{ github.sha }}
+          prerelease: true
+          body_path: RELEASE_CHANGELOG.md
+          files: |
+            ./FileHub.Release/*.zip
+            ./FileHub.Release/*.tar.gz
+            ./FileHub.Release/*.dmg

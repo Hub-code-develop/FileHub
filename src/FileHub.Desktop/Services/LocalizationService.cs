@@ -34,6 +34,12 @@ public static class Loc
         ["TabsMenu"] = new[] { "Tabs", "标签页" },
         ["NoClosedTabs"] = new[] { "No recently closed tabs", "没有最近关闭的标签页" },
         ["SwitchLanguage"] = new[] { "Language: Auto / English / Chinese (click to change)", "语言：自动 / English / 中文（点击切换）" },
+        ["BuildChannel"] = new[] { "Channel", "发布通道" },
+        ["BuildVersion"] = new[] { "Version", "版本" },
+        ["BuildChannel_dev"] = new[] { "Local development build", "本地开发构建" },
+        ["BuildChannel_stable"] = new[] { "Stable release", "正式版" },
+        ["BuildChannel_nightly"] = new[] { "Nightly build", "每日夜间构建" },
+        ["BuildChannel_preview"] = new[] { "Preview build", "预览版" },
         ["LangAutoHint"] = new[] { "Following the OS language ({0}). Click to override.", "跟随系统语言（{0}），点击可手动切换" },
         ["LangManualHint"] = new[] { "Manual override for this session. Click again to follow the OS.", "本次运行手动指定。再点一次恢复跟随系统" },
         ["DetailsPane"] = new[] { "Details", "详细信息" },
@@ -438,6 +444,12 @@ public static class Strings
     public static string TabsMenu => Loc.T("TabsMenu");
     public static string NoClosedTabs => Loc.T("NoClosedTabs");
     public static string SwitchLanguage => Loc.T("SwitchLanguage");
+    public static string BuildChannel => Loc.T("BuildChannel");
+    public static string BuildVersion => Loc.T("BuildVersion");
+    public static string BuildChannelDev => Loc.T("BuildChannel_dev");
+    public static string BuildChannelStable => Loc.T("BuildChannel_stable");
+    public static string BuildChannelNightly => Loc.T("BuildChannel_nightly");
+    public static string BuildChannelPreview => Loc.T("BuildChannel_preview");
     public static string DetailsPane => Loc.T("DetailsPane");
     public static string ToggleDetailsPane => Loc.T("ToggleDetailsPane");
     public static string NoSelection => Loc.T("NoSelection");
