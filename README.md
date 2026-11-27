@@ -438,7 +438,11 @@ FileHub/
   S3 assumes path-style addressing. Treat them as beta and report what breaks
 - Archives are read-only in place. Editing a file inside a zip means extracting it first; the
   provider supports extraction and re-compression through the context menu, not in-place writes
-  inside the container. RAR is read-only
+  inside the container. RAR is read-only, and creating a **password-protected** archive is not
+  supported: SharpCompress can read encrypted entries but its writers have no password option, so
+  FileHub refuses rather than silently producing an unencrypted archive
+- Compressed tars (`.tar.gz`, `.tar.bz2`, `.tar.xz`) must be decompressed once to list them;
+  the snapshot is cached afterwards, so the first open of a very large one is slow
 - Quick look reads PDF page counts by scanning objects rather than following every cross-reference
   stream, so an unusual or linearised PDF can report an approximate count
 - The plugin API is early: contracts may change between minor versions, and there is no sandbox

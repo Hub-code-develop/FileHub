@@ -258,7 +258,7 @@ public sealed class ArchiveFileSystemProvider : IFileSystemProvider
             }
             else
             {
-                AddFile(snapshot, path, entry.Size, entry.Modified, entry.Key);
+                AddFile(snapshot, path, entry.Size, entry.Modified);
             }
         }
 
@@ -307,7 +307,7 @@ public sealed class ArchiveFileSystemProvider : IFileSystemProvider
     }
 
     private static void AddFile(
-        ArchiveSnapshot snapshot, string path, long size, DateTimeOffset modified, string entryKey)
+        ArchiveSnapshot snapshot, string path, long size, DateTimeOffset modified)
     {
         var separator = path.LastIndexOf('/');
         var parent = separator < 0 ? string.Empty : path[..separator];
@@ -330,8 +330,7 @@ public sealed class ArchiveFileSystemProvider : IFileSystemProvider
             Path = path,
             IsDirectory = false,
             Size = size,
-            Modified = modified,
-            EntryKey = entryKey
+            Modified = modified
         };
         snapshot.Nodes[path] = node;
 
@@ -471,8 +470,5 @@ public sealed class ArchiveFileSystemProvider : IFileSystemProvider
         public bool IsDirectory { get; init; }
         public long Size { get; set; }
         public DateTimeOffset Modified { get; set; }
-
-        /// <summary>Key as stored in the container, used when the entry is opened again.</summary>
-        public string EntryKey { get; init; } = string.Empty;
     }
 }
