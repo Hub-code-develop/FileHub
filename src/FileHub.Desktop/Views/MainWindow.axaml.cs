@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.Linq;
 using System.Windows.Input;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Threading;
 using FileHub.Code.Services;
 using FileHub.Desktop.Actions;
 using FileHub.Desktop.Controls;
@@ -51,6 +53,13 @@ public partial class MainWindow : Window
         // property of the inherited DataContext did not resolve reliably in Avalonia 12, and a
         // tab switch has to re-point it anyway.
         _shell.PropertyChanged += OnShellPropertyChanged;
+        // The palette can be opened from the keyboard, a button or a command; focus its input
+        // whenever it becomes visible, regardless of who opened it.
+        _shell.Palette.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(CommandPaletteViewModel.IsOpen) && _shell.Palette.IsOpen)
+                Dispatcher.UIThread.Post(() => PaletteBox.Focus(), DispatcherPriority.Input);
+        };
         SyncActiveTab();
 
         Vm.LoadLocations();
@@ -74,9 +83,15 @@ public partial class MainWindow : Window
     /// <summary>Points the content area, address bar and status bar at the active tab.</summary>
     private void SyncActiveTab()
     {
-        if (_boundTab is not null) _boundTab.PropertyChanged -= OnTabPropertyChanged;
+        if (_boundTab is not null)
+        {
+            _boundTab.PropertyChanged -= OnTabPropertyChanged;
+            _boundTab.Locations.CollectionChanged -= OnLocationsChanged;
+        }
         _boundTab = _shell.ActiveTab;
         _boundTab.PropertyChanged += OnTabPropertyChanged;
+        // Adding a network location must show up immediately, not after a restart.
+        _boundTab.Locations.CollectionChanged += OnLocationsChanged;
 
         // These three regions bind against the tab itself. Assigning DataContext here (instead of
         // a XAML "ActiveTab.X" path on the window-level DataContext) keeps every nested binding
@@ -152,6 +167,9 @@ public partial class MainWindow : Window
     /// header, compact rows and a footer item. FANavigationView cannot reproduce that layout,
     /// so the library's SidebarItem equivalent (FileHub.Desktop.Controls.SidebarItem) is used.
     /// </summary>
+    private void OnLocationsChanged(object? sender, NotifyCollectionChangedEventArgs e)
+        => BuildNavigation(Vm.Locations);
+
     private void BuildNavigation(IEnumerable<LocationEntry> locations)
     {
         var quick = locations.Where(x => x.Kind == LocationKind.QuickAccess).ToArray();
@@ -213,8 +231,10 @@ public partial class MainWindow : Window
     private FAMenuFlyout CreateContextMenu()
     {
         var flyout = new FAMenuFlyout();
-        foreach (var command in _shell.Commands.ContextCommands)
+        var commands = _shell.Commands.ContextCommands.ToList();
+        for (var i = 0; i < commands.Count; i++)
         {
+            var command = commands[i];
             flyout.Items.Add(new FAMenuFlyoutItem
             {
                 Text = command.Label,
@@ -223,6 +243,28 @@ public partial class MainWindow : Window
                 CommandParameter = command.Parameter
             });
         }
+
+        // Archive and batch operations are tab methods rather than CommandManager entries, so
+        // they are appended here and resolve the active tab at invoke time.
+        flyout.Items.Add(new FAMenuFlyoutSeparator());
+        flyout.Items.Add(new FAMenuFlyoutItem
+        {
+            Text = Loc.T("Compress"),
+            IconSource = new FASymbolIconSource { Symbol = FASymbol.ZipFolder, FontSize = 16 },
+            Command = new RelayCommand(_ => _ = Vm.CompressSelectionAsync())
+        });
+        flyout.Items.Add(new FAMenuFlyoutItem
+        {
+            Text = Loc.T("Extract"),
+            IconSource = new FASymbolIconSource { Symbol = FASymbol.OpenFile, FontSize = 16 },
+            Command = new RelayCommand(_ => _ = Vm.ExtractArchiveAsync())
+        });
+        flyout.Items.Add(new FAMenuFlyoutItem
+        {
+            Text = Loc.T("BatchRename"),
+            IconSource = new FASymbolIconSource { Symbol = FASymbol.Edit, FontSize = 16 },
+            Command = new RelayCommand(_ => _ = Vm.OpenBatchRenameAsync())
+        });
         return flyout;
     }
 
@@ -452,6 +494,12 @@ public partial class MainWindow : Window
         _ = Vm.DropIntoAsync(paths, location.Path, copy);
     }
 
+    private void OpenPalette()
+    {
+        _shell.Palette.Open();
+        Dispatcher.UIThread.Post(() => PaletteBox.Focus(), DispatcherPriority.Input);
+    }
+
     private void OnAddressKeyDown(object? sender, KeyEventArgs args)
     {
         if (args.Key == Key.Enter)
@@ -482,8 +530,64 @@ public partial class MainWindow : Window
 
     private void OnWindowKeyDown(object? sender, KeyEventArgs args)
     {
+        // Overlays own the keyboard while they are open, including keys that would otherwise be
+        // swallowed by the palette's own text box.
+        if (_shell.Palette.IsOpen)
+        {
+            switch (args.Key)
+            {
+                case Key.Escape:
+                    _shell.Palette.Close();
+                    args.Handled = true;
+                    break;
+                case Key.Enter:
+                    _ = _shell.Palette.ExecuteSelectedAsync();
+                    args.Handled = true;
+                    break;
+                case Key.Down:
+                    _shell.Palette.MoveSelection(1);
+                    args.Handled = true;
+                    break;
+                case Key.Up:
+                    _shell.Palette.MoveSelection(-1);
+                    args.Handled = true;
+                    break;
+            }
+            return;
+        }
+
+        if (_shell.QuickLook.IsOpen)
+        {
+            switch (args.Key)
+            {
+                case Key.Escape:
+                case Key.Space:
+                    _shell.QuickLook.Close();
+                    break;
+                case Key.Right:
+                case Key.Down:
+                    _ = _shell.QuickLookStepAsync(1);
+                    break;
+                case Key.Left:
+                case Key.Up:
+                    _ = _shell.QuickLookStepAsync(-1);
+                    break;
+            }
+            args.Handled = true;
+            return;
+        }
+
         // Do not steal shortcuts while typing in a text box.
         if (args.Source is TextBox) return;
+
+        // Command palette must work on every page, before any file-manager shortcut.
+        if ((args.KeyModifiers.HasFlag(KeyModifiers.Control) || args.KeyModifiers.HasFlag(KeyModifiers.Meta))
+            && args.KeyModifiers.HasFlag(KeyModifiers.Shift) && args.Key == Key.P)
+        {
+            OpenPalette();
+            args.Handled = true;
+            return;
+        }
 
         var workspaceCtrl = args.KeyModifiers.HasFlag(KeyModifiers.Control) ||
                             args.KeyModifiers.HasFlag(KeyModifiers.Meta);
@@ -559,6 +663,7 @@ public partial class MainWindow : Window
             case Key.Delete: _shell.Commands.Execute(CommandCodes.Delete); args.Handled = true; break;
             case Key.Back: _shell.Commands.Execute(CommandCodes.GoUp); args.Handled = true; break;
             case Key.Enter: _shell.Commands.Execute(CommandCodes.OpenSelected); args.Handled = true; break;
+            case Key.Space: _ = _shell.ToggleQuickLookAsync(); args.Handled = true; break;
             case Key.Escape: Vm.ClearSearchCommand.Execute(null); args.Handled = true; break;
         }
     }

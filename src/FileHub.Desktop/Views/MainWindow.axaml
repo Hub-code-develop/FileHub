@@ -81,7 +81,7 @@
     <t:FilesNavigationToolbar x:Name="NavToolbar" Grid.Row="1" />
 
     <!-- Row 2: SidebarView + InnerContent (Files MainPage Grid.Row=2) -->
-    <Grid Grid.Row="2" ColumnDefinitions="Auto,Auto,*">
+    <Grid Grid.Row="2" ColumnDefinitions="Auto,Auto,*,Auto,*">
 
       <!-- Sidebar: Files App SidebarView.xaml, ported as Views/Controls/FilesSidebar.axaml. -->
       <t:FilesSidebar x:Name="Sidebar" Grid.Column="0" />
@@ -127,9 +127,178 @@
         <t:ExtensionsPage IsVisible="{Binding IsExtensionsPageOpen}" />
         <t:OfficePage IsVisible="{Binding IsOfficePageOpen}" />
       </Grid>
+
+      <!-- Dual pane: a second folder with its own path, history, selection and drag targets.
+           Kept at window level (not inside InnerContent) because InnerContent's DataContext is
+           the active tab, and these bindings must resolve against the shell. -->
+      <GridSplitter Grid.Column="3" Width="3" Background="Transparent"
+                    ResizeDirection="Columns" IsVisible="{Binding IsDualPaneOpen}" />
+
+      <Grid Grid.Column="4" RowDefinitions="Auto,*" IsVisible="{Binding IsDualPaneOpen}"
+            Margin="8,8,8,8">
+        <Border Grid.Row="0" Padding="10,6" CornerRadius="6,6,0,0"
+                Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}">
+          <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+            <Button Grid.Column="0" Classes="tabAction" Content="&#x2191;"
+                    ToolTip.Tip="{x:Static loc:Strings.Up}"
+                    Command="{Binding SecondPane.GoUpCommand}"
+                    IsEnabled="{Binding SecondPane.CanGoUp}" />
+            <TextBlock Grid.Column="1" Margin="8,0" VerticalAlignment="Center" FontSize="12"
+                       TextTrimming="CharacterEllipsis"
+                       Text="{Binding SecondPane.CurrentPath}" />
+            <Button Grid.Column="2" Classes="tabAction" Content="&#x21bb;"
+                    ToolTip.Tip="{x:Static loc:Strings.Refresh}"
+                    Command="{Binding SecondPane.RefreshCommand}" />
+            <Button Grid.Column="3" Classes="tabAction" Content="&#x2715;"
+                    ToolTip.Tip="{x:Static loc:Strings.DlgClose}"
+                    Command="{Binding ToggleDualPaneCommand}" />
+          </Grid>
+        </Border>
+        <t:DetailsLayoutPage Grid.Row="1" DataContext="{Binding SecondPane}" />
+      </Grid>
     </Grid>
 
     <!-- Row 3: Files App StatusBar.xaml (MinHeight 32, 1x18 dividers). -->
     <t:FilesStatusBar x:Name="StatusBar" Grid.Row="3" />
+
+    <!-- ================= Overlays (drawn above every row) ================= -->
+
+    <!-- Transfer queue: bottom-right card, same position Files uses for its operations flyout. -->
+    <Border Grid.RowSpan="4" HorizontalAlignment="Right" VerticalAlignment="Bottom"
+            Margin="0,0,20,46" Width="372" MaxHeight="340"
+            IsVisible="{Binding IsTransferPaneOpen}"
+            Background="{DynamicResource SystemControlBackgroundAltHighBrush}"
+            BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+            BorderThickness="1" CornerRadius="8" BoxShadow="0 8 24 0 #33000000">
+      <Grid RowDefinitions="Auto,*">
+        <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto" Margin="12,10,8,6">
+          <TextBlock Grid.Column="0" Text="{x:Static loc:Strings.TransfersTitle}"
+                     FontWeight="SemiBold" VerticalAlignment="Center" />
+          <Button Grid.Column="1" Classes="tabAction" Content="&#x2713;"
+                  ToolTip.Tip="{x:Static loc:Strings.TransfersClear}"
+                  Command="{Binding ClearTransfersCommand}" />
+          <Button Grid.Column="2" Classes="tabAction" Content="&#x2715;"
+                  Command="{Binding ToggleTransferPaneCommand}" />
+        </Grid>
+        <ScrollViewer Grid.Row="1" MaxHeight="280" Margin="8,0,8,8">
+          <ItemsControl ItemsSource="{Binding Transfers.Jobs}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Grid RowDefinitions="Auto,Auto" Margin="4,4">
+                  <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto">
+                    <TextBlock Grid.Column="0" Text="{Binding Title}" FontSize="12"
+                               TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="1" Text="{Binding StatusText}" FontSize="11"
+                               Opacity="0.7" Margin="8,0" VerticalAlignment="Center" />
+                    <Button Grid.Column="2" Classes="tabAction" Content="&#x2715;" FontSize="10"
+                            Command="{Binding $parent[Window].DataContext.CancelJobCommand}"
+                            CommandParameter="{Binding}" />
+                  </Grid>
+                  <ProgressBar Grid.Row="1" Minimum="0" Maximum="1" Height="3"
+                               Value="{Binding Fraction}" Margin="0,4,0,0" />
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </ScrollViewer>
+      </Grid>
+    </Border>
+
+    <!-- Quick look: Space opens a full-window preview without touching the folder. -->
+    <Grid Grid.RowSpan="4" IsVisible="{Binding QuickLook.IsOpen}" Background="#B3000000">
+      <Border Width="920" Height="660" CornerRadius="10" Padding="0"
+              Background="{DynamicResource SystemControlBackgroundAltHighBrush}"
+              BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+              BorderThickness="1" BoxShadow="0 12 40 0 #55000000">
+        <Grid RowDefinitions="Auto,*,Auto">
+          <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto" Margin="18,14,10,10">
+            <StackPanel Grid.Column="0" Spacing="2">
+              <TextBlock Text="{Binding QuickLook.Title}" FontSize="15" FontWeight="SemiBold"
+                         TextTrimming="CharacterEllipsis" />
+              <TextBlock Text="{Binding QuickLook.Subtitle}" FontSize="11" Opacity="0.7" />
+            </StackPanel>
+            <TextBlock Grid.Column="1" Text="{Binding QuickLook.CounterText}" FontSize="11"
+                       Opacity="0.6" VerticalAlignment="Center" Margin="8,0" />
+            <Button Grid.Column="2" Classes="tabAction" Content="&#x2715;"
+                    Command="{Binding ToggleQuickLookCommand}" />
+          </Grid>
+
+          <Border Grid.Row="1" Margin="18,0,18,0" Background="{DynamicResource SystemControlBackgroundBaseLowBrush}"
+                  CornerRadius="6">
+            <Grid>
+              <Image Source="{Binding QuickLook.Image}" Stretch="Uniform" Margin="8"
+                     IsVisible="{Binding QuickLook.HasImage}" />
+              <ScrollViewer IsVisible="{Binding QuickLook.HasText}" Padding="14">
+                <SelectableTextBlock Text="{Binding QuickLook.Text}" FontFamily="Menlo,Consolas,monospace"
+                                     FontSize="12" TextWrapping="Wrap" />
+              </ScrollViewer>
+              <StackPanel IsVisible="{Binding QuickLook.IsIconOnly}" VerticalAlignment="Center"
+                          HorizontalAlignment="Center" Spacing="8">
+                <ui:FASymbolIcon Symbol="Page" FontSize="40" HorizontalAlignment="Center" />
+                <TextBlock Text="{x:Static loc:Strings.QuickLookNoPreview}" FontSize="12" Opacity="0.7"
+                           HorizontalAlignment="Center" />
+              </StackPanel>
+              <ProgressBar IsIndeterminate="True" Height="3" VerticalAlignment="Top"
+                           IsVisible="{Binding QuickLook.IsLoading}" />
+            </Grid>
+          </Border>
+
+          <StackPanel Grid.Row="2" Margin="18,10,18,14" Spacing="4">
+            <TextBlock Text="{Binding QuickLook.Notice}" IsVisible="{Binding QuickLook.HasNotice}"
+                       FontSize="11" Foreground="{DynamicResource SystemControlForegroundCautionMediumBrush}" />
+            <TextBlock Text="{Binding QuickLook.PathText}" FontSize="11" Opacity="0.6"
+                       TextTrimming="CharacterEllipsis" />
+            <ItemsControl ItemsSource="{Binding QuickLook.Fields}" IsVisible="{Binding QuickLook.HasFields}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <WrapPanel />
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <StackPanel Orientation="Horizontal" Margin="0,0,18,0" Spacing="4">
+                    <TextBlock Text="{Binding Label}" FontSize="11" Opacity="0.6" />
+                    <TextBlock Text="{Binding Value}" FontSize="11" />
+                  </StackPanel>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </Grid>
+      </Border>
+    </Grid>
+
+    <!-- Command palette: Ctrl+Shift+P, filtered as you type, Enter runs the selection. -->
+    <Grid Grid.RowSpan="4" IsVisible="{Binding Palette.IsOpen}" Background="#66000000">
+      <Border Width="640" VerticalAlignment="Top" Margin="0,110,0,0" CornerRadius="8"
+              Background="{DynamicResource SystemControlBackgroundAltHighBrush}"
+              BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+              BorderThickness="1" BoxShadow="0 12 36 0 #55000000">
+        <Grid RowDefinitions="Auto,*,Auto">
+          <TextBox x:Name="PaletteBox" Grid.Row="0" Margin="10,10,10,6"
+                   Text="{Binding Palette.Query, Mode=TwoWay}"
+                   PlaceholderText="{x:Static loc:Strings.PalettePlaceholder}" />
+          <ListBox x:Name="PaletteList" Grid.Row="1" Margin="6,0,6,4" MaxHeight="380"
+                   Background="Transparent"
+                   ItemsSource="{Binding Palette.Results}"
+                   SelectedItem="{Binding Palette.SelectedItem, Mode=TwoWay}">
+            <ListBox.ItemTemplate>
+              <DataTemplate>
+                <Grid ColumnDefinitions="*,Auto" Margin="2,1">
+                  <TextBlock Grid.Column="0" Text="{Binding Title}" FontSize="13"
+                             VerticalAlignment="Center" />
+                  <TextBlock Grid.Column="1" Text="{Binding Category}" FontSize="11" Opacity="0.6"
+                             VerticalAlignment="Center" />
+                </Grid>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+          <TextBlock Grid.Row="1" Text="{x:Static loc:Strings.PaletteEmpty}"
+                     IsVisible="{Binding Palette.IsEmpty}" Margin="16,8,16,20" Opacity="0.6" />
+          <TextBlock Grid.Row="2" Text="{x:Static loc:Strings.PaletteHint}" FontSize="11"
+                     Opacity="0.55" Margin="14,0,14,10" />
+        </Grid>
+      </Border>
+    </Grid>
   </Grid>
 </Window>

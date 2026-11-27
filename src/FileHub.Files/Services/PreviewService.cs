@@ -5,6 +5,7 @@
 
 using System.Text;
 using FileHub.Files.Models;
+using FileHub.Files.Vfs;
 
 namespace FileHub.Files.Services;
 
@@ -58,6 +59,11 @@ public static class PreviewService
     public static Task<string?> ReadTextPreviewAsync(
         string path, int maxCharacters = 4000, CancellationToken cancellationToken = default)
     {
+        if (VfsPath.IsVirtualPath(path))
+        {
+            return ReadFromProviderAsync(path, maxCharacters, cancellationToken);
+        }
+
         return Task.Run(() =>
         {
             try
@@ -66,15 +72,7 @@ public static class PreviewService
                     FileShare.ReadWrite, 8192, FileOptions.SequentialScan);
                 var buffer = new byte[8192];
                 var read = stream.Read(buffer, 0, buffer.Length);
-                if (read <= 0) return null;
-
-                // A NUL byte in the sampled window is a reliable enough binary signal.
-                if (Array.IndexOf(buffer, (byte)0, 0, read) >= 0) return null;
-
-                var text = new UTF8Encoding(false, false).GetString(buffer, 0, read)
-                    .TrimStart('\uFEFF');
-                if (text.Length > maxCharacters) text = text[..maxCharacters] + "\n...";
-                return text.Length == 0 ? null : text;
+                return Decode(buffer, read, maxCharacters);
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException
                                            or ArgumentException or NotSupportedException)
@@ -82,5 +80,34 @@ public static class PreviewService
                 return null;
             }
         }, cancellationToken);
+    }
+
+    private static async Task<string?> ReadFromProviderAsync(
+        string path, int maxCharacters, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using var stream = await VfsFileSystem.Default.OpenReadAsync(path, cancellationToken)
+                .ConfigureAwait(false);
+            var buffer = new byte[8192];
+            var read = await stream.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
+            return Decode(buffer, read, maxCharacters);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException
+                                       or NotSupportedException or ArgumentException)
+        {
+            return null;
+        }
+    }
+
+    private static string? Decode(byte[] buffer, int read, int maxCharacters)
+    {
+        if (read <= 0) return null;
+        // A NUL byte in the sampled window is a reliable enough binary signal.
+        if (Array.IndexOf(buffer, (byte)0, 0, read) >= 0) return null;
+
+        var text = new UTF8Encoding(false, false).GetString(buffer, 0, read).TrimStart('\uFEFF');
+        if (text.Length > maxCharacters) text = text[..maxCharacters] + "\n...";
+        return text.Length == 0 ? null : text;
     }
 }

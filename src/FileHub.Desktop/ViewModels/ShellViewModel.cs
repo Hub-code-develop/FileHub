@@ -10,11 +10,14 @@ using System.Windows.Input;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Threading;
 using FileHub.Code.Services;
 using FileHub.Desktop.Actions;
 using FileHub.Desktop.Services;
 using FileHub.Desktop.Views;
+using FileHub.Files.Plugin;
 using FileHub.Files.Services;
+using FileHub.Files.Vfs;
 
 namespace FileHub.Desktop.ViewModels;
 
@@ -45,6 +48,11 @@ public sealed class ShellViewModel : ViewModelBase
     private CodeEditorViewModel? _codeEditor;
     private ExtensionsViewModel? _extensions;
     private OfficeViewModel? _office;
+    private QuickLookViewModel? _quickLook;
+    private CommandPaletteViewModel? _palette;
+    private MainViewModel? _secondPane;
+    private bool _isTransferPaneOpen;
+    private bool _isDualPaneOpen;
 
     /// <summary>Paths of the most recently closed tabs, newest first (Files: reopen closed tab).</summary>
     private readonly List<string> _closedTabPaths = [];
@@ -75,8 +83,65 @@ public sealed class ShellViewModel : ViewModelBase
             (Application.Current as App)?.RestartMainWindow();
         });
 
+        // Transfers report progress from a worker thread; marshal every property change.
+        Transfers = new TransferQueue(action => Dispatcher.UIThread.Post(action))
+        {
+            ConflictResolver = ResolveConflictAsync
+        };
+        Undo = new UndoService();
+
+        ToggleTransferPaneCommand = new RelayCommand(_ => IsTransferPaneOpen = !IsTransferPaneOpen);
+        ToggleDualPaneCommand = new RelayCommand(_ => ToggleDualPane());
+        ToggleQuickLookCommand = new RelayCommand(_ => _ = ToggleQuickLookAsync());
+        OpenPaletteCommand = new RelayCommand(_ => Palette.Open());
+        UndoCommand = new RelayCommand(_ => _ = StepUndoAsync(undo: true));
+        RedoCommand = new RelayCommand(_ => _ = StepUndoAsync(undo: false));
+        CancelJobCommand = new RelayCommand(p =>
+        {
+            if (p is TransferJob job) Transfers.Cancel(job);
+        });
+        PauseJobCommand = new RelayCommand(p =>
+        {
+            if (p is not TransferJob job) return;
+            if (job.State == TransferJobState.Paused) Transfers.Resume(job);
+            else Transfers.Pause(job);
+        });
+        ClearTransfersCommand = new RelayCommand(_ => Transfers.ClearFinished());
+
         Commands = new CommandManager(this);
+        PluginHost.Instance.Load();
+        WatchRuleService.Instance.Start();
     }
+
+    public TransferQueue Transfers { get; }
+    public UndoService Undo { get; }
+    public QuickLookViewModel QuickLook => _quickLook ??= new QuickLookViewModel();
+    public CommandPaletteViewModel Palette => _palette ??= new CommandPaletteViewModel(BuildPaletteItems);
+
+    public bool IsTransferPaneOpen
+    {
+        get => _isTransferPaneOpen;
+        set => Set(ref _isTransferPaneOpen, value);
+    }
+
+    public bool IsDualPaneOpen
+    {
+        get => _isDualPaneOpen;
+        private set
+        {
+            if (Set(ref _isDualPaneOpen, value)) OnPropertyChanged(nameof(IsFilesAreaVisible));
+        }
+    }
+
+    /// <summary>Secondary folder pane; created on first use and kept afterwards.</summary>
+    public MainViewModel? SecondPane
+    {
+        get => _secondPane;
+        private set => Set(ref _secondPane, value);
+    }
+
+    public bool IsFilesAreaVisible => !IsWorkspacePageOpen;
+
 
     public ObservableCollection<MainViewModel> Tabs { get; } = [];
 
@@ -118,6 +183,15 @@ public sealed class ShellViewModel : ViewModelBase
     public ICommand OpenExtensionsCommand { get; }
     public ICommand OpenOfficeCommand { get; }
     public ICommand CloseWorkspacePageCommand { get; }
+    public ICommand ToggleTransferPaneCommand { get; }
+    public ICommand ToggleDualPaneCommand { get; }
+    public ICommand ToggleQuickLookCommand { get; }
+    public ICommand OpenPaletteCommand { get; }
+    public ICommand UndoCommand { get; }
+    public ICommand RedoCommand { get; }
+    public ICommand CancelJobCommand { get; }
+    public ICommand PauseJobCommand { get; }
+    public ICommand ClearTransfersCommand { get; }
 
     /// <summary>Full-area overlay: Files, the Monaco editor, or the VS Code extensions page.</summary>
     public WorkspacePageKind WorkspacePage
@@ -163,23 +237,187 @@ public sealed class ShellViewModel : ViewModelBase
     /// </summary>
     public async Task OpenFileAsync(string path)
     {
-        if (FileHub.Office.Services.OfficeDocumentService.IsOfficeFile(path))
+        // Entries inside an archive or on a server have no local file handle: materialize a
+        // temporary copy so the Office page, Monaco and the OS handler all work unchanged.
+        var localPath = await MaterializeAsync(path).ConfigureAwait(true);
+
+        if (FileHub.Office.Services.OfficeDocumentService.IsOfficeFile(localPath))
         {
-            await OpenOfficeFileAsync(path);
+            await OpenOfficeFileAsync(localPath);
             return;
         }
-        if (FileHub.Code.Services.CodeLanguageService.IsCodeFile(path))
+        if (FileHub.Code.Services.CodeLanguageService.IsCodeFile(localPath))
         {
-            await OpenCodeFileAsync(path);
+            await OpenCodeFileAsync(localPath);
             return;
         }
-        await Task.Run(() => Process.Start(new ProcessStartInfo(path) { UseShellExecute = true }));
+        await Task.Run(() => Process.Start(new ProcessStartInfo(localPath) { UseShellExecute = true }));
+    }
+
+    /// <summary>
+    /// Returns a local path for a virtual entry, copying it to the temp folder on first use.
+    /// Local paths are returned untouched.
+    /// </summary>
+    public static async Task<string> MaterializeAsync(string path)
+    {
+        if (!VfsPath.IsVirtualPath(path)) return path;
+
+        var name = VfsPath.Parse(path).FileName;
+        if (string.IsNullOrWhiteSpace(name)) name = "entry";
+        var folder = Path.Combine(Path.GetTempPath(), "FileHub", "open");
+        Directory.CreateDirectory(folder);
+        var target = Path.Combine(folder, name);
+
+        // Overwrite so edits in a viewer do not accumulate "file (1).docx" copies.
+        await VfsFileSystem.Default.CopyAsync([path], folder, VfsConflictPolicy.Overwrite)
+            .ConfigureAwait(false);
+        return target;
     }
 
     public void CloseWorkspacePage()
     {
         WorkspacePage = WorkspacePageKind.Files;
     }
+
+    /// <summary>
+    /// Opens or closes the second folder pane. The second pane owns an independent path,
+    /// selection and history, so a drag between the two is an ordinary VFS transfer.
+    /// </summary>
+    public void ToggleDualPane()
+    {
+        if (!IsDualPaneOpen)
+        {
+            if (SecondPane is null)
+            {
+                var pane = new MainViewModel(CreateUiServices()) { Shell = this };
+                pane.RaiseDetailsPaneChanged();
+                SecondPane = pane;
+                _ = pane.InitializeAsync();
+            }
+            IsDualPaneOpen = true;
+            return;
+        }
+        IsDualPaneOpen = false;
+    }
+
+    /// <summary>Space toggles quick look for the focused entry; Space again closes it.</summary>
+    public async Task ToggleQuickLookAsync()
+    {
+        if (QuickLook.IsOpen)
+        {
+            QuickLook.Close();
+            return;
+        }
+        var tab = ActiveTab;
+        var entry = tab.PrimarySelection ?? tab.Entries.FirstOrDefault();
+        if (entry is null) return;
+        await QuickLook.ShowAsync(tab.Entries.ToList(), entry).ConfigureAwait(true);
+    }
+
+    public async Task QuickLookStepAsync(int delta)
+    {
+        if (!QuickLook.IsOpen) return;
+        if (delta > 0) await QuickLook.NextAsync().ConfigureAwait(true);
+        else await QuickLook.PreviousAsync().ConfigureAwait(true);
+        SyncQuickLookSelection();
+    }
+
+    /// <summary>Keeps the list selection in step with the quick look page.</summary>
+    private void SyncQuickLookSelection()
+    {
+        if (!QuickLook.IsOpen || string.IsNullOrEmpty(QuickLook.PathText)) return;
+        var match = ActiveTab.Entries.FirstOrDefault(x =>
+            string.Equals(x.FullPath, QuickLook.PathText, StringComparison.OrdinalIgnoreCase));
+        if (match is not null) ActiveTab.SetSelection([match]);
+    }
+
+    private async Task StepUndoAsync(bool undo)
+    {
+        try
+        {
+            var operation = undo
+                ? await Undo.UndoAsync().ConfigureAwait(true)
+                : await Undo.RedoAsync().ConfigureAwait(true);
+            if (operation is null) return;
+            OnPropertyChanged(nameof(UndoLabel));
+            foreach (var tab in Tabs) await tab.RefreshAsync().ConfigureAwait(true);
+            if (SecondPane is not null) await SecondPane.RefreshAsync().ConfigureAwait(true);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException)
+        {
+            ActiveTab.ShowInfo(Loc.T("MsgOperationFailed"), ex.Message, FluentAvalonia.UI.Controls.FAInfoBarSeverity.Error);
+        }
+    }
+
+    public string UndoLabel => Undo.CanUndo ? $"Undo {Undo.UndoTitle}" : "Nothing to undo";
+    public string RedoLabel => Undo.CanRedo ? $"Redo {Undo.RedoTitle}" : "Nothing to redo";
+
+    private Task<VfsConflictAnswer> ResolveConflictAsync(string targetPath)
+    {
+        var window = CurrentWindow();
+        if (window is null) return Task.FromResult(VfsConflictAnswer.KeepBoth);
+        return Dispatcher.UIThread.InvokeAsync(() => TransferConflictDialog.AskAsync(window, targetPath));
+    }
+
+    /// <summary>Every palette entry. Keywords are space separated so "hide files" finds the toggle.</summary>
+    private IReadOnlyList<PaletteItem> BuildPaletteItems()
+    {
+        var tab = ActiveTab;
+        var items = new List<PaletteItem>
+        {
+            new PaletteItem("New tab", "Tabs", "tab add new", () => { AddTab(); return Task.CompletedTask; }),
+            new PaletteItem("Close tab", "Tabs", "tab close remove", () => { CloseActiveTab(); return Task.CompletedTask; }),
+            new PaletteItem("Duplicate tab", "Tabs", "tab copy duplicate", () => { DuplicateActiveTab(); return Task.CompletedTask; }),
+            new PaletteItem("Reopen closed tab", "Tabs", "tab restore undo close", () => { ReopenClosedTab(); return Task.CompletedTask; }),
+            new PaletteItem("Go to home folder", "Navigate", "home folder navigate", () => tab.NavigateAsync(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile))),
+            new PaletteItem("Go to downloads", "Navigate", "downloads folder navigate", () => tab.NavigateAsync(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads"))),
+            new PaletteItem("Go to documents", "Navigate", "documents folder navigate", () => tab.NavigateAsync(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments))),
+            new PaletteItem("Go up one level", "Navigate", "up parent folder", () => { tab.GoUpCommand.Execute(null); return Task.CompletedTask; }),
+            new PaletteItem("Refresh", "View", "reload refresh f5", () => { tab.RefreshCommand.Execute(null); return Task.CompletedTask; }),
+            new PaletteItem("Toggle details / grid view", "View", "layout icons grid list", () => { tab.ToggleViewCommand.Execute(null); return Task.CompletedTask; }),
+            new PaletteItem("Toggle hidden files", "View", "hidden dotfiles show", () => { tab.ToggleHiddenCommand.Execute(null); return Task.CompletedTask; }),
+            new PaletteItem("Toggle sidebar", "View", "sidebar panel left", () => { ToggleSidebarCommand.Execute(null); return Task.CompletedTask; }),
+            new PaletteItem("Toggle details pane", "View", "preview pane right inspector", () => { ToggleDetailsPaneCommand.Execute(null); return Task.CompletedTask; }),
+            new PaletteItem("Toggle dual pane", "View", "split two panes side by side compare", () => { ToggleDualPane(); return Task.CompletedTask; }),
+            new PaletteItem("Toggle transfer panel", "View", "copy queue progress transfers", () => { IsTransferPaneOpen = !IsTransferPaneOpen; return Task.CompletedTask; }),
+            new PaletteItem("Toggle theme", "View", "dark light system appearance", () => { ToggleThemeCommand.Execute(null); return Task.CompletedTask; }),
+            new PaletteItem("New folder", "File", "create directory mkdir", () => { tab.NewFolderCommand.Execute(null); return Task.CompletedTask; }),
+            new PaletteItem("Rename", "File", "rename f2 name", () => { tab.RenameCommand.Execute(null); return Task.CompletedTask; }),
+            new PaletteItem("Batch rename", "File", "batch bulk rename pattern regex", () => tab.OpenBatchRenameAsync()),
+            new PaletteItem("Delete to recycle bin", "File", "delete trash remove", () => { tab.DeleteCommand.Execute(null); return Task.CompletedTask; }),
+            new PaletteItem("Copy path", "File", "clipboard path copy", () => { tab.CopyPathCommand.Execute(null); return Task.CompletedTask; }),
+            new PaletteItem("Reveal in system file manager", "File", "finder explorer reveal", () => { tab.RevealCommand.Execute(null); return Task.CompletedTask; }),
+            new PaletteItem("Compress selection", "Archive", "zip compress archive create", () => tab.CompressSelectionAsync()),
+            new PaletteItem("Extract archive here", "Archive", "unzip extract here archive", () => tab.ExtractArchiveAsync()),
+            new PaletteItem("Add network location", "Network", "remote mount smb sftp webdav s3 server", () => tab.AddRemoteLocationAsync()),
+            new PaletteItem("Deep search in this folder", "Search", "find recursive search grep", () => { tab.DeepSearchCommand.Execute(null); return Task.CompletedTask; }),
+            new PaletteItem("Undo", "Edit", "undo revert", () => StepUndoAsync(true)),
+            new PaletteItem("Redo", "Edit", "redo repeat", () => StepUndoAsync(false)),
+            new PaletteItem("Open code editor", "Workspace", "monaco code editor source", () => { WorkspacePage = WorkspacePageKind.Code; return Task.CompletedTask; }),
+            new PaletteItem("Open office workspace", "Workspace", "word excel powerpoint docx xlsx pptx", () => { WorkspacePage = WorkspacePageKind.Office; return Task.CompletedTask; }),
+            new PaletteItem("Open extensions", "Workspace", "vs code extensions marketplace", () => { WorkspacePage = WorkspacePageKind.Extensions; return Task.CompletedTask; }),
+            new PaletteItem("Close workspace page", "Workspace", "back to files escape", () => { CloseWorkspacePage(); return Task.CompletedTask; })
+        };
+
+        // Plugin contributions are appended so a third-party command sits beside the built-ins.
+        foreach (var command in PluginHost.Instance.Commands)
+        {
+            var captured = command;
+            items.Add(new PaletteItem(captured.Title, captured.Category, captured.Keywords,
+                () => captured.Execute(new PluginCommandContext
+                {
+                    CurrentPath = tab.CurrentPath,
+                    SelectedPaths = tab.SelectedEntries.Select(x => x.FullPath).ToList(),
+                    NavigateAsync = path => tab.NavigateAsync(path),
+                    Report = (title, message) =>
+                        tab.ShowInfo(title, message,
+                            FluentAvalonia.UI.Controls.FAInfoBarSeverity.Informational)
+                })));
+        }
+
+        return items;
+    }
+
 
     /// <summary>Forwarded so the tab-strip footer can switch theme without reaching into a tab.</summary>
     public ICommand ToggleThemeCommand => ActiveTab.ToggleThemeCommand;
@@ -188,6 +426,12 @@ public sealed class ShellViewModel : ViewModelBase
     {
         if (Tabs.Count == 0)
         {
+            // A path passed by the shell or a filehub:// link wins over the restored session.
+            if (Program.StartupPath is { Length: > 0 } startup)
+            {
+                AddTab(startup);
+                return ActiveTab;
+            }
             var paths = LoadSession();
             if (paths.Count > 0)
             {

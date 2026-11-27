@@ -1,0 +1,17 @@
+SMBLibrary
+==========
+
+Copyright (c) 2018 Tal Aloni
+Project: https://github.com/TalAloni/SMBLibrary
+Package: SMBLibrary 1.5.8.1 (nuget.org)
+
+License: GNU Lesser General Public License v3.0 or later (LGPL-3.0-or-later)
+Full text: https://www.gnu.org/licenses/lgpl-3.0.txt
+           https://licenses.nuget.org/LGPL-3.0-or-later
+
+FileHub uses SMBLibrary unmodified, as a separate dynamically loaded assembly, to browse
+SMB2/3 shares. It is not linked into FileHub's own assemblies, so you may replace
+SMBLibrary.dll next to the FileHub executable with your own build of the library.
+
+Corresponding source for version 1.5.8.1: the project URL above (tag 1.5.8.1), or the
+SMBLibrary package on nuget.org.

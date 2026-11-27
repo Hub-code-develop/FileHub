@@ -1,4 +1,5 @@
 using FileHub.Files.Services;
+using FileHub.Files.Vfs;
 
 namespace FileHub.Files.Models;
 
@@ -11,6 +12,9 @@ public sealed class FileEntry
     public bool IsHidden { get; init; }
     public long Size { get; init; }
     public DateTimeOffset LastWriteTime { get; init; }
+
+    /// <summary>True when FullPath addresses an archive or remote location, not a local file.</summary>
+    public bool IsVirtual => VfsPath.IsVirtualPath(FullPath);
 
     public string Extension => IsDirectory ? string.Empty : Path.GetExtension(Name);
 

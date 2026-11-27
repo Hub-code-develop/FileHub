@@ -400,6 +400,59 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
+## SharpCompress (archive provider)
+
+- **Project:** https://github.com/adamhathcock/sharpcompress
+- **Package:** `SharpCompress` 0.50.4 (NuGet)
+- **License:** The MIT License (MIT)
+- **Copyright:** Copyright (c) 2014 Adam Hathcock
+- **Status:** **Binary dependency**, used unmodified.
+
+Used by `src/FileHub.Files/Vfs/ArchiveFileSystemProvider.cs` and
+`src/FileHub.Files/Services/ArchiveService.cs` to browse zip / tar / tar.gz / bz2 / xz / 7z / rar
+archives as folders and to create or extract archives. No archive handling code was copied from
+the project; only its public API is called. 7z and rar reading is managed code, so archives work
+on every supported platform with no extra native runtime.
+
+## SSH.NET (SFTP provider)
+
+- **Project:** https://github.com/sshnet/SSH.NET
+- **Package:** `SSH.NET` 2026.0.1 (NuGet)
+- **License:** The MIT License (MIT)
+- **Copyright:** Copyright (c) 2008-2026 Renci
+- **Status:** **Binary dependency**, used unmodified.
+
+Used by `src/FileHub.Files/Vfs/SftpFileSystemProvider.cs` for SFTP browsing, download and upload.
+Host keys are **not** verified against `known_hosts`; this is a documented trade-off, not an
+oversight, and it means SFTP is not protection against a man-in-the-middle attack on an untrusted
+network. Use it on networks you trust.
+
+## SMBLibrary (SMB provider)
+
+- **Project:** https://github.com/TalAloni/SMBLibrary
+- **Package:** `SMBLibrary` 1.5.8.1 (NuGet)
+- **License:** GNU Lesser General Public License v3.0 or later (LGPL-3.0-or-later)
+- **Copyright:** Copyright (c) 2018 Tal Aloni
+- **Status:** **Binary dependency**, used unmodified, loaded as a separate assembly.
+
+Used by `src/FileHub.Files/Vfs/SmbFileSystemProvider.cs` for SMB2/3 share browsing. Because
+SMBLibrary is LGPL-3.0-or-later while FileHub itself is MIT, the following applies:
+
+1. SMBLibrary is referenced as a separate NuGet assembly. It is **not** statically linked,
+   source-merged, ILMerged or otherwise combined into FileHub's own assemblies.
+2. Users may replace it with a modified build of their own: drop a compatible
+   `SMBLibrary.dll` next to `FileHub` and the application loads that copy instead. No signing or
+   verification step prevents this.
+3. The complete corresponding source for SMBLibrary 1.5.8.1 is available from the project URL
+   above (tag `1.5.8.1`) and from nuget.org as the `SMBLibrary` package.
+4. The LGPL notice, copyright line and links to the full licence text ship as
+   `licenses/SMBLibrary/NOTICE.txt`, together with this file.
+
+If you redistribute FileHub, keep `THIRD-PARTY-NOTICES.md` and the `licenses/` folder intact.
+If you prefer a build without any LGPL component, remove the `SMBLibrary` package reference from
+`src/FileHub.Files/FileHub.Files.csproj` and delete `SmbFileSystemProvider.cs`; every other
+location type — local, archive, SFTP, WebDAV, S3 — is MIT-only.
+
 ---
 
 ## Fonts and icons

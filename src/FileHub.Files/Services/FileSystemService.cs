@@ -1,7 +1,13 @@
 using FileHub.Files.Models;
+using FileHub.Files.Vfs;
 
 namespace FileHub.Files.Services;
 
+/// <summary>
+/// Presentation helpers plus the legacy static façade over <see cref="VfsFileSystem"/>. New code
+/// should call <see cref="VfsFileSystem.Default"/> directly; these forwards exist so the desktop
+/// layer keeps one obvious entry point for local and virtual locations alike.
+/// </summary>
 public static class FileSystemService
 {
     private static readonly string[] TextSizeUnits = ["B", "KB", "MB", "GB", "TB", "PB"];
@@ -86,244 +92,34 @@ public static class FileSystemService
         }
     }
 
-    /// <summary>异步列出目录，单个条目权限异常被跳过而不是让整个目录失败。</summary>
     public static Task<IReadOnlyList<FileEntry>> ListDirectoryAsync(
         string path, bool includeHidden, CancellationToken cancellationToken = default)
-    {
-        return Task.Run<IReadOnlyList<FileEntry>>(() =>
-        {
-            var list = new List<FileEntry>();
-            var dir = new DirectoryInfo(path);
-            foreach (var item in dir.EnumerateFileSystemInfos())
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                try
-                {
-                    var isHidden = item.Name.StartsWith('.') ||
-                                   (item.Attributes & FileAttributes.Hidden) != 0;
-                    if (isHidden && !includeHidden) continue;
+        => VfsFileSystem.Default.ListAsync(path, includeHidden, cancellationToken);
 
-                    var isDir = item is DirectoryInfo;
-                    list.Add(new FileEntry
-                    {
-                        Name = item.Name,
-                        FullPath = item.FullName,
-                        IsDirectory = isDir,
-                        IsHidden = isHidden,
-                        Size = isDir ? 0 : new FileInfo(item.FullName).Length,
-                        LastWriteTime = new DateTimeOffset(item.LastWriteTimeUtc, TimeSpan.Zero)
-                    });
-                }
-                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-                {
-                    // 单个文件读不到元数据不影响其余条目
-                }
-            }
-            return list;
-        }, cancellationToken);
-    }
-
-    /// <summary>递归搜索，带结果上限，避免在大目录里失控。</summary>
     public static Task<IReadOnlyList<FileEntry>> SearchAsync(
         string root, string query, int maxResults = 300, CancellationToken cancellationToken = default)
-    {
-        return Task.Run<IReadOnlyList<FileEntry>>(() =>
-        {
-            var list = new List<FileEntry>();
-            var options = new EnumerationOptions
-            {
-                RecurseSubdirectories = true,
-                IgnoreInaccessible = true,
-                AttributesToSkip = FileAttributes.Hidden | FileAttributes.System,
-                ReturnSpecialDirectories = false
-            };
+        => VfsFileSystem.Default.SearchAsync(root, query, maxResults, cancellationToken);
 
-            try
-            {
-                foreach (var full in Directory.EnumerateFileSystemEntries(root, "*", options))
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    if (list.Count >= maxResults) break;
-                    if (!Path.GetFileName(full).Contains(query, StringComparison.OrdinalIgnoreCase)) continue;
+    public static Task<string> CreateFolderAsync(string parent, string name, CancellationToken ct = default)
+        => VfsFileSystem.Default.CreateFolderAsync(parent, name, ct);
 
-                    try
-                    {
-                        var info = new FileInfo(full);
-                        var isDir = Directory.Exists(full);
-                        list.Add(new FileEntry
-                        {
-                            Name = Path.GetFileName(full),
-                            FullPath = full,
-                            IsDirectory = isDir,
-                            Size = isDir ? 0 : info.Length,
-                            LastWriteTime = new DateTimeOffset(
-                                (isDir ? new DirectoryInfo(full).LastWriteTimeUtc : info.LastWriteTimeUtc),
-                                TimeSpan.Zero)
-                        });
-                    }
-                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-                    {
-                    }
-                }
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-            {
-            }
+    public static Task<string> RenameAsync(string source, string newName, CancellationToken ct = default)
+        => VfsFileSystem.Default.RenameAsync(source, newName, ct);
 
-            return list;
-        }, cancellationToken);
-    }
+    public static Task<VfsTransferResult> CopyIntoAsync(
+        IReadOnlyList<string> sources, string destinationDir,
+        IProgress<VfsTransferProgress>? progress = null, CancellationToken ct = default)
+        => VfsFileSystem.Default.CopyAsync(sources, destinationDir, VfsConflictPolicy.Rename, null, progress, ct);
 
-    public static string CreateFolder(string parent, string name)
-    {
-        if (string.IsNullOrWhiteSpace(name)) throw new ArgumentException("Name cannot be empty", nameof(name));
-        if (name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0) throw new ArgumentException("Name contains invalid characters", nameof(name));
-        var target = Path.Combine(parent, name);
-        if (Directory.Exists(target) || File.Exists(target)) throw new IOException("An item with the same name already exists");
-        Directory.CreateDirectory(target);
-        return target;
-    }
-
-    public static string Rename(string source, string newName)
-    {
-        if (string.IsNullOrWhiteSpace(newName)) throw new ArgumentException("Name cannot be empty", nameof(newName));
-        if (newName == Path.GetFileName(source)) return source;
-        if (newName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0) throw new ArgumentException("Name contains invalid characters", nameof(newName));
-        var parent = Path.GetDirectoryName(source) ?? throw new IOException("Cannot locate the parent directory");
-        var target = Path.Combine(parent, newName);
-        if (Directory.Exists(target) || File.Exists(target)) throw new IOException("An item with the same name already exists");
-        if (Directory.Exists(source)) Directory.Move(source, target);
-        else File.Move(source, target);
-        return target;
-    }
-
-    public static void CopyInto(IEnumerable<string> sources, string destinationDir, CancellationToken ct = default)
-    {
-        foreach (var source in sources)
-        {
-            ct.ThrowIfCancellationRequested();
-            var target = Path.Combine(destinationDir, Path.GetFileName(source));
-            target = EnsureUnique(target);
-            if (Directory.Exists(source)) CopyDirectory(source, target, ct);
-            else File.Copy(source, target);
-        }
-    }
-
-    public static void MoveInto(IEnumerable<string> sources, string destinationDir, CancellationToken ct = default)
-    {
-        foreach (var source in sources)
-        {
-            ct.ThrowIfCancellationRequested();
-            var target = Path.Combine(destinationDir, Path.GetFileName(source));
-            if (string.Equals(Path.GetDirectoryName(source), destinationDir, StringComparison.OrdinalIgnoreCase)) continue;
-            target = EnsureUnique(target);
-            if (Directory.Exists(source)) Directory.Move(source, target);
-            else File.Move(source, target);
-        }
-    }
-
-    /// <summary>
-    /// Result of a drop operation. Counts successful items and keeps per-item errors so the UI
-    /// can report a partial move instead of failing the whole batch.
-    /// </summary>
-    public sealed class TransferResult
-    {
-        public int Succeeded { get; set; }
-        public int Skipped { get; set; }
-        public List<string> Errors { get; } = [];
-    }
+    public static Task<VfsTransferResult> MoveIntoAsync(
+        IReadOnlyList<string> sources, string destinationDir,
+        IProgress<VfsTransferProgress>? progress = null, CancellationToken ct = default)
+        => VfsFileSystem.Default.MoveAsync(sources, destinationDir, VfsConflictPolicy.Rename, null, progress, ct);
 
     /// <summary>
     /// True when moving/copying <paramref name="source"/> would place it inside itself.
-    /// File managers must reject this case: Directory.Move throws, but a copy would recurse.
+    /// File managers must reject this case: a copy would recurse forever.
     /// </summary>
     public static bool IsDescendantOrSelf(string source, string destinationDir)
-    {
-        if (!Directory.Exists(source)) return false;
-        var sourceFull = Path.GetFullPath(source).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        var destFull = Path.GetFullPath(destinationDir).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        if (string.Equals(sourceFull, destFull, StringComparison.OrdinalIgnoreCase)) return true;
-        return destFull.StartsWith(sourceFull + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
-    }
-
-    /// <summary>
-    /// Moves or copies a set of dropped paths into a destination directory, collecting errors
-    /// per item so one locked file cannot cancel the rest. Never throws for a single bad item.
-    /// </summary>
-    public static TransferResult TransferInto(
-        IEnumerable<string> sources, string destinationDir, ClipboardOperation operation,
-        CancellationToken ct = default)
-    {
-        var result = new TransferResult();
-        foreach (var source in sources)
-        {
-            ct.ThrowIfCancellationRequested();
-            try
-            {
-                if (!File.Exists(source) && !Directory.Exists(source))
-                {
-                    result.Errors.Add($"{Path.GetFileName(source)}: source no longer exists");
-                    continue;
-                }
-                if (string.Equals(Path.GetDirectoryName(source), destinationDir, StringComparison.OrdinalIgnoreCase))
-                {
-                    result.Skipped++;
-                    continue;
-                }
-                // Both copy and move must reject a folder dropped into its own subtree:
-                // copying would recurse into the freshly created target forever.
-                if (IsDescendantOrSelf(source, destinationDir))
-                {
-                    result.Errors.Add($"{Path.GetFileName(source)}: cannot drop a folder into itself");
-                    continue;
-                }
-
-                var target = EnsureUnique(Path.Combine(destinationDir, Path.GetFileName(source)));
-                if (Directory.Exists(source)) CopyDirectory(source, target, ct);
-                else File.Copy(source, target);
-
-                if (operation == ClipboardOperation.Cut)
-                {
-                    if (Directory.Exists(source)) Directory.Delete(source, recursive: true);
-                    else File.Delete(source);
-                }
-                result.Succeeded++;
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or
-                                           ArgumentException or NotSupportedException)
-            {
-                result.Errors.Add($"{Path.GetFileName(source)}: {ex.Message}");
-            }
-        }
-        return result;
-    }
-
-    private static void CopyDirectory(string source, string target, CancellationToken ct)
-    {
-        Directory.CreateDirectory(target);
-        foreach (var file in Directory.EnumerateFiles(source))
-        {
-            ct.ThrowIfCancellationRequested();
-            File.Copy(file, Path.Combine(target, Path.GetFileName(file)), overwrite: false);
-        }
-        foreach (var sub in Directory.EnumerateDirectories(source))
-        {
-            ct.ThrowIfCancellationRequested();
-            CopyDirectory(sub, Path.Combine(target, Path.GetFileName(sub)), ct);
-        }
-    }
-
-    private static string EnsureUnique(string path)
-    {
-        if (!File.Exists(path) && !Directory.Exists(path)) return path;
-        var dir = Path.GetDirectoryName(path) ?? "";
-        var name = Path.GetFileNameWithoutExtension(path);
-        var ext = Path.GetExtension(path);
-        for (var i = 1; i < 1000; i++)
-        {
-            var candidate = Path.Combine(dir, $"{name} ({i}){ext}");
-            if (!File.Exists(candidate) && !Directory.Exists(candidate)) return candidate;
-        }
-        return Path.Combine(dir, $"{name} ({Guid.NewGuid():N}){ext}");
-    }
+        => VfsFileSystem.IsDescendantOrSelf(source, destinationDir);
 }

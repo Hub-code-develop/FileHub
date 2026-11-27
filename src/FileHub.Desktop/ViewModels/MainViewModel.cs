@@ -3,8 +3,10 @@ using System.Windows.Input;
 using Avalonia.Threading;
 using FileHub.Desktop.Models;
 using FileHub.Desktop.Services;
+using FileHub.Desktop.Views;
 using FileHub.Files.Models;
 using FileHub.Files.Services;
+using FileHub.Files.Vfs;
 using FluentAvalonia.UI.Controls;
 
 namespace FileHub.Desktop.ViewModels;
@@ -146,10 +148,17 @@ public sealed class MainViewModel : ViewModelBase
     /// <summary>Optional folder to open on first initialization (session restore / reopen tab).</summary>
     public string InitialPath { get; set; } = string.Empty;
 
-    public string TabTitle => string.IsNullOrWhiteSpace(CurrentPath)
-        ? Loc.T("TabHome")
-        : (Path.GetFileName(CurrentPath.TrimEnd(Path.DirectorySeparatorChar)) is { Length: > 0 } name
-            ? name : CurrentPath);
+    public string TabTitle
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(CurrentPath)) return Loc.T("TabHome");
+            var name = VfsPath.IsVirtualPath(CurrentPath)
+                ? VfsPath.Parse(CurrentPath).FileName
+                : Path.GetFileName(CurrentPath.TrimEnd(Path.DirectorySeparatorChar));
+            return string.IsNullOrEmpty(name) ? CurrentPath : name;
+        }
+    }
 
     public ICommand SelectTabCommand { get; }
     public ICommand CloseTabCommand { get; }
@@ -213,10 +222,50 @@ public sealed class MainViewModel : ViewModelBase
     public FileEntryViewModel? PrimarySelection { get => _primarySelection; private set => Set(ref _primarySelection, value); }
     public bool HasSelection { get => _hasSelection; private set => Set(ref _hasSelection, value); }
 
-    public void LoadLocations()
+    public void LoadLocations(bool force = false)
     {
-        if (Locations.Count > 0) return;
+        if (Locations.Count > 0 && !force) return;
+        Locations.Clear();
         foreach (var location in FileSystemService.GetLocations()) Locations.Add(location);
+        foreach (var remote in RemoteLocationStore.Load())
+        {
+            Locations.Add(new LocationEntry
+            {
+                Name = remote.Name,
+                Path = remote.RootPath,
+                IconKey = remote.Protocol switch
+                {
+                    RemoteProtocol.Smb => "HardDrive",
+                    RemoteProtocol.Sftp => "Globe",
+                    RemoteProtocol.S3 => "Cloud",
+                    _ => "Globe"
+                },
+                Kind = LocationKind.Drive,
+                Detail = $"{remote.Protocol} · {remote.Host}"
+            });
+        }
+        // Browsing inside an archive adds a pin for the container so it is one click away.
+        foreach (var archive in RecentArchives())
+            Locations.Add(archive);
+    }
+
+    private IEnumerable<LocationEntry> RecentArchives()
+    {
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var tab in Shell?.Tabs ?? [])
+        {
+            // A freshly created tab has no path yet; parsing it would throw.
+            if (string.IsNullOrWhiteSpace(tab.CurrentPath)) continue;
+            var vp = VfsPath.Parse(tab.CurrentPath);
+            if (vp.Scheme != VfsScheme.Archive || !seen.Add(vp.Authority)) continue;
+            yield return new LocationEntry
+            {
+                Name = Path.GetFileName(vp.Authority),
+                Path = new VfsPath(VfsScheme.Archive, vp.Authority, "/").Canonical,
+                IconKey = "ZipFolder",
+                Kind = LocationKind.QuickAccess
+            };
+        }
     }
 
     public async Task InitializeAsync()
@@ -234,18 +283,26 @@ public sealed class MainViewModel : ViewModelBase
     public async Task NavigateAsync(string? path, bool recordHistory = true)
     {
         if (string.IsNullOrWhiteSpace(path)) return;
+        var trimmed = path.Trim().Trim('"');
         string full;
-        try
+        if (VfsPath.IsVirtualPath(trimmed))
         {
-            full = Path.GetFullPath(ExpandHome(path.Trim().Trim('"')));
+            full = VfsPath.Parse(trimmed).Canonical;
         }
-        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+        else
         {
-            ShowInfo(Loc.T("MsgInvalidPath"), ex.Message, FAInfoBarSeverity.Warning);
-            return;
+            try
+            {
+                full = Path.GetFullPath(ExpandHome(trimmed));
+            }
+            catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+            {
+                ShowInfo(Loc.T("MsgInvalidPath"), ex.Message, FAInfoBarSeverity.Warning);
+                return;
+            }
         }
 
-        if (!Directory.Exists(full))
+        if (!await VfsFileSystem.Default.DirectoryExistsAsync(full))
         {
             ShowInfo(Loc.T("MsgCannotOpenLocation"), Loc.F("MsgLocationDetail", full), FAInfoBarSeverity.Warning);
             return;
@@ -281,6 +338,13 @@ public sealed class MainViewModel : ViewModelBase
     private void BuildBreadcrumbs(string path)
     {
         Breadcrumbs.Clear();
+        if (VfsPath.IsVirtualPath(path))
+        {
+            // Archive: "<container>.zip / docs / readme.md". Remote: "smb://host / share / dir".
+            foreach (var (name, segmentPath) in VfsPath.Parse(path).Segments())
+                Breadcrumbs.Add(new PathSegment { Name = name, FullPath = segmentPath });
+            return;
+        }
         var chain = new Stack<DirectoryInfo>();
         DirectoryInfo? current;
         try { current = new DirectoryInfo(path); }
@@ -470,15 +534,28 @@ public sealed class MainViewModel : ViewModelBase
 
     private Task GoUpAsync()
     {
-        var parent = Directory.GetParent(CurrentPath);
-        return parent is null ? Task.CompletedTask : NavigateAsync(parent.FullName);
+        var virtualPath = VfsPath.Parse(CurrentPath);
+        if (virtualPath.IsVirtual)
+        {
+            if (virtualPath.Parent is { } parent) return NavigateAsync(parent.Canonical);
+            // Leaving an archive root returns to the folder that holds the archive.
+            if (virtualPath.Scheme == VfsScheme.Archive)
+                return NavigateAsync(Path.GetDirectoryName(virtualPath.Authority) ?? "/");
+            return Task.CompletedTask;
+        }
+
+        var parentDir = Directory.GetParent(CurrentPath);
+        return parentDir is null ? Task.CompletedTask : NavigateAsync(parentDir.FullName);
     }
 
     private void UpdateNavState()
     {
         CanGoBack = _back.Count > 0;
         CanGoForward = _forward.Count > 0;
-        CanGoUp = Directory.GetParent(CurrentPath) is not null;
+        var virtualPath = VfsPath.Parse(CurrentPath);
+        CanGoUp = virtualPath.IsVirtual
+            ? virtualPath.Parent is not null || virtualPath.Scheme == VfsScheme.Archive
+            : Directory.GetParent(CurrentPath) is not null;
     }
 
     private async Task OpenEntryAsync(FileEntryViewModel? entry)
@@ -489,6 +566,19 @@ public sealed class MainViewModel : ViewModelBase
             await NavigateAsync(entry.FullPath);
             return;
         }
+
+        // Archives open as folders. A remote archive would need provider-to-provider streaming,
+        // which the archive provider does not support yet, so those fall through to "open".
+        if (!VfsPath.IsVirtualPath(entry.FullPath) && ArchiveService.IsArchiveExtension(entry.FullPath))
+        {
+            var root = new VfsPath(VfsScheme.Archive, entry.FullPath, "/").Canonical;
+            if (await VfsFileSystem.Default.DirectoryExistsAsync(root))
+            {
+                await NavigateAsync(root);
+                return;
+            }
+        }
+
         try
         {
             await _ui.OpenFileAsync(entry.FullPath);
@@ -505,9 +595,18 @@ public sealed class MainViewModel : ViewModelBase
         if (string.IsNullOrWhiteSpace(name)) return;
         try
         {
-            var created = FileSystemService.CreateFolder(CurrentPath, name.Trim());
+            var created = await FileSystemService.CreateFolderAsync(CurrentPath, name.Trim());
+            Shell?.Undo.Push(new CreateFolderOperation(created,
+                (path, ct) => VfsFileSystem.Default.DeleteAsync(path, recursive: false, ct),
+                (path, ct) =>
+                {
+                    var vp = VfsPath.Parse(path).Parent;
+                    return vp is null
+                        ? Task.CompletedTask
+                        : VfsFileSystem.Default.CreateFolderAsync(vp.Value.Canonical, VfsPath.Parse(path).FileName, ct);
+                }));
             await LoadAsync();
-            ShowInfo(Loc.T("MsgCreatedFolder"), Path.GetFileName(created), FAInfoBarSeverity.Success);
+            ShowInfo(Loc.T("MsgCreatedFolder"), VfsPath.Parse(created).FileName, FAInfoBarSeverity.Success);
         }
         catch (Exception ex) { ShowInfo(Loc.T("MsgCreateFailed"), ex.Message, FAInfoBarSeverity.Error); }
     }
@@ -520,8 +619,11 @@ public sealed class MainViewModel : ViewModelBase
         if (string.IsNullOrWhiteSpace(name)) return;
         try
         {
-            FileSystemService.Rename(target.FullPath, name.Trim());
-            ThumbnailService.Instance.Invalidate(target.FullPath);
+            var before = target.FullPath;
+            var after = await FileSystemService.RenameAsync(before, name.Trim());
+            if (!target.Model.IsVirtual) ThumbnailService.Instance.Invalidate(before);
+            Shell?.Undo.Push(new RenameOperation(before, after,
+                (source, newName, ct) => VfsFileSystem.Default.RenameAsync(source, newName, ct)));
             await LoadAsync();
             ShowInfo(Loc.T("MsgRenameDone"), name.Trim(), FAInfoBarSeverity.Success);
         }
@@ -543,11 +645,19 @@ public sealed class MainViewModel : ViewModelBase
         {
             try
             {
-                ThumbnailService.Instance.Invalidate(path);
-                RecycleBinService.MoveToTrash(path);
+                if (VfsPath.IsVirtualPath(path))
+                {
+                    // Nothing to recycle outside the local disk: providers delete directly.
+                    await VfsFileSystem.Default.DeleteAsync(path);
+                }
+                else
+                {
+                    ThumbnailService.Instance.Invalidate(path);
+                    RecycleBinService.MoveToTrash(path);
+                }
                 done++;
             }
-            catch (Exception ex) { errors.Add($"{Path.GetFileName(path)}: {ex.Message}"); }
+            catch (Exception ex) { errors.Add($"{VfsPath.Parse(path).FileName}: {ex.Message}"); }
         }
         await LoadAsync();
         ShowInfo(done > 0 ? Loc.T("MsgMovedToTrash") : Loc.T("MsgDeleteFailed"),
@@ -569,20 +679,26 @@ public sealed class MainViewModel : ViewModelBase
         if (!_clipboard.HasContent) return;
         var operation = _clipboard.Operation;
         var paths = _clipboard.Paths.ToArray();
+        IsLoading = true;
         try
         {
-            await Task.Run(() =>
-            {
-                if (operation == ClipboardOperation.Copy) FileSystemService.CopyInto(paths, CurrentPath);
-                else FileSystemService.MoveInto(paths, CurrentPath);
-            });
+            var result = operation == ClipboardOperation.Copy
+                ? await FileSystemService.CopyIntoAsync(paths, CurrentPath)
+                : await FileSystemService.MoveIntoAsync(paths, CurrentPath);
             _clipboard.Clear();
             await LoadAsync();
-            ShowInfo(Loc.T("MsgPasteDone"), Loc.F("MsgPasteBody", paths.Length,
+            if (result.Errors.Count > 0)
+            {
+                ShowInfo(Loc.T("MsgPasteFailed"), string.Join("\n", result.Errors.Take(3)), FAInfoBarSeverity.Warning);
+                return;
+            }
+            ShowInfo(Loc.T("MsgPasteDone"), Loc.F("MsgPasteBody", result.Succeeded,
                 operation == ClipboardOperation.Copy ? Loc.T("MsgCopiedWord") : Loc.T("MsgMovedWord")),
                 FAInfoBarSeverity.Success);
         }
+        catch (OperationCanceledException) { }
         catch (Exception ex) { ShowInfo(Loc.T("MsgPasteFailed"), ex.Message, FAInfoBarSeverity.Error); }
+        finally { IsLoading = false; }
     }
 
     /// <summary>
@@ -602,18 +718,23 @@ public sealed class MainViewModel : ViewModelBase
             return;
         }
 
-        if (!Directory.Exists(destination))
+        if (!await VfsFileSystem.Default.DirectoryExistsAsync(destination))
         {
             ShowInfo(Loc.T("MsgDropFailed"), Loc.F("MsgLocationDetail", destination), FAInfoBarSeverity.Warning);
             return;
         }
 
         var token = _loadCts?.Token ?? default;
-        var result = await Task.Run(
-            () => FileSystemService.TransferInto(paths, destination,
-                copy ? ClipboardOperation.Copy : ClipboardOperation.Cut, token), token);
+        IsLoading = true;
+        var result = copy
+            ? await FileSystemService.CopyIntoAsync(paths, destination, null, token)
+            : await FileSystemService.MoveIntoAsync(paths, destination, null, token);
+        IsLoading = false;
 
-        foreach (var path in paths) ThumbnailService.Instance.Invalidate(path);
+        foreach (var path in paths)
+        {
+            if (!VfsPath.IsVirtualPath(path)) ThumbnailService.Instance.Invalidate(path);
+        }
         await LoadAsync(preserveSelection: true);
 
         if (result.Errors.Count > 0)
@@ -688,7 +809,7 @@ public sealed class MainViewModel : ViewModelBase
             _ = selected.EnsurePreviewAsync(ThumbnailService.PaneWidth, _selectionPreviewCts.Token);
     }
 
-    private void ShowInfo(string title, string message, FAInfoBarSeverity severity)
+    internal void ShowInfo(string title, string message, FAInfoBarSeverity severity)
     {
         InfoTitle = title;
         InfoMessage = message;
@@ -698,4 +819,137 @@ public sealed class MainViewModel : ViewModelBase
 
     private AsyncRelayCommand Async(Func<object?, Task> execute)
         => new(execute) { ErrorHandler = ex => ShowInfo(Loc.T("MsgOperationFailed"), ex.Message, FAInfoBarSeverity.Error) };
+
+    // ---- Archive, batch rename and remote locations -------------------------------------
+    // These live here rather than in a separate coordinator because they all act on the
+    // current folder/selection of one tab.
+
+    /// <summary>Opens the batch rename dialog for the current selection and applies the plan.</summary>
+    public async Task OpenBatchRenameAsync()
+    {
+        if (SelectedEntries.Count == 0)
+        {
+            ShowInfo(Loc.T("DlgRenameTitle"), Loc.T("MsgSearchEmpty"), FAInfoBarSeverity.Informational);
+            return;
+        }
+
+        var paths = SelectedEntries.Select(x => x.FullPath).ToArray();
+        var plan = await BatchRenameDialog.ShowAsync(paths).ConfigureAwait(true);
+        if (plan is null) return;
+
+        var applied = await BatchRenameService.ApplyAsync(
+            plan, (source, newName) => VfsFileSystem.Default.RenameAsync(source, newName)).ConfigureAwait(true);
+
+        var moves = plan.Items
+            .Where(x => x.IsValid && x.Error is null && !string.Equals(x.TargetName, x.SourceName, StringComparison.Ordinal))
+            .Select(x => new RenameRecord(x.SourcePath, x.TargetPath))
+            .ToList();
+        if (moves.Count > 0 && applied > 0)
+        {
+            Shell?.Undo.Push(new RenameOperation($"Rename {moves.Count} items", moves,
+                (source, newName, ct) => VfsFileSystem.Default.RenameAsync(source, newName, ct)));
+        }
+
+        await LoadAsync().ConfigureAwait(true);
+        var failed = plan.Items.Count(x => !x.IsValid || x.Error is not null);
+        ShowInfo(Loc.T("MsgRenameDone"), $"{applied} / {plan.Items.Count}",
+            failed == 0 ? FAInfoBarSeverity.Success : FAInfoBarSeverity.Warning);
+    }
+
+    /// <summary>Compresses the selection (or the current folder) into a .zip next to the target.</summary>
+    public async Task CompressSelectionAsync()
+    {
+        var sources = SelectedEntries.Count > 0
+            ? SelectedEntries.Select(x => x.FullPath).ToArray()
+            : [CurrentPath];
+
+        var suggested = sources.Length == 1
+            ? VfsPath.Parse(sources[0]).FileName + ".zip"
+            : "Archive.zip";
+        var name = await _ui.PromptAsync("Compress",
+            $"{sources.Length} item(s) -> {CurrentPath}", suggested, "Compress").ConfigureAwait(true);
+        if (string.IsNullOrWhiteSpace(name)) return;
+
+        var target = VfsPath.Parse(CurrentPath).Combine(name.Trim()).Canonical;
+        if (VfsPath.IsVirtualPath(CurrentPath))
+        {
+            ShowInfo("Compress", "Compressing into a virtual location is not supported yet.",
+                FAInfoBarSeverity.Warning);
+            return;
+        }
+
+        IsLoading = true;
+        try
+        {
+            await ArchiveService.CreateAsync(sources, target,
+                ArchiveService.GuessFormat(target) ?? ArchiveFormat.Zip, null, CancellationToken.None)
+                .ConfigureAwait(true);
+            await LoadAsync().ConfigureAwait(true);
+            ShowInfo("Compress", VfsPath.Parse(target).FileName, FAInfoBarSeverity.Success);
+        }
+        catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException)
+        {
+            ShowInfo("Compress failed", ex.Message, FAInfoBarSeverity.Error);
+        }
+        finally { IsLoading = false; }
+    }
+
+    /// <summary>
+    /// Extracts the archive being browsed, or the selected archive file, into a sibling folder.
+    /// </summary>
+    public async Task ExtractArchiveAsync()
+    {
+        string archiveFile;
+        string innerPath;
+        string destination;
+        var current = VfsPath.Parse(CurrentPath);
+
+        if (current.Scheme == VfsScheme.Archive)
+        {
+            archiveFile = current.Authority;
+            innerPath = current.Inner;
+            destination = Path.Combine(Path.GetDirectoryName(archiveFile) ?? CurrentPath,
+                Path.GetFileNameWithoutExtension(archiveFile));
+        }
+        else if (PrimarySelection is { IsDirectory: false } selected &&
+                 ArchiveService.IsArchiveExtension(selected.FullPath))
+        {
+            archiveFile = selected.FullPath;
+            innerPath = "/";
+            destination = Path.Combine(Path.GetDirectoryName(archiveFile) ?? CurrentPath,
+                Path.GetFileNameWithoutExtension(archiveFile));
+        }
+        else
+        {
+            ShowInfo("Extract", "Select an archive, or open one first.", FAInfoBarSeverity.Informational);
+            return;
+        }
+
+        IsLoading = true;
+        try
+        {
+            var count = await ArchiveService.ExtractAsync(archiveFile, innerPath, destination, null, null,
+                CancellationToken.None).ConfigureAwait(true);
+            ShowInfo("Extract", $"{count} file(s) -> {destination}", FAInfoBarSeverity.Success);
+            await NavigateAsync(Path.GetDirectoryName(destination) ?? CurrentPath).ConfigureAwait(true);
+        }
+        catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException)
+        {
+            ShowInfo("Extract failed", ex.Message, FAInfoBarSeverity.Error);
+        }
+        finally { IsLoading = false; }
+    }
+
+    /// <summary>Adds a network location and navigates to it.</summary>
+    public async Task AddRemoteLocationAsync()
+    {
+        var location = await RemoteLocationDialog.ShowAsync().ConfigureAwait(true);
+        if (location is null) return;
+
+        var all = RemoteLocationStore.Load().Where(x => x.Id != location.Id).Append(location).ToList();
+        RemoteLocationStore.Save(all);
+        LoadLocations(force: true);
+
+        await NavigateAsync(location.RootPath).ConfigureAwait(true);
+    }
 }

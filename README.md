@@ -204,6 +204,43 @@ FluentUI-CodeHub widgets used: `FANavigationView` (sidebar), `FABreadcrumbBar` (
   package is bundled with FileHub, and search terms are sent to Microsoft
 - **Delete always moves items to the recycle bin** (Windows Shell, macOS `~/.Trash`, Linux
   `gio trash`). Nothing is silently deleted permanently
+- **Every location is a virtual path**: the local disk, an archive, a NAS share and an S3 bucket
+  all flow through the same `IFileSystemProvider` contract, so navigation, breadcrumbs, search,
+  drag and drop and file operations behave identically everywhere
+- **Archives open as folders**: double-click a `.zip`, `.tar`, `.tar.gz`, `.bz2`, `.xz`, `.7z` or
+  `.rar` to browse it, extract a subfolder, or drop files into the current folder. Right-click
+  compresses the selection into a zip; extraction never overwrites, it adds " (n)" suffixes.
+  Encrypted zips ask for a password through `ArchiveFileSystemProvider.PasswordProvider`
+- **Transfer queue with real progress**: copy and move run on a background queue showing bytes
+  done, current item and a per-job progress bar. Jobs can be paused or cancelled mid-file, and a
+  target that already exists raises a conflict prompt (skip / keep both / replace / cancel) with
+  an "apply to this and all remaining items" option
+- **Undo and redo**: renames (single and batch) and new-folder creation are recorded on an undo
+  stack (100 entries), so a wrong batch rename is one Ctrl+Z away. Transfers are deliberately not
+  on the stack yet: the queue resolves name collisions while copying, so the final paths are only
+  known afterwards
+- **Batch rename**: pattern tokens (`{name}` `{ext}` `{orig}` `{n}` `{n:000}` `{date}` `{time}`
+  `{modified}` `{exif:date}` `{exif:model}`), pipe transforms (`{name|upper}` `{name|slug}`), a
+  regular-expression find/replace pass, prefix/suffix, case mode, and a live preview that flags
+  collisions and illegal names before anything is renamed
+- **Quick look**: press Space for a full-window preview of the focused item without leaving the
+  folder. Arrow keys walk the folder, Space or Esc closes it. Images, text, Markdown, PDF info,
+  audio/video metadata, fonts, archives, Office properties and EXIF all resolve here
+- **Dual pane**: a second independent folder view beside the first (own path, history, selection),
+  which makes drag-to-move between two trees trivial
+- **Command palette**: `Ctrl+Shift+P` lists every verb in the window with keywords, filtered as
+  you type; plugin commands are appended to the same list
+- **Network locations**: add SMB, SFTP, WebDAV or S3-compatible endpoints from the palette. The
+  bookmark is stored in `remote-locations.json`, the password in the OS keychain where available,
+  and the location appears in the sidebar like a drive
+- **Plugins**: drop a folder with `plugin.json` and an assembly into
+  `%APPDATA%/FileHub/plugins`. Each plugin loads in its own collectible `AssemblyLoadContext` and
+  may register commands, list columns, preview handlers and whole file-system providers. A plugin
+  that throws is marked failed; the host keeps running. See `docs/plugins.md`
+- **Folder rules**: `watch-rules.json` describes "when a file matching X lands in Y, move / copy /
+  rename it to Z", applied by a background watcher through the same VFS layer
+- **Command line and links**: `filehub <path>` opens that folder, and
+  `filehub://open?path=<url-encoded>` does the same from the OS
 - Multiple tabs, each with its own path, history, selection and sidebar location. Tabs can be
   reordered by dragging, closed with the middle mouse button, duplicated, and the open folders
   are restored on the next launch. Right-click a tab for close-other / close-to-the-right
@@ -221,6 +258,8 @@ FluentUI-CodeHub widgets used: `FANavigationView` (sidebar), `FABreadcrumbBar` (
 | `Ctrl/Cmd+T` | New tab | `Ctrl/Cmd+W` | Close tab |
 | `Ctrl/Cmd+Tab` / `Ctrl/Cmd+Shift+Tab` | Next / previous tab | `Ctrl/Cmd+1`..`8` | Jump to tab |
 | `Ctrl/Cmd+Shift+T` | Reopen closed tab | `Ctrl/Cmd+Shift+D` | Duplicate tab |
+| `Space` | Quick look | `Ctrl/Cmd+Shift+P` | Command palette |
+| `Ctrl/Cmd+Z` | Undo | `Ctrl/Cmd+Shift+Z` | Redo |
 | `Ctrl/Cmd+Shift+Left` / `Right` | Move tab left / right | Right-click tab | Tab context menu |
 
 ## Build and run
@@ -341,7 +380,11 @@ FileHub/
 └── src/
     ├── FileHub.Files/     logic only, no UI dependency, unit-testable
     │   ├── Models/        FileEntry / LocationEntry
-    │   └── Services/      FileSystemService / RecycleBinService / PlatformService / FileClipboard / PreviewService / DirectoryWatcherService
+    │   ├── Plugin/        IFileHubPlugin contracts (commands, columns, previewers, providers)
+    │   ├── Vfs/           VfsPath / IFileSystemProvider / local + archive + SMB + SFTP + WebDAV + S3
+    │   └── Services/      FileSystemService / ArchiveService / TransferQueue / UndoService /
+    │                      BatchRenameService / FileInspector / WatchRuleService / RecycleBinService /
+    │                      PlatformService / FileClipboard / PreviewService / DirectoryWatcherService
     ├── FileHub.Code/      logic only, code editing + VS Code contribution data
     │   ├── Models/        ExtensionInfo / ExtensionLanguage / ExtensionTheme / ExtensionSnippet
     │   └── Services/      CodeFileService / CodeLanguageService / ExtensionDiscoveryService / MonacoThemeConverter
@@ -354,7 +397,8 @@ FileHub/
         ├── Styles/        application styles
         ├── ViewModels/    ShellViewModel (tabs + pages) / MainViewModel / CodeEditorViewModel / ExtensionsViewModel / OfficeViewModel
         ├── Views/         MainWindow / Views/Controls (Files App layout ports + editor + extensions + Office ribbon)
-        └── Services/      LocalizationService / DialogService / ThumbnailService / DragDropPayload / MonacoAssetServer
+        └── Services/      LocalizationService / DialogService / ThumbnailService / DragDropPayload /
+                           MonacoAssetServer / FileInspectionService / PluginHost
 ```
 
 ## Verification
@@ -388,6 +432,18 @@ FileHub/
   custom language id contributed by an extension is registered but renders as plain text
 - Some virtual / network volumes cannot raise change events; F5 manual refresh still works there
 - Recursive search has a fixed 300 item limit to keep large trees under control
+- Network providers are implemented but have not been exercised against real hardware in CI:
+  SMB uses SMBLibrary (LGPL-3.0, dynamically linked — see THIRD-PARTY-NOTICES.md), SFTP uses
+  SSH.NET without `known_hosts` verification, WebDAV assumes a standards-compliant PROPFIND, and
+  S3 assumes path-style addressing. Treat them as beta and report what breaks
+- Archives are read-only in place. Editing a file inside a zip means extracting it first; the
+  provider supports extraction and re-compression through the context menu, not in-place writes
+  inside the container. RAR is read-only
+- Quick look reads PDF page counts by scanning objects rather than following every cross-reference
+  stream, so an unusual or linearised PDF can report an approximate count
+- The plugin API is early: contracts may change between minor versions, and there is no sandbox
+  beyond per-plugin assembly isolation — a plugin runs with the app's own permissions
+- Dual pane shares one window width; there is no tab-per-pane yet
 - Thumbnails cover common bitmap formats via Avalonia's Skia decoder; SVG, HEIC and video
   thumbnails need platform codecs and currently use the category icon instead
 - Copy / move uses an in-app clipboard; only "copy path" writes to the system clipboard

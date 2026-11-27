@@ -5,6 +5,7 @@
 
 using Avalonia.Media.Imaging;
 using FileHub.Files.Services;
+using FileHub.Files.Vfs;
 
 namespace FileHub.Desktop.Services;
 
@@ -53,8 +54,19 @@ public sealed class ThumbnailService
 
         try
         {
-            var bitmap = await Task.Run(() =>
+            var virtualPath = VfsPath.IsVirtualPath(path);
+            var bitmap = await Task.Run(async () =>
             {
+                if (virtualPath)
+                {
+                    // Archive and network entries have no local file handle; stream them through
+                    // the provider so a thumbnail inside a zip still decodes.
+                    await using var remote = await VfsFileSystem.Default.OpenReadAsync(path, cancellationToken)
+                        .ConfigureAwait(false);
+                    using var buffer = await CopyToSeekableAsync(remote, cancellationToken).ConfigureAwait(false);
+                    return Bitmap.DecodeToWidth(buffer, width, BitmapInterpolationMode.HighQuality);
+                }
+
                 using var stream = new FileStream(path, FileMode.Open, FileAccess.Read,
                     FileShare.ReadWrite, 64 * 1024, FileOptions.SequentialScan);
                 return Bitmap.DecodeToWidth(stream, width, BitmapInterpolationMode.HighQuality);
@@ -90,6 +102,27 @@ public sealed class ThumbnailService
         }
     }
 
+    /// <summary>
+    /// Decodes an already-extracted byte buffer (for example the cover art inside an MP3) without
+    /// touching the file system. Not cached: the caller owns the lifetime.
+    /// </summary>
+    public Task<Bitmap?> LoadFromBytesAsync(byte[] bytes, int width, CancellationToken cancellationToken = default)
+    {
+        if (bytes.Length == 0) return Task.FromResult<Bitmap?>(null);
+        return Task.Run<Bitmap?>(() =>
+        {
+            try
+            {
+                using var stream = new MemoryStream(bytes, writable: false);
+                return Bitmap.DecodeToWidth(stream, width, BitmapInterpolationMode.HighQuality);
+            }
+            catch (Exception ex) when (ex is ArgumentException or NotSupportedException or InvalidOperationException)
+            {
+                return null;
+            }
+        }, cancellationToken);
+    }
+
     /// <summary>Drops cached variants after a rename, delete or overwrite.</summary>
     public void Invalidate(string path)
     {
@@ -99,6 +132,15 @@ public sealed class ThumbnailService
             foreach (var width in new[] { ListWidth, GridWidth, PaneWidth })
                 _cache.Remove(Key(path, width));
         }
+    }
+
+    /// <summary>Decoders need a seekable stream; providers may hand back a forward-only one.</summary>
+    private static async Task<MemoryStream> CopyToSeekableAsync(Stream source, CancellationToken ct)
+    {
+        var buffer = new MemoryStream();
+        await source.CopyToAsync(buffer, ct).ConfigureAwait(false);
+        buffer.Position = 0;
+        return buffer;
     }
 
     private static string Key(string path, int width) => width + "|" + path;

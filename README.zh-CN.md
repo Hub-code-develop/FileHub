@@ -158,6 +158,29 @@ macOS 优先读系统语言偏好是故意的：从 Finder 启动的 GUI 应用�
   卸载只移除 FileHub 安装的包；详情面板可打开商店页面与许可证链接。FileHub 与 Microsoft
   无隶属关系，Gallery API 无公开 SLA；FileHub 不随包分发任何扩展，搜索词会发送给 Microsoft。
 - **删除一律移到回收站**（Windows Shell / macOS `~/.Trash` / Linux `gio trash`），绝不静默永久删除
+- **所有位置统一走虚拟路径**：本地磁盘、压缩包、NAS 共享、S3 桶都实现同一套
+  `IFileSystemProvider` 契约，导航、面包屑、搜索、拖拽与文件操作在任何位置行为一致
+- **压缩包当目录用**：双击 `.zip` / `.tar` / `.tar.gz` / `.bz2` / `.xz` / `.7z` / `.rar` 直接进入浏览，
+  可以只解压某个子目录，也可以把文件拖进压缩包所在目录。右键把选中项压成 zip；解压同名文件
+  一律加 " (n)" 后缀，绝不覆盖。加密 zip 通过 `ArchiveFileSystemProvider.PasswordProvider` 询问密码
+- **传输队列**：复制 / 移动在后台队列里执行，显示已传字节、当前文件与逐项进度条，可暂停、可取消；
+  目标已存在时弹出冲突选项（跳过 / 两个都留 / 替换 / 取消），可勾选"应用到其余所有项"
+- **撤销 / 重做**：重命名、新建文件夹、传输都进撤销栈（100 条），批量改错名一个 Ctrl+Z 就能回退
+- **批量重命名**：支持 `{name}` `{ext}` `{orig}` `{n}` `{n:000}` `{date}` `{time}` `{modified}`
+  `{exif:date}` `{exif:model}` 占位符、`{name|upper}` 这类管道转换、正则查找替换、前后缀与大小写模式，
+  并带实时预览，改名之前就能看到重名与非法字符
+- **快速查看**：按空格在整窗浮层里预览当前项，不离开当前文件夹；方向键切换、空格或 Esc 关闭。
+  图片、文本、Markdown、PDF 信息、音视频元数据、字体、压缩包、Office 属性与 EXIF 都在这里解析
+- **双栏对照**：右侧再开一个独立文件夹视图（各自路径、历史、选择），两边直接拖拽即可搬文件
+- **命令面板**：`Ctrl+Shift+P` 列出窗口内所有动作并支持关键词过滤，插件命令也接在同一列表
+- **网络位置**：从命令面板添加 SMB / SFTP / WebDAV / S3 兼容位置；书签存进 `remote-locations.json`，
+  密码优先交给系统钥匙串，位置会像驱动器一样出现在侧栏
+- **插件**：把带 `plugin.json` 的文件夹放进 `%APPDATA%/FileHub/plugins` 即可。每个插件在独立的
+  可回收 `AssemblyLoadContext` 里加载，可注册命令、列表列、预览器和完整的文件系统 Provider；
+  插件初始化抛异常只会被标记失败，不会带崩主程序。写法见 `docs/plugins.md`
+- **文件夹规则**：`watch-rules.json` 描述"匹配 X 的文件进入 Y 后，移动 / 复制 / 改名到 Z"，
+  后台监视器通过同一套 VFS 执行
+- **命令行与链接**：`filehub <路径>` 直接打开该目录，`filehub://open?path=<url 编码>` 同理
 - 多标签页，每个标签有独立的路径、历史、选中项与侧栏位置；标签可拖拽重排、中键关闭、复制，
   下次启动会恢复上次打开的目录；右键标签可关闭其他 / 关闭右侧标签
 - 多选、隐藏文件开关、浅色 / 深色 / 跟随系统主题、状态栏统计
@@ -277,6 +300,8 @@ FileHub/
 ├── NuGet.Config           nuget.org + 仓库内离线源
 ├── local-feed/            CodeHub-FluentUI 的 nupkg（MIT）
 ├── licenses/Monaco/       monaco-editor 的 LICENSE + ThirdPartyNotices.txt（MIT）
+├── licenses/SMBLibrary/   LGPL-3.0 声明与源码获取方式
+├── docs/plugins.md        插件开发说明
 ├── LICENSE                MIT
 ├── build.sh               带资源护栏的构建脚本
 ├── README.md              英文主说明
@@ -284,7 +309,11 @@ FileHub/
 └── src/
     ├── FileHub.Files/     纯逻辑，无 UI 依赖，可单测
     │   ├── Models/        FileEntry / LocationEntry
-    │   └── Services/      FileSystemService / RecycleBinService / PlatformService / FileClipboard / PreviewService / DirectoryWatcherService
+    │   ├── Plugin/        IFileHubPlugin 契约（命令 / 列 / 预览器 / Provider）
+    │   ├── Vfs/           VfsPath / IFileSystemProvider / 本地 + 压缩包 + SMB + SFTP + WebDAV + S3
+    │   └── Services/      FileSystemService / ArchiveService / TransferQueue / UndoService /
+    │                      BatchRenameService / FileInspector / WatchRuleService / RecycleBinService /
+    │                      PlatformService / FileClipboard / PreviewService / DirectoryWatcherService
     ├── FileHub.Code/      纯逻辑，代码编辑与 VS Code 贡献数据
     │   ├── Models/        ExtensionInfo / ExtensionLanguage / ExtensionTheme / ExtensionSnippet
     │   └── Services/      CodeFileService / CodeLanguageService / ExtensionDiscoveryService / MonacoThemeConverter
@@ -297,7 +326,8 @@ FileHub/
         ├── Styles/        应用样式
         ├── ViewModels/    ShellViewModel（标签与页面）/ MainViewModel / CodeEditorViewModel / ExtensionsViewModel / OfficeViewModel
         ├── Views/         MainWindow / Views/Controls（Files 布局移植 + 编辑器 + 扩展页 + Office 功能区）
-        └── Services/      LocalizationService / DialogService / ThumbnailService / DragDropPayload / MonacoAssetServer
+        └── Services/      LocalizationService / DialogService / ThumbnailService / DragDropPayload /
+                           MonacoAssetServer / FileInspectionService / PluginHost
 ```
 
 ## 验证情况

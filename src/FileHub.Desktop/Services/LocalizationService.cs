@@ -323,6 +323,17 @@ public static class Loc
 
         ["ExtensionsTab"] = new[] { "Extensions", "扩展" },
         ["ClosePage"] = new[] { "Close page", "关闭页面" },
+        ["TransfersTitle"] = new[] { "Transfers", "传输队列" },
+        ["TransfersClear"] = new[] { "Clear finished", "清除已完成" },
+        ["QuickLookNoPreview"] = new[] { "No preview available for this type", "此类型暂无可用预览" },
+        ["PalettePlaceholder"] = new[] { "Type a command", "输入命令" },
+        ["PaletteEmpty"] = new[] { "No matching command", "没有匹配的命令" },
+        ["PaletteHint"] = new[] { "Enter runs the selected command. Esc closes.", "回车执行选中命令，Esc 关闭" },
+        ["DualPane"] = new[] { "Dual pane", "双栏对照" },
+        ["BatchRename"] = new[] { "Batch rename", "批量重命名" },
+        ["Compress"] = new[] { "Compress", "压缩" },
+        ["Extract"] = new[] { "Extract", "解压" },
+        ["AddRemoteLocation"] = new[] { "Add network location", "添加网络位置" },
         ["CodeTitle"] = new[] { "Code editor", "代码编辑器" },
         ["CodeOpenFile"] = new[] { "Open file", "打开文件" },
         ["CodeSave"] = new[] { "Save", "保存" },
@@ -869,6 +880,17 @@ public static class Strings
 
     public static string ExtensionsTab => Loc.T("ExtensionsTab");
     public static string ClosePage => Loc.T("ClosePage");
+    public static string TransfersTitle => Loc.T("TransfersTitle");
+    public static string TransfersClear => Loc.T("TransfersClear");
+    public static string QuickLookNoPreview => Loc.T("QuickLookNoPreview");
+    public static string PalettePlaceholder => Loc.T("PalettePlaceholder");
+    public static string PaletteEmpty => Loc.T("PaletteEmpty");
+    public static string PaletteHint => Loc.T("PaletteHint");
+    public static string DualPane => Loc.T("DualPane");
+    public static string BatchRename => Loc.T("BatchRename");
+    public static string Compress => Loc.T("Compress");
+    public static string Extract => Loc.T("Extract");
+    public static string AddRemoteLocation => Loc.T("AddRemoteLocation");
     public static string CodeTitle => Loc.T("CodeTitle");
     public static string CodeOpenFile => Loc.T("CodeOpenFile");
     public static string CodeSave => Loc.T("CodeSave");
