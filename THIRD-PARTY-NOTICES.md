@@ -346,16 +346,17 @@ snippets are read.
 
 ### What it is used for
 
-The built-in Office page reads document paragraphs, worksheet cells and slide outlines through
-the Open XML SDK, and writes back light edits (Word text/formatting and Excel cell values).
-No Microsoft Office code or binaries are bundled. This is an independent implementation using a
-published open file format; it is not a port of Microsoft Office source code.
+The built-in Office suite reads and writes Word paragraphs/runs/tables/images, Excel cells,
+formulas and styles, and PowerPoint slides/shapes/notes through the Open XML SDK. No Microsoft
+Office code or binaries are bundled. This is an independent implementation using a published
+open file format; it is not a port of Microsoft Office source code.
 
-Slides are shown as a read-only outline. Complex OOXML features (macros, Track Changes, pivot
-tables, charts, embedded objects, custom XML) are outside the scope of this lightweight editor
-and may be simplified when a file is saved. FileHub is **not** affiliated with or endorsed by
-Microsoft. "Microsoft Office", "Word", "Excel" and "PowerPoint" are trademarks of Microsoft
-Corporation.
+Complex OOXML features (macros, Track Changes, pivot tables, charts, embedded OLE objects,
+custom XML, advanced numbering definitions) are outside the scope of this implementation and may
+be simplified when a file is saved. Inline formatting in Word is stored at run level in the file;
+the plain-text editor displays each paragraph using its leading run style. FileHub is **not**
+affiliated with or endorsed by Microsoft. "Microsoft Office", "Word", "Excel" and "PowerPoint"
+are trademarks of Microsoft Corporation.
 
 ### The MIT License (MIT)
 

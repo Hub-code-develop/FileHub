@@ -167,12 +167,18 @@ FluentUI-CodeHub widgets used: `FANavigationView` (sidebar), `FABreadcrumbBar` (
   local Monaco editor with syntax highlighting, language auto-detection, Ctrl+S save, an
   encoding-preserving writer, a dirty marker and a cursor readout. All assets are bundled, so
   editing works offline
-- **Built-in Office page**: double-click a `.docx` / `.xlsx` / `.pptx` (or press Office in the tab
-  strip) to open a Microsoft-Office-style ribbon workspace. Word paragraphs can be edited with
-  bold / italic / underline and heading styles; Excel worksheets render as an editable cell grid;
-  PowerPoint slides appear as a read-only outline. Ctrl+S saves Word and Excel changes back to
-  the original file. Powered by the Open XML SDK - no Office installation, no COM, works
-  cross-platform. Complex OOXML features may be simplified on save; see THIRD-PARTY-NOTICES.md
+- **Built-in Office suite**: double-click a `.docx` / `.xlsx` / `.pptx` (or press Office in the tab
+  strip) to open a Microsoft-Office-style ribbon workspace with three real editors:
+  - **Word**: page canvas, styles, font/size/colour, bold / italic / underline, alignment,
+    bullets/numbering, tables, inline pictures, hyperlinks, find/replace, undo/redo and HTML export.
+  - **Excel**: worksheet tabs, a scrollable cell grid, formula bar with a formula engine
+    (`SUM`, `AVERAGE`, `IF`, cell references and ranges), cell styles, row/column editing and
+    live status aggregates.
+  - **PowerPoint**: slide thumbnails, an editable 16:9 canvas with text boxes, add/duplicate/
+    delete/reorder slides, layouts and speaker notes.
+  Ctrl+S writes changes back to the original file. Powered by the Open XML SDK - no Office
+  installation, no COM, cross-platform. Complex OOXML features may be simplified on save; see
+  THIRD-PARTY-NOTICES.md
 - **VS Code extensions page**: discovers extensions installed under `.vscode`,
   `.vscode-insiders`, `.vscode-oss`, `.cursor` and `.windsurf`, lets you enable or disable them
   for FileHub, and shows their language / theme / snippet / grammar contributions. Enabled

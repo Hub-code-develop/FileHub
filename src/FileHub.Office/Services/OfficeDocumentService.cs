@@ -1,26 +1,24 @@
 using DocumentFormat.OpenXml;
 using DocumentFormat.OpenXml.Packaging;
 using FileHub.Office.Models;
-using D = DocumentFormat.OpenXml.Drawing;
+using A = DocumentFormat.OpenXml.Drawing;
+using PIC = DocumentFormat.OpenXml.Drawing.Pictures;
 using S = DocumentFormat.OpenXml.Spreadsheet;
-using P = DocumentFormat.OpenXml.Presentation;
 using W = DocumentFormat.OpenXml.Wordprocessing;
+using WP = DocumentFormat.OpenXml.Drawing.Wordprocessing;
 
 namespace FileHub.Office.Services;
 
 /// <summary>
-/// Reads and writes docx / xlsx / pptx through the Open XML SDK. No COM, no Office install,
-/// cross-platform. The model is intentionally small: this is a built-in editor for browsing and
-/// light edits, not a full Word/Excel/PowerPoint clone.
+/// Reads and writes docx / xlsx / pptx through the Open XML SDK. No COM and no Office install:
+/// the same files open in Word, Excel and PowerPoint on Windows, macOS and Linux.
 /// </summary>
-public static class OfficeDocumentService
+public static partial class OfficeDocumentService
 {
-    private const int MinGridRows = 30;
-    private const int MinGridColumns = 20;
+    internal const int DefaultRows = 60;
+    internal const int DefaultColumns = 20;
 
-    /// <summary>Extensions handled by the built-in Office page.</summary>
-    public static bool IsOfficeFile(string path)
-        => Detect(path) != OfficeDocumentKind.Unknown;
+    public static bool IsOfficeFile(string path) => Detect(path) != OfficeDocumentKind.Unknown;
 
     public static OfficeDocumentKind Detect(string path)
     {
@@ -49,44 +47,172 @@ public static class OfficeDocumentService
         return doc;
     }
 
-    /// <summary>Save the in-memory model back to its file. Word and Excel are editable; PowerPoint is read-only.</summary>
     public static void Save(OfficeDocument doc)
     {
         switch (doc.Kind)
         {
             case OfficeDocumentKind.Word: SaveWord(doc); break;
             case OfficeDocumentKind.Excel: SaveExcel(doc); break;
-            case OfficeDocumentKind.PowerPoint:
-                throw new NotSupportedException("PowerPoint outline editing is not supported; open the file to view it.");
+            case OfficeDocumentKind.PowerPoint: SavePowerPoint(doc); break;
             default: throw new NotSupportedException("Unknown document type.");
         }
     }
 
-    // ---------------------------------------------------------------- Word
+    public static void CreateNew(string path, OfficeDocumentKind kind)
+    {
+        switch (kind)
+        {
+            case OfficeDocumentKind.Word: CreateWord(path); break;
+            case OfficeDocumentKind.Excel: CreateExcel(path); break;
+            case OfficeDocumentKind.PowerPoint: CreatePowerPoint(path); break;
+            default: throw new NotSupportedException("Unknown document type.");
+        }
+    }
+
+    // ---------------------------------------------------------------- Word: load
 
     private static void LoadWord(OfficeDocument doc)
     {
         using var package = WordprocessingDocument.Open(doc.Path, false);
-        var body = package.MainDocumentPart?.Document?.Body;
+        var main = package.MainDocumentPart;
+        var body = main?.Document?.Body;
         if (body is null) return;
 
-        foreach (var paragraph in body.Elements<W.Paragraph>())
+        var numbering = main!.NumberingDefinitionsPart?.Numbering;
+        var hyperlinks = main.HyperlinkRelationships.ToDictionary(r => r.Id, r => r.Uri?.OriginalString ?? string.Empty);
+
+        foreach (var element in body.ChildElements)
         {
-            var text = string.Concat(paragraph.Descendants<W.Text>().Select(t => t.Text));
-            var style = paragraph.ParagraphProperties?.ParagraphStyleId?.Val?.Value ?? "Normal";
-            var runProps = paragraph.Descendants<W.RunProperties>().FirstOrDefault();
-            doc.Paragraphs.Add(new WordParagraph
+            switch (element)
             {
-                Text = text,
-                Style = NormaliseWordStyle(style),
-                IsBold = runProps?.GetFirstChild<W.Bold>() is not null,
-                IsItalic = runProps?.GetFirstChild<W.Italic>() is not null,
-                IsUnderline = runProps?.GetFirstChild<W.Underline>() is not null
+                case W.Paragraph paragraph:
+                    var images = new List<WordImage>();
+                    var block = ReadWordParagraph(paragraph, numbering, hyperlinks, main!, images);
+                    if (block is WordParagraph textBlock && textBlock.PlainText.Length == 0 && images.Count > 0)
+                    {
+                        // The paragraph only carried the inline picture.
+                    }
+                    else doc.Blocks.Add(block);
+                    foreach (var image in images) doc.Blocks.Add(image);
+                    break;
+                case W.Table table:
+                    doc.Blocks.Add(ReadWordTable(table));
+                    break;
+            }
+        }
+
+        if (doc.Blocks.Count == 0)
+            doc.Blocks.Add(new WordParagraph());
+    }
+
+    private static WordBlock ReadWordParagraph(W.Paragraph paragraph, W.Numbering? numbering,
+        IReadOnlyDictionary<string, string> hyperlinks, MainDocumentPart main, List<WordImage> images)
+    {
+        var result = new WordParagraph();
+        var props = paragraph.ParagraphProperties;
+        if (props is not null)
+        {
+            result.Style = NormaliseWordStyle(props.ParagraphStyleId?.Val?.Value);
+            var justification = props.Justification?.Val?.Value;
+            result.Alignment = justification == W.JustificationValues.Center ? WordAlignment.Center
+                : justification == W.JustificationValues.Right ? WordAlignment.Right
+                : justification == W.JustificationValues.Both ? WordAlignment.Justify
+                : WordAlignment.Left;
+            result.LeftIndent = TwipsToPoints(props.Indentation?.Left?.Value);
+            var spacing = props.SpacingBetweenLines;
+            result.SpaceBefore = TwipsToPoints(spacing?.Before?.Value);
+            result.SpaceAfter = TwipsToPoints(spacing?.After?.Value);
+
+            var numberingProps = props.NumberingProperties;
+            if (numberingProps is not null)
+            {
+                var level = (int)(numberingProps.NumberingLevelReference?.Val?.Value ?? 0);
+                result.ListLevel = level;
+                var numId = numberingProps.NumberingId?.Val?.Value;
+                result.ListKind = IsBullet(numbering, numId, level) ? WordListKind.Bullet : WordListKind.Number;
+            }
+        }
+
+        foreach (var run in paragraph.Elements<W.Run>())
+        {
+            var model = ReadRun(run);
+            if (!string.IsNullOrEmpty(model.Text)) result.Runs.Add(model);
+        }
+
+        foreach (var link in paragraph.Elements<W.Hyperlink>())
+        {
+            var url = link.Id?.Value is { } id && hyperlinks.TryGetValue(id, out var target) ? target : string.Empty;
+            foreach (var run in link.Elements<W.Run>())
+            {
+                var model = ReadRun(run);
+                model.Hyperlink = url;
+                if (!string.IsNullOrEmpty(model.Text)) result.Runs.Add(model);
+            }
+        }
+
+        // A picture lives inside a run's drawing. Promote it to a block so it can be displayed.
+        var blip = paragraph.Descendants<A.Blip>().FirstOrDefault(b => !string.IsNullOrEmpty(b.Embed?.Value));
+        if (blip?.Embed?.Value is { } embedId && main.GetPartById(embedId) is ImagePart imagePart)
+        {
+            using var stream = imagePart.GetStream(FileMode.Open, FileAccess.Read);
+            using var memory = new MemoryStream();
+            stream.CopyTo(memory);
+            var extent = paragraph.Descendants<WP.Extent>().FirstOrDefault();
+            images.Add(new WordImage
+            {
+                Path = string.Empty,
+                Data = memory.ToArray(),
+                ContentType = imagePart.ContentType,
+                WidthPx = extent?.Cx is { } cx ? (int)(cx / 9525) : 480,
+                HeightPx = extent?.Cy is { } cy ? (int)(cy / 9525) : 270
             });
         }
 
-        if (doc.Paragraphs.Count == 0)
-            doc.Paragraphs.Add(new WordParagraph());
+        return result;
+    }
+
+    private static WordRun ReadRun(W.Run run)
+    {
+        var model = new WordRun();
+        var props = run.RunProperties;
+        if (props is not null)
+        {
+            model.IsBold = props.GetFirstChild<W.Bold>() is not null;
+            model.IsItalic = props.GetFirstChild<W.Italic>() is not null;
+            model.IsUnderline = props.GetFirstChild<W.Underline>() is not null;
+            model.FontName = props.RunFonts?.Ascii?.Value ?? string.Empty;
+            if (double.TryParse(props.FontSize?.Val?.Value, out var size)) model.FontSize = size / 2;
+            model.ColorHex = props.Color?.Val?.Value ?? string.Empty;
+        }
+        model.Text = string.Concat(run.Descendants<W.Text>().Select(t => t.Text ?? string.Empty));
+        if (run.Descendants<W.Break>().Any()) model.Text += "\n";
+        return model;
+    }
+
+    private static WordTable ReadWordTable(W.Table table)
+    {
+        var result = WordTable.Create(0, Math.Max(1, table.GetFirstChild<W.TableGrid>()?.Elements<W.GridColumn>().Count() ?? 1));
+        result.Rows.Clear();
+        foreach (var row in table.Elements<W.TableRow>())
+        {
+            var cells = new List<WordTableCell>();
+            foreach (var cell in row.Elements<W.TableCell>())
+            {
+                cells.Add(new WordTableCell { Text = string.Concat(cell.Descendants<W.Text>().Select(t => t.Text ?? string.Empty)) });
+            }
+            result.Rows.Add(cells);
+        }
+        return result;
+    }
+
+    private static bool IsBullet(W.Numbering? numbering, int? numId, int level)
+    {
+        if (numbering is null || numId is null) return false;
+        var num = numbering.Elements<W.NumberingInstance>().FirstOrDefault(n => n.NumberID?.Value == numId);
+        var abstractId = num?.AbstractNumId?.Val?.Value;
+        var abs = numbering.Elements<W.AbstractNum>().FirstOrDefault(a => a.AbstractNumberId?.Value == abstractId);
+        var lvl = abs?.Elements<W.Level>().FirstOrDefault(l => l.LevelIndex?.Value == level);
+        return lvl?.OuterXml.Contains("bullet", StringComparison.OrdinalIgnoreCase) == true;
     }
 
     private static string NormaliseWordStyle(string? styleId) => styleId switch
@@ -97,85 +223,232 @@ public static class OfficeDocumentService
         _ => "Normal"
     };
 
+    private static double TwipsToPoints(string? value) =>
+        int.TryParse(value, out var twips) ? twips / 20.0 : 0;
+
+    private static int PointsToTwips(double points) => (int)Math.Round(points * 20);
+
+    // ---------------------------------------------------------------- Word: save
+
     private static void SaveWord(OfficeDocument doc)
     {
         using var package = WordprocessingDocument.Open(doc.Path, true);
-        var body = package.MainDocumentPart?.Document?.Body
-            ?? throw new InvalidOperationException("Document body is missing.");
+        var main = package.MainDocumentPart ?? throw new InvalidOperationException("Document body is missing.");
+        var body = main.Document?.Body ?? throw new InvalidOperationException("Document body is missing.");
+        var section = body.GetFirstChild<W.SectionProperties>();
+        foreach (var child in body.ChildElements.ToList())
+            if (child is not W.SectionProperties) child.Remove();
 
-        var sectPr = body.GetFirstChild<W.SectionProperties>();
-        foreach (var paragraph in body.Elements<W.Paragraph>().ToList())
-            paragraph.Remove();
-
-        foreach (var model in doc.Paragraphs)
+        foreach (var block in doc.Blocks)
         {
-            var paragraph = new W.Paragraph();
-            if (model.Style != "Normal")
-                paragraph.AppendChild(new W.ParagraphProperties(
-                    new W.ParagraphStyleId { Val = model.Style }));
-
-            var run = new W.Run();
-            if (model.IsBold || model.IsItalic || model.IsUnderline)
+            OpenXmlElement? element = block switch
             {
-                var props = new W.RunProperties();
-                if (model.IsBold) props.AppendChild(new W.Bold());
-                if (model.IsItalic) props.AppendChild(new W.Italic());
-                if (model.IsUnderline) props.AppendChild(new W.Underline { Val = W.UnderlineValues.Single });
-                run.AppendChild(props);
-            }
-            run.AppendChild(new W.Text { Text = model.Text, Space = SpaceProcessingModeValues.Preserve });
-            paragraph.AppendChild(run);
-
-            if (sectPr is not null) body.InsertBefore(paragraph, sectPr);
-            else body.AppendChild(paragraph);
+                WordParagraph paragraph => CreateWordParagraph(main, paragraph),
+                WordTable table => CreateWordTable(table),
+                WordImage image => CreateWordImage(main, image),
+                _ => null
+            };
+            if (element is null) continue;
+            if (section is not null) body.InsertBefore(element, section);
+            else body.AppendChild(element);
         }
-        package.MainDocumentPart!.Document.Save();
+        main.Document.Save();
     }
 
-    // ---------------------------------------------------------------- Excel
+    private static W.Paragraph CreateWordParagraph(MainDocumentPart main, WordParagraph model)
+    {
+        var paragraph = new W.Paragraph();
+        var props = new W.ParagraphProperties();
+        if (model.Style != "Normal")
+            props.AppendChild(new W.ParagraphStyleId { Val = model.Style });
+
+        var justification = model.Alignment == WordAlignment.Center ? W.JustificationValues.Center
+            : model.Alignment == WordAlignment.Right ? W.JustificationValues.Right
+            : model.Alignment == WordAlignment.Justify ? W.JustificationValues.Both
+            : W.JustificationValues.Left;
+        props.AppendChild(new W.Justification { Val = justification });
+
+        if (model.ListKind != WordListKind.None)
+        {
+            props.AppendChild(new W.Indentation
+            {
+                Left = PointsToTwips(36 * (model.ListLevel + 1)).ToString(),
+                Hanging = "360"
+            });
+            props.AppendChild(new W.NumberingProperties(
+                new W.NumberingLevelReference { Val = model.ListLevel },
+                new W.NumberingId { Val = model.ListKind == WordListKind.Bullet ? 1 : 2 }));
+        }
+        else if (model.LeftIndent != 0)
+        {
+            props.AppendChild(new W.Indentation { Left = PointsToTwips(model.LeftIndent).ToString() });
+        }
+
+        if (model.SpaceBefore != 0 || model.SpaceAfter != 0)
+        {
+            var spacing = new W.SpacingBetweenLines();
+            if (model.SpaceBefore != 0) spacing.Before = PointsToTwips(model.SpaceBefore).ToString();
+            if (model.SpaceAfter != 0) spacing.After = PointsToTwips(model.SpaceAfter).ToString();
+            props.AppendChild(spacing);
+        }
+
+        if (props.ChildElements.Count > 0) paragraph.AppendChild(props);
+
+        foreach (var runModel in model.Runs)
+        {
+            var run = CreateRun(runModel);
+            if (!string.IsNullOrWhiteSpace(runModel.Hyperlink) &&
+                Uri.TryCreate(runModel.Hyperlink, UriKind.Absolute, out var uri))
+            {
+                var relationship = main.AddHyperlinkRelationship(uri, true);
+                var linkRun = new W.Run();
+                if (run.RunProperties is not null) linkRun.AppendChild(run.RunProperties.CloneNode(true));
+                linkRun.AppendChild(new W.Text
+                {
+                    Text = runModel.Text,
+                    Space = SpaceProcessingModeValues.Preserve
+                });
+                paragraph.AppendChild(new W.Hyperlink(linkRun) { Id = relationship.Id });
+            }
+            else
+            {
+                paragraph.AppendChild(run);
+            }
+        }
+        if (model.Runs.Count == 0) paragraph.AppendChild(new W.Run());
+        return paragraph;
+    }
+
+    private static W.Run CreateRun(WordRun model)
+    {
+        var run = new W.Run();
+        if (model.IsBold || model.IsItalic || model.IsUnderline || model.FontSize > 0 ||
+            !string.IsNullOrEmpty(model.FontName) || !string.IsNullOrEmpty(model.ColorHex))
+        {
+            var props = new W.RunProperties();
+            if (model.IsBold) props.AppendChild(new W.Bold());
+            if (model.IsItalic) props.AppendChild(new W.Italic());
+            if (model.IsUnderline) props.AppendChild(new W.Underline { Val = W.UnderlineValues.Single });
+            if (!string.IsNullOrEmpty(model.FontName))
+                props.AppendChild(new W.RunFonts { Ascii = model.FontName, HighAnsi = model.FontName });
+            if (model.FontSize > 0)
+                props.AppendChild(new W.FontSize { Val = ((int)Math.Round(model.FontSize * 2)).ToString() });
+            if (!string.IsNullOrEmpty(model.ColorHex))
+                props.AppendChild(new W.Color { Val = model.ColorHex });
+            run.AppendChild(props);
+        }
+        run.AppendChild(new W.Text { Text = model.Text, Space = SpaceProcessingModeValues.Preserve });
+        return run;
+    }
+
+    private static W.Table CreateWordTable(WordTable model)
+    {
+        var table = new W.Table(
+            new W.TableProperties(
+                new W.TableStyle { Val = "TableGrid" },
+                new W.TableBorders(
+                    new W.TopBorder { Val = W.BorderValues.Single, Size = 4U },
+                    new W.LeftBorder { Val = W.BorderValues.Single, Size = 4U },
+                    new W.BottomBorder { Val = W.BorderValues.Single, Size = 4U },
+                    new W.RightBorder { Val = W.BorderValues.Single, Size = 4U },
+                    new W.InsideHorizontalBorder { Val = W.BorderValues.Single, Size = 4U },
+                    new W.InsideVerticalBorder { Val = W.BorderValues.Single, Size = 4U })),
+            new W.TableGrid(Enumerable.Range(0, model.ColumnCount)
+                .Select(_ => new W.GridColumn { Width = "2400" })));
+
+        foreach (var row in model.Rows)
+        {
+            var tableRow = new W.TableRow();
+            for (var c = 0; c < model.ColumnCount; c++)
+            {
+                var text = row.ElementAtOrDefault(c)?.Text ?? string.Empty;
+                tableRow.AppendChild(new W.TableCell(new W.Paragraph(
+                    new W.Run(new W.Text { Text = text, Space = SpaceProcessingModeValues.Preserve }))));
+            }
+            table.AppendChild(tableRow);
+        }
+        return table;
+    }
+
+    private static W.Paragraph CreateWordImage(MainDocumentPart main, WordImage model)
+    {
+        var contentType = string.IsNullOrWhiteSpace(model.ContentType) ? "image/png" : model.ContentType;
+        var part = main.AddNewPart<ImagePart>(contentType);
+        using (var stream = part.GetStream(FileMode.Create, FileAccess.Write))
+            stream.Write(model.Data);
+        var relId = main.GetIdOfPart(part);
+
+        var cx = (long)Math.Max(1, model.WidthPx) * 9525;
+        var cy = (long)Math.Max(1, model.HeightPx) * 9525;
+        var docPrId = (uint)(main.RootElement?.Descendants<WP.DocProperties>().Count() + 1 ?? 1);
+
+        var drawing = new W.Drawing(
+            new WP.Inline(
+                new WP.Extent { Cx = cx, Cy = cy },
+                new WP.EffectExtent { LeftEdge = 0, TopEdge = 0, RightEdge = 0, BottomEdge = 0 },
+                new WP.DocProperties { Id = docPrId, Name = "Picture " + docPrId, Description = "FileHub image" },
+                new WP.NonVisualGraphicFrameDrawingProperties(),
+                new A.Graphic(
+                    new A.GraphicData(
+                        new PIC.Picture(
+                            new PIC.NonVisualPictureProperties(
+                                new PIC.NonVisualDrawingProperties { Id = 0U, Name = "Picture " + docPrId },
+                                new PIC.NonVisualPictureDrawingProperties()),
+                            new PIC.BlipFill(
+                                new A.Blip { Embed = relId },
+                                new A.Stretch(new A.FillRectangle())),
+                            new PIC.ShapeProperties(
+                                new A.Transform2D(
+                                    new A.Offset { X = 0L, Y = 0L },
+                                    new A.Extents { Cx = cx, Cy = cy }),
+                                new A.PresetGeometry(new A.AdjustValueList())
+                                { Preset = A.ShapeTypeValues.Rectangle }))
+                    ) { Uri = "http://schemas.openxmlformats.org/drawingml/2006/picture" })
+            ) { DistanceFromTop = 0U, DistanceFromBottom = 0U, DistanceFromLeft = 0U, DistanceFromRight = 0U });
+        return new W.Paragraph(new W.Run(drawing));
+    }
+
+    // ---------------------------------------------------------------- Excel: load
 
     private static void LoadExcel(OfficeDocument doc)
     {
         using var package = SpreadsheetDocument.Open(doc.Path, false);
-        var workbookPart = package.WorkbookPart
-            ?? throw new InvalidOperationException("Workbook part is missing.");
-        var shared = workbookPart.SharedStringTablePart?.SharedStringTable;
+        var wbPart = package.WorkbookPart ?? throw new InvalidOperationException("Workbook part is missing.");
+        var shared = wbPart.SharedStringTablePart?.SharedStringTable;
+        var styles = wbPart.WorkbookStylesPart?.Stylesheet;
 
-        var sheets = workbookPart.Workbook.Sheets?.Elements<S.Sheet>().ToList() ?? new List<S.Sheet>();
-        foreach (var sheet in sheets)
+        foreach (var sheet in wbPart.Workbook.Sheets?.Elements<S.Sheet>() ?? Enumerable.Empty<S.Sheet>())
         {
-            var model = new ExcelSheet { Name = sheet.Name?.Value ?? "Sheet" };
-            if (sheet.Id?.Value is not null &&
-                workbookPart.GetPartById(sheet.Id.Value) is WorksheetPart wsPart)
+            var model = new ExcelSheet
             {
-                var data = wsPart.Worksheet.GetFirstChild<S.SheetData>();
-                if (data is not null)
+                Name = sheet.Name?.Value ?? "Sheet",
+                RowCount = DefaultRows,
+                ColumnCount = DefaultColumns
+            };
+            if (sheet.Id?.Value is { } id && wbPart.GetPartById(id) is WorksheetPart wsPart)
+            {
+                var columns = wsPart.Worksheet.GetFirstChild<S.Columns>();
+                foreach (var col in columns?.Elements<S.Column>() ?? Enumerable.Empty<S.Column>())
                 {
-                    foreach (var cell in data.Elements<S.Row>().SelectMany(r => r.Elements<S.Cell>()))
-                    {
-                        var (row, col) = ParseReference(cell.CellReference?.Value);
-                        if (row < 1 || col < 1) continue;
-                        model.Cells.Add(new ExcelCell
-                        {
-                            Reference = cell.CellReference?.Value ?? CellReference(row, col),
-                            Row = row,
-                            Column = col,
-                            Text = CellText(cell, shared)
-                        });
-                    }
+                    if (col.Min is null || col.Max is null) continue;
+                    var width = col.Width?.Value ?? 8.43;
+                    for (var c = (int)col.Min.Value; c <= (int)col.Max.Value && c <= 60; c++)
+                        while (model.ColumnWidths.Count < c) model.ColumnWidths.Add(width);
+                }
+
+                foreach (var cell in wsPart.Worksheet.GetFirstChild<S.SheetData>()?.Elements<S.Row>()
+                             .SelectMany(r => r.Elements<S.Cell>()) ?? Enumerable.Empty<S.Cell>())
+                {
+                    var (row, column) = ExcelSheet.ParseReference(cell.CellReference?.Value);
+                    if (row < 1 || column < 1) continue;
+                    var cellModel = model.Ensure(row, column);
+                    cellModel.Display = CellText(cell, shared);
+                    cellModel.Formula = cell.CellFormula?.Text ?? string.Empty;
+                    cellModel.NumberFormat = NumberFormatFor(styles, cell.StyleIndex?.Value);
+                    ApplyCellStyle(cellModel, styles, cell.StyleIndex?.Value);
                 }
             }
-
-            // Pad the grid so empty cells are visible and editable.
-            var maxRow = Math.Max(MinGridRows, model.Cells.Count == 0 ? 0 : model.Cells.Max(c => c.Row));
-            var maxCol = Math.Max(MinGridColumns, model.Cells.Count == 0 ? 0 : model.Cells.Max(c => c.Column));
-            var existing = model.Cells.ToDictionary(c => (c.Row, c.Column));
-            for (var r = 1; r <= maxRow; r++)
-            for (var c = 1; c <= maxCol; c++)
-            {
-                if (existing.ContainsKey((r, c))) continue;
-                model.Cells.Add(new ExcelCell { Row = r, Column = c, Reference = CellReference(r, c) });
-            }
+            while (model.ColumnWidths.Count < DefaultColumns) model.ColumnWidths.Add(110);
             doc.Sheets.Add(model);
         }
 
@@ -187,186 +460,283 @@ public static class OfficeDocumentService
     {
         var raw = cell.CellValue?.InnerText ?? string.Empty;
         if (cell.DataType?.Value == S.CellValues.SharedString &&
-            int.TryParse(raw, out var index) &&
-            shared is not null)
-        {
-            var item = shared.Elements<S.SharedStringItem>().ElementAtOrDefault(index);
-            return item?.InnerText ?? string.Empty;
-        }
+            int.TryParse(raw, out var index) && shared is not null)
+            return shared.Elements<S.SharedStringItem>().ElementAtOrDefault(index)?.InnerText ?? string.Empty;
         if (cell.DataType?.Value == S.CellValues.InlineString)
             return cell.Elements<S.InlineString>().FirstOrDefault()?.InnerText ?? string.Empty;
         return raw;
     }
 
-    private static (int Row, int Column) ParseReference(string? reference)
+    private static string NumberFormatFor(S.Stylesheet? styles, uint? styleIndex)
     {
-        if (string.IsNullOrWhiteSpace(reference)) return (0, 0);
-        var col = 0;
-        var i = 0;
-        while (i < reference.Length && char.IsLetter(reference[i]))
-        {
-            col = col * 26 + (char.ToUpperInvariant(reference[i]) - 'A' + 1);
-            i++;
-        }
-        if (!int.TryParse(reference.AsSpan(i), out var row)) return (0, 0);
-        return (row, col);
+        if (styles is null || styleIndex is null) return string.Empty;
+        var xfs = styles.GetFirstChild<S.CellFormats>();
+        var xf = xfs?.Elements<S.CellFormat>().ElementAtOrDefault((int)styleIndex.Value);
+        if (xf?.NumberFormatId?.Value is not { } id) return string.Empty;
+        if (id < 164) return string.Empty;
+        return styles.GetFirstChild<S.NumberingFormats>()?.Elements<S.NumberingFormat>()
+            .FirstOrDefault(n => n.NumberFormatId?.Value == id)?.FormatCode?.Value ?? string.Empty;
     }
 
-    private static string CellReference(int row, int column)
+    private static void ApplyCellStyle(ExcelCell cell, S.Stylesheet? styles, uint? styleIndex)
     {
-        var text = string.Empty;
-        while (column > 0)
+        if (styles is null || styleIndex is null) return;
+        var xf = styles.GetFirstChild<S.CellFormats>()?.Elements<S.CellFormat>().ElementAtOrDefault((int)styleIndex.Value);
+        if (xf?.FontId?.Value is not { } fontId) return;
+        var font = styles.GetFirstChild<S.Fonts>()?.Elements<S.Font>().ElementAtOrDefault((int)fontId);
+        if (font is null) return;
+        cell.IsBold = font.GetFirstChild<S.Bold>() is not null;
+        cell.IsItalic = font.GetFirstChild<S.Italic>() is not null;
+        cell.IsUnderline = font.GetFirstChild<S.Underline>() is not null;
+        cell.FontColor = StripAlpha(font.GetFirstChild<S.Color>()?.Rgb?.Value);
+        if (xf.FillId?.Value is { } fillId)
         {
-            var rem = (column - 1) % 26;
-            text = (char)('A' + rem) + text;
-            column = (column - 1) / 26;
+            var fill = styles.GetFirstChild<S.Fills>()?.Elements<S.Fill>().ElementAtOrDefault((int)fillId);
+            cell.FillColor = StripAlpha(fill?.PatternFill?.ForegroundColor?.Rgb?.Value);
         }
-        return text + row;
+        var horizontal = xf.Alignment?.Horizontal?.Value;
+        cell.Alignment = horizontal == S.HorizontalAlignmentValues.Center ? WordAlignment.Center
+            : horizontal == S.HorizontalAlignmentValues.Right ? WordAlignment.Right
+            : horizontal == S.HorizontalAlignmentValues.Justify ? WordAlignment.Justify
+            : WordAlignment.Left;
     }
+
+    // ---------------------------------------------------------------- Excel: save
 
     private static void SaveExcel(OfficeDocument doc)
     {
         using var package = SpreadsheetDocument.Open(doc.Path, true);
-        var workbookPart = package.WorkbookPart
-            ?? throw new InvalidOperationException("Workbook part is missing.");
-        var sheets = workbookPart.Workbook.Sheets?.Elements<S.Sheet>().ToList() ?? new List<S.Sheet>();
+        var wbPart = package.WorkbookPart ?? throw new InvalidOperationException("Workbook part is missing.");
+        var sheetsElement = wbPart.Workbook.Sheets ?? wbPart.Workbook.AppendChild(new S.Sheets());
+        var existing = sheetsElement.Elements<S.Sheet>().ToList();
 
-        foreach (var sheetModel in doc.Sheets)
+        // Remove worksheets that were deleted in the editor.
+        foreach (var sheet in existing)
         {
-            var sheet = sheets.FirstOrDefault(s =>
-                string.Equals(s.Name?.Value, sheetModel.Name, StringComparison.OrdinalIgnoreCase));
-            if (sheet?.Id?.Value is null ||
-                workbookPart.GetPartById(sheet.Id.Value) is not WorksheetPart wsPart) continue;
-
-            var data = wsPart.Worksheet.GetFirstChild<S.SheetData>()
-                ?? wsPart.Worksheet.AppendChild(new S.SheetData());
-
-            foreach (var cellModel in sheetModel.Cells.Where(c => !string.IsNullOrEmpty(c.Text)))
-            {
-                var cell = data.Elements<S.Row>()
-                    .SelectMany(r => r.Elements<S.Cell>())
-                    .FirstOrDefault(c => string.Equals(c.CellReference?.Value, cellModel.Reference, StringComparison.OrdinalIgnoreCase));
-                if (cell is null)
-                {
-                    var row = EnsureRow(data, (uint)cellModel.Row);
-                    cell = new S.Cell { CellReference = cellModel.Reference };
-                    InsertCellInOrder(row, cell);
-                }
-                cell.RemoveAllChildren();
-                cell.DataType = S.CellValues.InlineString;
-                cell.AppendChild(new S.InlineString(new S.Text { Text = cellModel.Text, Space = SpaceProcessingModeValues.Preserve }));
-            }
-            wsPart.Worksheet.Save();
+            if (doc.Sheets.Any(s => string.Equals(s.Name, sheet.Name?.Value, StringComparison.OrdinalIgnoreCase)))
+                continue;
+            if (sheet.Id?.Value is { } id && wbPart.GetPartById(id) is WorksheetPart oldPart)
+                wbPart.DeletePart(oldPart);
+            sheet.Remove();
         }
-    }
 
-    private static S.Row EnsureRow(S.SheetData data, uint rowIndex)
-    {
-        var row = data.Elements<S.Row>().FirstOrDefault(r => r.RowIndex?.Value == rowIndex);
-        if (row is not null) return row;
-        row = new S.Row { RowIndex = rowIndex };
-        var after = data.Elements<S.Row>().FirstOrDefault(r => (r.RowIndex?.Value ?? 0) > rowIndex);
-        if (after is not null) data.InsertBefore(row, after);
-        else data.AppendChild(row);
-        return row;
-    }
-
-    private static void InsertCellInOrder(S.Row row, S.Cell cell)
-    {
-        var col = ParseReference(cell.CellReference?.Value).Column;
-        var after = row.Elements<S.Cell>().FirstOrDefault(c => ParseReference(c.CellReference?.Value).Column > col);
-        if (after is not null) row.InsertBefore(cell, after);
-        else row.AppendChild(cell);
-    }
-
-    // ---------------------------------------------------------------- PowerPoint
-
-    private static void LoadPowerPoint(OfficeDocument doc)
-    {
-        using var package = PresentationDocument.Open(doc.Path, false);
-        var presentationPart = package.PresentationPart
-            ?? throw new InvalidOperationException("Presentation part is missing.");
-
-        var number = 1;
-        foreach (var slidePart in presentationPart.SlideParts)
+        foreach (var model in doc.Sheets)
         {
-            var slide = new PowerPointSlide { Number = number++ };
-            var shapeTree = slidePart.Slide.CommonSlideData?.ShapeTree;
-            if (shapeTree is not null)
+            var sheet = sheetsElement.Elements<S.Sheet>().FirstOrDefault(s =>
+                string.Equals(s.Name?.Value, model.Name, StringComparison.OrdinalIgnoreCase));
+            WorksheetPart wsPart;
+            if (sheet is null)
             {
-                foreach (var shape in shapeTree.Elements<P.Shape>())
+                wsPart = wbPart.AddNewPart<WorksheetPart>();
+                var maxSheetId = 0U;
+                foreach (var candidate in sheetsElement.Elements<S.Sheet>())
+                    maxSheetId = Math.Max(maxSheetId, candidate.SheetId?.Value ?? 0U);
+                var newId = maxSheetId + 1;
+                sheet = new S.Sheet { Name = model.Name, SheetId = newId, Id = wbPart.GetIdOfPart(wsPart) };
+                sheetsElement.AppendChild(sheet);
+                wsPart.Worksheet = new S.Worksheet(new S.SheetData());
+            }
+            else
+            {
+                if (sheet.Id?.Value is not { } id || wbPart.GetPartById(id) is not WorksheetPart found) continue;
+                wsPart = found;
+                wsPart.Worksheet ??= new S.Worksheet();
+            }
+
+            sheet.Name = model.Name;
+            WriteWorksheet(wbPart, wsPart, model);
+        }
+        wbPart.Workbook.Save();
+    }
+
+    private static void WriteWorksheet(WorkbookPart wbPart, WorksheetPart wsPart, ExcelSheet model)
+    {
+        var worksheet = wsPart.Worksheet;
+        var data = worksheet.GetFirstChild<S.SheetData>() ?? worksheet.AppendChild(new S.SheetData());
+
+        // A clean SheetData keeps row/column insertion and deletion consistent with the model.
+        data.RemoveAllChildren();
+        foreach (var group in model.Cells.Where(c => c.HasFormula || !string.IsNullOrEmpty(c.Display))
+                     .OrderBy(c => c.Row).ThenBy(c => c.Column).GroupBy(c => c.Row))
+        {
+            var row = new S.Row { RowIndex = (uint)group.Key };
+            foreach (var cellModel in group.OrderBy(c => c.Column))
+            {
+                var cell = new S.Cell { CellReference = cellModel.Reference };
+                var styleIndex = EnsureCellStyle(wbPart, cellModel);
+                if (styleIndex > 0) cell.StyleIndex = styleIndex;
+
+                if (cellModel.HasFormula)
                 {
-                    // OpenXML 3.x may parse a:txBody inside p:sp as an unknown element; walking by
-                    // local name keeps this working across SDK versions.
-                    var textBody = shape.ChildElements.FirstOrDefault(e => e.LocalName == "txBody");
-                    if (textBody is null) continue;
-                    var lines = textBody.ChildElements
-                        .Where(e => e.LocalName == "p")
-                        .Select(e => e.InnerText.Trim())
-                        .Where(t => !string.IsNullOrWhiteSpace(t))
-                        .ToList();
-                    if (lines.Count == 0) continue;
-
-                    var ph = shape.ChildElements.FirstOrDefault(e => e.LocalName == "nvSpPr")
-                        ?.ChildElements.FirstOrDefault(e => e.LocalName == "nvPr")
-                        ?.ChildElements.FirstOrDefault(e => e.LocalName == "ph");
-                    var phType = ph?.OuterXml.Contains("type=\"title\"") == true ||
-                                 ph?.OuterXml.Contains("type='title'") == true
-                        ? "title"
-                        : ph?.OuterXml.Contains("type=\"ctrTitle\"") == true ||
-                          ph?.OuterXml.Contains("type='ctrTitle'") == true
-                            ? "ctrTitle"
-                            : string.Empty;
-                    var isTitle = phType is "title" or "ctrTitle";
-
-                    if (isTitle && string.IsNullOrEmpty(slide.Title))
-                        slide.Title = lines[0];
-                    else
+                    cell.AppendChild(new S.CellFormula { Text = cellModel.Formula.TrimStart('=') });
+                    cell.AppendChild(new S.CellValue { Text = cellModel.Display });
+                }
+                else if (double.TryParse(cellModel.Display, out var number))
+                {
+                    cell.AppendChild(new S.CellValue { Text = number.ToString(System.Globalization.CultureInfo.InvariantCulture) });
+                }
+                else
+                {
+                    cell.DataType = S.CellValues.InlineString;
+                    cell.AppendChild(new S.InlineString(new S.Text
                     {
-                        if (!string.IsNullOrEmpty(slide.Title) || slide.Lines.Count > 0)
-                            slide.Lines.AddRange(lines);
-                        else
-                            slide.Title = lines[0];
-                    }
+                        Text = cellModel.Display,
+                        Space = SpaceProcessingModeValues.Preserve
+                    }));
                 }
+                row.AppendChild(cell);
             }
-            doc.Slides.Add(slide);
+            data.AppendChild(row);
         }
+
+        var columns = worksheet.GetFirstChild<S.Columns>();
+        if (columns is not null) columns.Remove();
+        if (model.ColumnWidths.Any(w => Math.Abs(w - 110) > 0.5))
+        {
+            columns = new S.Columns();
+            for (var c = 0; c < model.ColumnWidths.Count; c++)
+            {
+                var index = (uint)(c + 1);
+                columns.AppendChild(new S.Column
+                {
+                    Min = index, Max = index,
+                    Width = model.ColumnWidths[c] / 11.0,
+                    CustomWidth = true
+                });
+            }
+            worksheet.InsertBefore(columns, data);
+        }
+        worksheet.Save();
+    }
+
+    private static uint EnsureCellStyle(WorkbookPart wbPart, ExcelCell model)
+    {
+        if (!model.IsBold && !model.IsItalic && !model.IsUnderline &&
+            string.IsNullOrEmpty(model.FontColor) && string.IsNullOrEmpty(model.FillColor) &&
+            string.IsNullOrEmpty(model.NumberFormat) && model.Alignment == WordAlignment.Left)
+            return 0;
+
+        var stylesPart = wbPart.WorkbookStylesPart ?? wbPart.AddNewPart<WorkbookStylesPart>();
+        var stylesheet = stylesPart.Stylesheet ??= CreateDefaultStylesheet();
+        var fonts = stylesheet.GetFirstChild<S.Fonts>() ?? stylesheet.PrependChild(new S.Fonts());
+        var fills = stylesheet.GetFirstChild<S.Fills>() ?? stylesheet.AppendChild(new S.Fills());
+        var cellXfs = stylesheet.GetFirstChild<S.CellFormats>() ?? stylesheet.AppendChild(new S.CellFormats());
+
+        var font = new S.Font();
+        if (model.IsBold) font.AppendChild(new S.Bold());
+        if (model.IsItalic) font.AppendChild(new S.Italic());
+        if (model.IsUnderline) font.AppendChild(new S.Underline());
+        if (!string.IsNullOrEmpty(model.FontColor))
+            font.AppendChild(new S.Color { Rgb = "FF" + NormaliseHex(model.FontColor) });
+        if (!font.ChildElements.Any()) font.AppendChild(new S.FontSize { Val = 1100 });
+        fonts.AppendChild(font);
+        var fontId = (uint)(fonts.ChildElements.Count - 1);
+
+        var fillId = 0U;
+        if (!string.IsNullOrEmpty(model.FillColor))
+        {
+            var fill = new S.Fill(new S.PatternFill
+            {
+                PatternType = S.PatternValues.Solid,
+                ForegroundColor = new S.ForegroundColor { Rgb = "FF" + NormaliseHex(model.FillColor) },
+                BackgroundColor = new S.BackgroundColor { Indexed = 64U }
+            });
+            fills.AppendChild(fill);
+            fillId = (uint)(fills.ChildElements.Count - 1);
+        }
+
+        var numberFormatId = 0U;
+        if (!string.IsNullOrEmpty(model.NumberFormat))
+            numberFormatId = EnsureNumberFormat(stylesheet, model.NumberFormat);
+
+        var xf = new S.CellFormat
+        {
+            FontId = fontId, FillId = fillId, NumberFormatId = numberFormatId,
+            ApplyFont = true, ApplyFill = fillId > 0, ApplyNumberFormat = numberFormatId > 0,
+            ApplyAlignment = model.Alignment != WordAlignment.Left
+        };
+        if (model.Alignment != WordAlignment.Left)
+        {
+            xf.AppendChild(new S.Alignment
+            {
+                Horizontal = model.Alignment switch
+                {
+                    WordAlignment.Center => S.HorizontalAlignmentValues.Center,
+                    WordAlignment.Right => S.HorizontalAlignmentValues.Right,
+                    WordAlignment.Justify => S.HorizontalAlignmentValues.Justify,
+                    _ => S.HorizontalAlignmentValues.Left
+                }
+            });
+        }
+        cellXfs.AppendChild(xf);
+        stylesPart.Stylesheet.Save();
+        return (uint)(cellXfs.ChildElements.Count - 1);
+    }
+
+    private static uint EnsureNumberFormat(S.Stylesheet stylesheet, string code)
+    {
+        var builtin = code switch
+        {
+            "General" => 0U, "0" => 1U, "0.00" => 2U, "#,##0" => 3U, "#,##0.00" => 4U,
+            "0%" => 9U, "0.00%" => 10U, _ => 0U
+        };
+        if (builtin != 0 || code == "General") return builtin;
+
+        var formats = stylesheet.GetFirstChild<S.NumberingFormats>()
+            ?? stylesheet.PrependChild(new S.NumberingFormats());
+        var existing = formats.Elements<S.NumberingFormat>()
+            .FirstOrDefault(n => string.Equals(n.FormatCode?.Value, code, StringComparison.OrdinalIgnoreCase));
+        if (existing?.NumberFormatId?.Value is { } found) return found;
+        var id = (uint)(164 + formats.ChildElements.Count);
+        formats.AppendChild(new S.NumberingFormat { NumberFormatId = id, FormatCode = code });
+        return id;
+    }
+
+    private static S.Stylesheet CreateDefaultStylesheet() => new(
+        new S.Fonts(new S.Font(new S.FontSize { Val = 1100 })),
+        new S.Fills(
+            new S.Fill(new S.PatternFill { PatternType = S.PatternValues.None }),
+            new S.Fill(new S.PatternFill { PatternType = S.PatternValues.Gray125 })),
+        new S.Borders(new S.Border()),
+        new S.CellStyleFormats(new S.CellFormat { NumberFormatId = 0, FontId = 0, FillId = 0, BorderId = 0 }),
+        new S.CellFormats(new S.CellFormat { NumberFormatId = 0, FontId = 0, FillId = 0, BorderId = 0, FormatId = 0 }));
+
+    private static string StripAlpha(string? value)
+    {
+        if (string.IsNullOrEmpty(value)) return string.Empty;
+        return value.Length == 8 ? value[2..] : value;
+    }
+
+    private static string NormaliseHex(string value)
+    {
+        var hex = value.TrimStart('#');
+        if (hex.Length == 6) return hex.ToUpperInvariant();
+        return hex.Length == 8 ? hex.ToUpperInvariant()[2..] : "000000";
     }
 
     // ---------------------------------------------------------------- New documents
 
-    /// <summary>Create a blank document. PowerPoint creation is not supported (view-only).</summary>
-    public static void CreateNew(string path, OfficeDocumentKind kind)
+    private static void CreateWord(string path)
     {
-        switch (kind)
-        {
-            case OfficeDocumentKind.Word:
-                using (var word = WordprocessingDocument.Create(path, WordprocessingDocumentType.Document))
-                {
-                    var main = word.AddMainDocumentPart();
-                    main.Document = new W.Document(new W.Body(
-                        new W.Paragraph(new W.Run(new W.Text(string.Empty))),
-                        new W.SectionProperties(
-                            new W.PageSize { Width = 12240U, Height = 15840U },
-                            new W.PageMargin { Top = 1440, Right = 1440, Bottom = 1440, Left = 1440 })));
-                    main.Document.Save();
-                }
-                break;
-            case OfficeDocumentKind.Excel:
-                using (var excel = SpreadsheetDocument.Create(path, SpreadsheetDocumentType.Workbook))
-                {
-                    var wbPart = excel.AddWorkbookPart();
-                    wbPart.Workbook = new S.Workbook(new S.Sheets(
-                        new S.Sheet { Name = "Sheet1", SheetId = 1U, Id = "rId1" }));
-                    var wsPart = wbPart.AddNewPart<WorksheetPart>("rId1");
-                    wsPart.Worksheet = new S.Worksheet(new S.SheetData());
-                    wbPart.Workbook.Save();
-                    wsPart.Worksheet.Save();
-                }
-                break;
-            default:
-                throw new NotSupportedException("Creating PowerPoint documents is not supported.");
-        }
+        using var word = WordprocessingDocument.Create(path, WordprocessingDocumentType.Document);
+        var main = word.AddMainDocumentPart();
+        main.Document = new W.Document(new W.Body(
+            new W.Paragraph(new W.Run(new W.Text(string.Empty))),
+            new W.SectionProperties(
+                new W.PageSize { Width = 12240U, Height = 15840U },
+                new W.PageMargin { Top = 1440, Right = 1440, Bottom = 1440, Left = 1440 })));
+        main.Document.Save();
+    }
+
+    private static void CreateExcel(string path)
+    {
+        using var excel = SpreadsheetDocument.Create(path, SpreadsheetDocumentType.Workbook);
+        var wbPart = excel.AddWorkbookPart();
+        wbPart.Workbook = new S.Workbook(new S.Sheets(
+            new S.Sheet { Name = "Sheet1", SheetId = 1U, Id = "rId1" }));
+        var wsPart = wbPart.AddNewPart<WorksheetPart>("rId1");
+        wsPart.Worksheet = new S.Worksheet(new S.SheetData());
+        wbPart.Workbook.Save();
+        wsPart.Worksheet.Save();
     }
 }

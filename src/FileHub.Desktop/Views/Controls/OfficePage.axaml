@@ -5,11 +5,68 @@
              x:Class="FileHub.Desktop.Views.Controls.OfficePage">
 
   <!--
-    Microsoft Office style workspace: title strip, ribbon tabs + ribbon groups, document canvas,
-    status bar. The ribbon is built from the same WinUI 3 styled Button/ComboBox resources used by
-    the rest of FileHub; the layout follows Word/Excel's tab+group hierarchy.
+    Built-in Office workspace. The ribbon, page grid and slide canvas follow the Microsoft
+    Office information architecture while using FileHub's WinUI 3 styled controls.
   -->
-  <Grid RowDefinitions="Auto,Auto,Auto,*,Auto" Background="{DynamicResource SystemControlBackgroundAltHighBrush}">
+  <UserControl.Resources>
+    <loc:ByteArrayToImageConverter x:Key="OfficeImageConverter" />
+  </UserControl.Resources>
+
+  <UserControl.DataTemplates>
+    <DataTemplate DataType="m:WordParagraph">
+      <Border Padding="2,3">
+        <Panel>
+          <TextBox Text="{Binding PlainText, Mode=TwoWay}"
+                   BorderThickness="0" Background="Transparent" Padding="4,3"
+                   FontSize="14" TextWrapping="Wrap" AcceptsReturn="True"
+                   IsVisible="{Binding IsEditing}"
+                   GotFocus="OnParagraphGotFocus" LostFocus="OnParagraphLostFocus" />
+          <TextBlock Text="{Binding DisplayText}" TextWrapping="Wrap" FontSize="14"
+                     Margin="4,3" IsVisible="{Binding !IsEditing}"
+                     PointerPressed="OnParagraphDisplayPressed" />
+        </Panel>
+      </Border>
+    </DataTemplate>
+    <DataTemplate DataType="m:WordTable">
+      <Border Margin="0,8" Padding="4"
+              BorderThickness="1" BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
+        <ItemsControl ItemsSource="{Binding Rows}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <StackPanel Orientation="Horizontal">
+                <ItemsControl ItemsSource="{Binding}">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                      <StackPanel Orientation="Horizontal" />
+                    </ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="m:WordTableCell">
+                      <Border Width="150" BorderThickness="0,0,1,1"
+                              BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
+                        <TextBox Text="{Binding Text, Mode=TwoWay}" BorderThickness="0"
+                                 Background="Transparent" FontSize="12" Padding="4,3"
+                                 GotFocus="OnTableGotFocus" LostFocus="OnTableLostFocus" />
+                      </Border>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </Border>
+    </DataTemplate>
+    <DataTemplate DataType="m:WordImage">
+      <Border Margin="0,8" HorizontalAlignment="Center">
+        <Image Source="{Binding Data, Converter={StaticResource OfficeImageConverter}}"
+               MaxWidth="700" MaxHeight="420" Stretch="Uniform" />
+      </Border>
+    </DataTemplate>
+  </UserControl.DataTemplates>
+
+  <Grid RowDefinitions="Auto,Auto,Auto,Auto,*,Auto"
+        Background="{DynamicResource SystemControlBackgroundAltHighBrush}">
 
     <!-- Title strip -->
     <Border Grid.Row="0" Classes="paneSurface" Padding="12,8">
@@ -27,174 +84,301 @@
           <TextBlock Text="{Binding FilePath}" Opacity="0.6" FontSize="11"
                      TextTrimming="CharacterEllipsis" />
         </StackPanel>
-        <TextBlock Grid.Column="3" Text="{Binding DocumentTypeLabel}" Opacity="0.65"
-                   FontSize="12" Margin="12,0,0,0" />
+        <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="10" Margin="12,0,0,0">
+          <TextBlock Text="{Binding ActiveTab}" Opacity="0.55" FontSize="12" />
+          <TextBlock Text="{Binding DocumentTypeLabel}" Opacity="0.65" FontSize="12" />
+        </StackPanel>
       </Grid>
     </Border>
 
-    <!-- Ribbon tab row -->
+    <!-- Ribbon tabs -->
     <Border Grid.Row="1" Padding="12,0" BorderThickness="0,0,0,1"
             BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
-      <StackPanel Orientation="Horizontal" Spacing="2">
-        <Button Content="{x:Static loc:Strings.OfficeTabFile}" Command="{Binding SelectTabCommand}"
-                CommandParameter="File" Classes="subtle" Padding="14,6" />
-        <Button Content="{x:Static loc:Strings.OfficeTabHome}" Command="{Binding SelectTabCommand}"
-                CommandParameter="Home" Classes="subtle" Padding="14,6" />
-        <Button Content="{x:Static loc:Strings.OfficeTabInsert}" Command="{Binding SelectTabCommand}"
-                CommandParameter="Insert" Classes="subtle" Padding="14,6" />
-        <Button Content="{x:Static loc:Strings.OfficeTabView}" Command="{Binding SelectTabCommand}"
-                CommandParameter="View" Classes="subtle" Padding="14,6" />
-      </StackPanel>
+      <ItemsControl ItemsSource="{Binding RibbonTabs}">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate>
+            <StackPanel Orientation="Horizontal" Spacing="2" />
+          </ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate>
+            <Button Content="{Binding}" Classes="subtle" Padding="14,6"
+                    Command="{Binding $parent[UserControl].DataContext.SelectTabCommand}"
+                    CommandParameter="{Binding}" />
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
     </Border>
 
     <!-- Ribbon groups -->
-    <Border Grid.Row="2" Classes="paneSurface" Padding="12,8" MinHeight="74"
+    <Border Grid.Row="2" Classes="paneSurface" Padding="12,8" MinHeight="78"
             BorderThickness="0,0,0,1"
             BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
-      <StackPanel Orientation="Horizontal" Spacing="18" VerticalAlignment="Center">
+      <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+        <ItemsControl ItemsSource="{Binding RibbonGroups}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <StackPanel Orientation="Horizontal" Spacing="18" />
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                <ItemsControl ItemsSource="{Binding Items}">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                      <StackPanel Orientation="Horizontal" Spacing="4" />
+                    </ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                      <ToggleButton Content="{Binding Label}" Width="44" MinHeight="28"
+                                    FontSize="12" Padding="4,2"
+                                    ToolTip.Tip="{Binding ToolTip}"
+                                    IsChecked="{Binding IsChecked, Mode=OneWay}"
+                                    IsEnabled="{Binding IsEnabled}"
+                                    Command="{Binding Command}"
+                                    CommandParameter="{Binding Parameter}"
+                                    Click="OnRibbonItemClick" />
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBlock Text="{Binding Name}" FontSize="10" Opacity="0.55"
+                           VerticalAlignment="Bottom" Margin="0,0,0,2" />
+              </StackPanel>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
+    </Border>
 
-        <!-- File group -->
-        <StackPanel Orientation="Horizontal" Spacing="6">
-          <StackPanel Spacing="3">
-            <Button Content="{x:Static loc:Strings.OfficeNew}" Command="{Binding CreateNewCommand}"
-                    ToolTip.Tip="{x:Static loc:Strings.OfficeNewHint}" Padding="10,4" />
-            <Button Content="{x:Static loc:Strings.OfficeSave}" Command="{Binding SaveCommand}"
-                    ToolTip.Tip="Ctrl+S" Padding="10,4" />
-          </StackPanel>
-          <TextBlock Text="{x:Static loc:Strings.OfficeGroupFile}" FontSize="10" Opacity="0.55"
-                     VerticalAlignment="Bottom" Margin="0,0,0,2" />
-        </StackPanel>
+    <!-- Contextual tool strip -->
+    <Border Grid.Row="3" Padding="12,6" BorderThickness="0,0,0,1"
+            BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
+      <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
 
-        <!-- Font group (Word) -->
+        <!-- Word tools -->
         <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding IsWord}">
-          <StackPanel Spacing="4">
-            <StackPanel Orientation="Horizontal" Spacing="4">
-              <ToggleButton Content="B" FontWeight="Bold" IsChecked="{Binding IsBold}"
-                            ToolTip.Tip="{x:Static loc:Strings.OfficeBold}" Width="30" />
-              <ToggleButton Content="I" FontStyle="Italic" IsChecked="{Binding IsItalic}"
-                            ToolTip.Tip="{x:Static loc:Strings.OfficeItalic}" Width="30" />
-              <ToggleButton Content="U" IsChecked="{Binding IsUnderline}"
-                            ToolTip.Tip="{x:Static loc:Strings.OfficeUnderline}" Width="30" />
-            </StackPanel>
-            <ComboBox ItemsSource="{Binding StyleOptions}" SelectedItem="{Binding SelectedStyle}"
-                      MinWidth="160" FontSize="12" />
-          </StackPanel>
-          <TextBlock Text="{x:Static loc:Strings.OfficeGroupFont}" FontSize="10" Opacity="0.55"
-                     VerticalAlignment="Bottom" Margin="0,0,0,2" />
+          <TextBlock Text="{x:Static loc:Strings.OfficeStyle}" FontSize="11" Opacity="0.7"
+                     VerticalAlignment="Center" />
+          <ComboBox ItemsSource="{Binding StyleOptions}" SelectedItem="{Binding SelectedStyle}"
+                    MinWidth="120" FontSize="12" />
+          <ComboBox ItemsSource="{Binding FontSizes}" SelectedItem="{Binding SelectedFontSize}"
+                    Width="64" FontSize="12" />
+          <ComboBox ItemsSource="{Binding FontColors}" SelectedItem="{Binding SelectedColor}"
+                    Width="80" FontSize="12" />
+          <TextBlock Text="{x:Static loc:Strings.OfficeFind}" FontSize="11" Opacity="0.7"
+                     Margin="12,0,0,0" VerticalAlignment="Center" />
+          <TextBox Text="{Binding SearchText, Mode=TwoWay}" Width="120" FontSize="12"
+                   PlaceholderText="{x:Static loc:Strings.OfficeFind}" />
+          <TextBlock Text="{x:Static loc:Strings.OfficeReplace}" FontSize="11" Opacity="0.7"
+                     VerticalAlignment="Center" />
+          <TextBox Text="{Binding ReplaceText, Mode=TwoWay}" Width="120" FontSize="12"
+                   PlaceholderText="{x:Static loc:Strings.OfficeReplace}" />
+          <TextBlock Text="{Binding FindResult}" FontSize="11" Opacity="0.7"
+                     VerticalAlignment="Center" />
         </StackPanel>
 
-        <!-- Workbook group (Excel) -->
-        <StackPanel IsVisible="{Binding IsExcel}" Spacing="4">
-          <TextBlock Text="{x:Static loc:Strings.OfficeExcelHint}" FontSize="12" Opacity="0.8" />
-          <TextBlock Text="{x:Static loc:Strings.OfficeGroupCells}" FontSize="10" Opacity="0.55" />
+        <!-- Excel formula bar -->
+        <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding IsExcel}">
+          <Border BorderThickness="1" BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                  Padding="8,4" MinWidth="70">
+            <TextBlock Text="{Binding CellReference}" FontSize="12" FontWeight="SemiBold" />
+          </Border>
+          <TextBlock Text="fx" FontStyle="Italic" FontSize="14" Opacity="0.7"
+                     VerticalAlignment="Center" />
+          <TextBox Text="{Binding FormulaText, Mode=TwoWay}" MinWidth="420" FontSize="12"
+                   KeyDown="OnFormulaKeyDown"
+                   PlaceholderText="{x:Static loc:Strings.OfficeFormulaHint}" />
+          <TextBlock Text="{Binding SelectionSummary}" FontSize="11" Opacity="0.7"
+                     VerticalAlignment="Center" />
         </StackPanel>
 
-        <!-- Slide group (PowerPoint) -->
-        <StackPanel IsVisible="{Binding IsPowerPoint}" Spacing="4">
-          <TextBlock Text="{x:Static loc:Strings.OfficeReadOnlyHint}" FontSize="12" Opacity="0.8" />
-          <TextBlock Text="{x:Static loc:Strings.OfficeGroupSlides}" FontSize="10" Opacity="0.55" />
+        <!-- PowerPoint tools -->
+        <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding IsPowerPoint}">
+          <TextBlock Text="{x:Static loc:Strings.OfficeLayout}" FontSize="11" Opacity="0.7"
+                     VerticalAlignment="Center" />
+          <ComboBox ItemsSource="{Binding LayoutOptions}" SelectedItem="{Binding SelectedLayout}"
+                    MinWidth="140" FontSize="12" />
+          <TextBlock Text="{x:Static loc:Strings.OfficeNotes}" FontSize="11" Opacity="0.7"
+                     Margin="12,0,0,0" VerticalAlignment="Center" />
+          <TextBox Text="{Binding NotesText, Mode=TwoWay}" MinWidth="260" FontSize="12"
+                   PlaceholderText="{x:Static loc:Strings.OfficeNotesHint}" />
         </StackPanel>
 
-        <!-- New-document box -->
+        <!-- New document box -->
         <StackPanel Orientation="Horizontal" Spacing="6" Margin="12,0,0,0">
+          <ComboBox ItemsSource="{Binding NewDocumentKinds}"
+                    SelectedItem="{Binding NewDocumentKind}" Width="110" FontSize="12" />
           <TextBox Text="{Binding NewFileName}" PlaceholderText="{x:Static loc:Strings.OfficeNewNameHint}"
-                   MinWidth="140" FontSize="12" VerticalAlignment="Center"
+                   MinWidth="130" FontSize="12" VerticalAlignment="Center"
                    KeyDown="OnNewNameKeyDown" />
+          <Button Content="{x:Static loc:Strings.OfficeNew}" Command="{Binding CreateNewCommand}"
+                  Padding="10,4" />
         </StackPanel>
       </StackPanel>
     </Border>
 
     <!-- Document canvas -->
-    <Grid Grid.Row="3">
+    <Grid Grid.Row="4">
+
       <!-- Empty state -->
       <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8"
                   IsVisible="{Binding !HasDocument}">
         <TextBlock Text="{x:Static loc:Strings.OfficeEmpty}" FontSize="16" Opacity="0.6"
                    HorizontalAlignment="Center" />
         <TextBlock Text="{x:Static loc:Strings.OfficeEmptyHint}" FontSize="12" Opacity="0.5"
-                   HorizontalAlignment="Center" />
+                   HorizontalAlignment="Center" TextWrapping="Wrap" />
       </StackPanel>
 
-      <!-- Word: paragraph list -->
-      <ScrollViewer IsVisible="{Binding IsWord}">
-        <ItemsControl ItemsSource="{Binding Paragraphs}" Margin="32,24,32,40">
-          <ItemsControl.ItemTemplate>
-            <DataTemplate DataType="m:WordParagraph">
-              <TextBox Text="{Binding Text}" AcceptsReturn="True" TextWrapping="Wrap"
-                       BorderThickness="0" Background="Transparent" Padding="4,3"
-                       FontSize="14" LostFocus="OnParagraphLostFocus"
-                       GotFocus="OnParagraphGotFocus" />
-            </DataTemplate>
-          </ItemsControl.ItemTemplate>
-        </ItemsControl>
+      <!-- Word: page canvas -->
+      <ScrollViewer IsVisible="{Binding IsWord}" HorizontalScrollBarVisibility="Disabled">
+        <Border Background="White" Margin="24" Padding="48,40" MaxWidth="860"
+                BorderThickness="1" BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
+          <ItemsControl ItemsSource="{Binding Blocks}" />
+        </Border>
       </ScrollViewer>
 
-      <!-- Excel: grid -->
+      <!-- Excel: worksheet grid -->
       <ScrollViewer IsVisible="{Binding IsExcel}" HorizontalScrollBarVisibility="Auto"
                     VerticalScrollBarVisibility="Auto">
-        <ItemsControl ItemsSource="{Binding Sheets}" x:Name="SheetList">
-          <ItemsControl.ItemTemplate>
-            <DataTemplate DataType="m:ExcelSheet">
-              <StackPanel Margin="16,12">
-                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="14" Margin="0,0,0,8" />
-                <ItemsControl ItemsSource="{Binding Cells}">
-                  <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                      <WrapPanel Orientation="Horizontal" />
-                    </ItemsPanelTemplate>
-                  </ItemsControl.ItemsPanel>
-                  <ItemsControl.ItemTemplate>
-                    <DataTemplate DataType="m:ExcelCell">
-                      <Border BorderThickness="0,0,1,1"
-                              BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
-                              Width="100" MinHeight="26">
-                        <TextBox Text="{Binding Text}" BorderThickness="0" Background="Transparent"
-                                 FontSize="12" Padding="4,3" LostFocus="OnCellLostFocus"
-                                 GotFocus="OnCellGotFocus" />
-                      </Border>
-                    </DataTemplate>
-                  </ItemsControl.ItemTemplate>
-                </ItemsControl>
-              </StackPanel>
-            </DataTemplate>
-          </ItemsControl.ItemTemplate>
-        </ItemsControl>
-      </ScrollViewer>
-
-      <!-- PowerPoint: slide outline -->
-      <ScrollViewer IsVisible="{Binding IsPowerPoint}">
-        <ItemsControl ItemsSource="{Binding Slides}" Margin="32,24,32,40">
-          <ItemsControl.ItemTemplate>
-            <DataTemplate DataType="m:PowerPointSlide">
-              <Border Classes="paneSurface" Padding="16" Margin="0,0,0,14" CornerRadius="6">
-                <StackPanel Spacing="6">
-                  <TextBlock Text="{Binding Number, StringFormat='Slide {0}'}" FontSize="11" Opacity="0.6" />
-                  <TextBlock Text="{Binding Title}" FontSize="18" FontWeight="SemiBold"
-                             TextWrapping="Wrap" />
-                  <ItemsControl ItemsSource="{Binding Lines}">
+        <StackPanel Margin="12">
+          <StackPanel Orientation="Horizontal">
+            <Border Width="46" Height="26" BorderThickness="0,0,1,1"
+                    BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}" />
+            <ItemsControl ItemsSource="{Binding ColumnHeaders}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <StackPanel Orientation="Horizontal" />
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <Border Width="110" Height="26" BorderThickness="0,0,1,1"
+                          BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
+                    <TextBlock Text="{Binding}" HorizontalAlignment="Center" FontSize="11"
+                               FontWeight="SemiBold" VerticalAlignment="Center" />
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+          <ItemsControl ItemsSource="{Binding GridRows}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <StackPanel Orientation="Horizontal">
+                  <Border Width="46" Height="26" BorderThickness="0,0,1,1"
+                          BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
+                    <TextBlock Text="{Binding Header}" HorizontalAlignment="Center" FontSize="11"
+                               VerticalAlignment="Center" Opacity="0.7" />
+                  </Border>
+                  <ItemsControl ItemsSource="{Binding Cells}">
+                    <ItemsControl.ItemsPanel>
+                      <ItemsPanelTemplate>
+                        <StackPanel Orientation="Horizontal" />
+                      </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
                       <DataTemplate>
-                        <TextBlock Text="{Binding}" FontSize="13" Margin="12,0,0,0"
-                                   TextWrapping="Wrap" />
+                        <Border Width="110" Height="26" BorderThickness="0,0,1,1"
+                                BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                                Background="{Binding FillColor, Converter={x:Static loc:StringToBrushConverter.Instance}}">
+                          <TextBox Text="{Binding EditingText, Mode=TwoWay}" BorderThickness="0"
+                                   Background="Transparent" FontSize="12" Padding="4,2"
+                                   GotFocus="OnCellGotFocus" LostFocus="OnCellLostFocus" />
+                        </Border>
                       </DataTemplate>
                     </ItemsControl.ItemTemplate>
                   </ItemsControl>
                 </StackPanel>
-              </Border>
-            </DataTemplate>
-          </ItemsControl.ItemTemplate>
-        </ItemsControl>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
       </ScrollViewer>
+
+      <!-- PowerPoint: thumbnails + slide canvas -->
+      <Grid IsVisible="{Binding IsPowerPoint}" ColumnDefinitions="200,*">
+        <Border Grid.Column="0" Classes="paneSurface" BorderThickness="0,0,1,0"
+                BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}" Padding="8">
+          <DockPanel>
+            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="4" Margin="0,0,0,8">
+              <Button Content="+" Command="{Binding AddSlideCommand}" Width="30" />
+              <Button Content="{x:Static loc:Strings.OfficeDuplicateSlide}"
+                      Command="{Binding DuplicateSlideCommand}" FontSize="11" Padding="6,3" />
+              <Button Content="−" Command="{Binding DeleteSlideCommand}" Width="30" />
+            </StackPanel>
+            <ScrollViewer>
+              <ItemsControl ItemsSource="{Binding Slides}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate>
+                    <Button HorizontalAlignment="Stretch" Margin="0,0,0,8" Padding="6"
+                            Command="{Binding $parent[UserControl].DataContext.SelectSlideCommand}"
+                            CommandParameter="{Binding}">
+                      <StackPanel Spacing="4">
+                        <Border Height="82" Background="White" BorderThickness="1"
+                                BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
+                          <TextBlock Text="{Binding Title}" FontSize="11" Foreground="#222"
+                                     Margin="6" TextWrapping="Wrap" />
+                        </Border>
+                        <TextBlock Text="{Binding Number, StringFormat='Slide {0}'}"
+                                   FontSize="11" Opacity="0.7" HorizontalAlignment="Center" />
+                      </StackPanel>
+                    </Button>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </ScrollViewer>
+          </DockPanel>
+        </Border>
+
+        <ScrollViewer Grid.Column="1" HorizontalScrollBarVisibility="Auto"
+                      VerticalScrollBarVisibility="Auto" Padding="24">
+          <Border Width="960" Height="540" Background="White" BorderThickness="1"
+                  BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
+            <Panel>
+              <ItemsControl ItemsSource="{Binding ActiveSlide.Shapes}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <Canvas />
+                  </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate>
+                    <Border Canvas.Left="{Binding X}" Canvas.Top="{Binding Y}"
+                            Width="{Binding Width}" Height="{Binding Height}"
+                            BorderThickness="1" Padding="4"
+                            BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
+                      <TextBox Text="{Binding Text, Mode=TwoWay}" Background="Transparent"
+                               BorderThickness="0" FontSize="{Binding FontSize}"
+                               FontWeight="{Binding IsBold, Converter={x:Static loc:BoolToFontWeightConverter.Instance}}"
+                               TextWrapping="Wrap" AcceptsReturn="True"
+                               GotFocus="OnShapeGotFocus" LostFocus="OnShapeLostFocus" />
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </Panel>
+          </Border>
+        </ScrollViewer>
+      </Grid>
     </Grid>
 
     <!-- Status bar -->
-    <Border Grid.Row="4" Classes="paneSurface" Padding="12,5">
-      <StackPanel Orientation="Horizontal" Spacing="18">
-        <TextBlock Text="{Binding Status}" FontSize="11" Opacity="0.8"
+    <Border Grid.Row="5" Classes="paneSurface" Padding="12,5">
+      <Grid ColumnDefinitions="*,Auto,Auto,Auto">
+        <TextBlock Grid.Column="0" Text="{Binding Status}" FontSize="11" Opacity="0.8"
                    TextTrimming="CharacterEllipsis" />
-        <TextBlock Text="{Binding DocumentTypeLabel}" FontSize="11" Opacity="0.6" />
-        <TextBlock Text="{x:Static loc:Strings.OfficeDisclaimer}" FontSize="11" Opacity="0.5" />
-      </StackPanel>
+        <TextBlock Grid.Column="1" Text="{Binding Pages, StringFormat='Pages: {0}'}"
+                   FontSize="11" Opacity="0.6" Margin="12,0" IsVisible="{Binding IsWord}" />
+        <TextBlock Grid.Column="2"
+                   Text="{Binding Words, StringFormat='Words: {0}'}"
+                   FontSize="11" Opacity="0.6" Margin="12,0" IsVisible="{Binding IsWord}" />
+        <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="10">
+          <TextBlock Text="{Binding Zoom, StringFormat='{}{0}%'}" FontSize="11" Opacity="0.6" />
+          <TextBlock Text="{x:Static loc:Strings.OfficeDisclaimer}" FontSize="11" Opacity="0.5" />
+        </StackPanel>
+      </Grid>
     </Border>
   </Grid>
 </UserControl>

@@ -133,11 +133,15 @@ macOS 优先读系统语言偏好是故意的：从 Finder 启动的 GUI 应用�
 - **Monaco 代码编辑器**：双击源代码文件（或点标签栏的「代码」）即可打开本地 Monaco 编辑器，
   支持语法高亮、语言自动识别、Ctrl+S 保存、保留原编码写入、未保存标记与光标位置显示。
   所有资源都随应用打包，离线也能写代码。
-- **内置 Office 页面**：双击 `.docx` / `.xlsx` / `.pptx`（或点标签栏「Office」）即可打开 Microsoft Office
-  风格的功能区工作区。Word 段落可编辑并支持粗体 / 斜体 / 下划线和标题样式；Excel 工作表渲染为可编辑的
-  单元格网格；PowerPoint 幻灯片以只读大纲展示。Ctrl+S 把 Word / Excel 的修改写回原文件。
-  底层是 Open XML SDK，无需安装 Office、不用 COM，跨平台可用。复杂 OOXML 特性保存时可能被简化，
-  详见 THIRD-PARTY-NOTICES.md。
+- **内置 Office 工作套件**：双击 `.docx` / `.xlsx` / `.pptx`（或点标签栏「Office」）即可打开 Microsoft Office
+  风格的功能区工作区，内含三款真正可编辑的组件：
+  - **Word**：页面画布、样式、字体/字号/颜色、粗体/斜体/下划线、对齐、项目符号与编号、表格、内嵌图片、
+    超链接、查找替换、撤销/重做与 HTML 导出。
+  - **Excel**：工作表标签、可滚动单元格网格、公式栏与公式引擎（`SUM`、`AVERAGE`、`IF`、单元格引用与区域）、
+    单元格样式、行列增删与实时统计。
+  - **PowerPoint**：幻灯片缩略图、可编辑的 16:9 画布与文本框、新建/复制/删除/排序幻灯片、版式与演讲者备注。
+  Ctrl+S 把修改写回原文件。底层是 Open XML SDK，无需安装 Office、不用 COM，跨平台可用。复杂 OOXML
+  特性保存时可能被简化，详见 THIRD-PARTY-NOTICES.md。
 - **VS Code 扩展页面**：扫描 `.vscode`、`.vscode-insiders`、`.vscode-oss`、`.cursor`、`.windsurf`
   下已安装的扩展，可为 FileHub 单独启用 / 禁用，并展示语言、主题、代码片段和语法贡献。
   启用的扩展会向 Monaco 提供文件关联、配色主题和补全片段；**不会执行扩展的 JavaScript**。
