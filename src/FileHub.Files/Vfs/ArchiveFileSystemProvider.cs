@@ -38,8 +38,10 @@ public sealed class ArchiveFileSystemProvider : IFileSystemProvider
     /// </summary>
     public static Func<string, string?>? PasswordProvider { get; set; }
 
+    /// <summary>Always <see cref="VfsScheme.Archive"/>.</summary>
     public VfsScheme Scheme => VfsScheme.Archive;
 
+    /// <summary>Label shown for archive locations in the sidebar.</summary>
     public string DisplayName => "Archive";
 
     /// <summary>Lists one folder of the archive, including folders that only exist implicitly.</summary>
@@ -77,6 +79,7 @@ public sealed class ArchiveFileSystemProvider : IFileSystemProvider
         return result;
     }
 
+    /// <summary>Reports whether a folder or file exists inside the container.</summary>
     public async Task<VfsStat> StatAsync(VfsPath path, CancellationToken cancellationToken)
     {
         var container = ContainerOf(path);
@@ -122,19 +125,19 @@ public sealed class ArchiveFileSystemProvider : IFileSystemProvider
     public Task<Stream> CreateFileAsync(VfsPath path, CancellationToken cancellationToken)
         => throw ReadOnly("Creating a file", path);
 
-    /// <inheritdoc />
+    /// <summary>Archives cannot be written in place; repack them with <see cref="ArchiveService"/>.</summary>
     public Task CreateDirectoryAsync(VfsPath path, CancellationToken cancellationToken)
         => throw ReadOnly("Creating a folder", path);
 
-    /// <inheritdoc />
+    /// <summary>Archives cannot be written in place; repack them with <see cref="ArchiveService"/>.</summary>
     public Task DeleteAsync(VfsPath path, bool recursive, CancellationToken cancellationToken)
         => throw ReadOnly("Deleting", path);
 
-    /// <inheritdoc />
+    /// <summary>Archives cannot be written in place; repack them with <see cref="ArchiveService"/>.</summary>
     public Task RenameAsync(VfsPath path, string newName, CancellationToken cancellationToken)
         => throw ReadOnly("Renaming", path);
 
-    /// <inheritdoc />
+    /// <summary>Archives cannot be written in place; repack them with <see cref="ArchiveService"/>.</summary>
     public Task MoveAsync(VfsPath source, VfsPath target, CancellationToken cancellationToken)
         => throw ReadOnly("Moving", source);
 

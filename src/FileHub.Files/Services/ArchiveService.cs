@@ -282,7 +282,17 @@ public static class ArchiveService
     {
         await using var output = new FileStream(target, FileMode.CreateNew, FileAccess.Write,
             FileShare.None, CopyBufferSize, FileOptions.Asynchronous);
-        var written = await ArchiveIo.PumpAsync(source, output, null, ct).ConfigureAwait(false);
+
+        // Throttle to ~1 MB so a fast disk does not flood the UI thread with progress events.
+        var lastReported = 0L;
+        void OnBytes(long bytes)
+        {
+            if (progress is null || bytes - lastReported < 1024 * 1024) return;
+            lastReported = bytes;
+            progress.Report(new VfsTransferProgress(itemName, bytesDoneSoFar + bytes, totalBytes, index, itemCount));
+        }
+
+        var written = await ArchiveIo.PumpAsync(source, output, OnBytes, ct).ConfigureAwait(false);
         progress?.Report(new VfsTransferProgress(itemName, bytesDoneSoFar + written, totalBytes, index, itemCount));
         return written;
     }

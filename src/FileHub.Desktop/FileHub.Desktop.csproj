@@ -24,6 +24,21 @@
   </ItemGroup>
 
   <!--
+    A binary distribution must carry its licence and third-party notices: FileHub bundles MIT
+    components (monaco-editor, Avalonia, SharpCompress, SSH.NET) and links SMBLibrary under
+    LGPL-3.0. Copying them next to the executable keeps every download compliant.
+  -->
+  <ItemGroup>
+    <None Include="..\..\LICENSE" Link="LICENSE"
+          CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="..\..\THIRD-PARTY-NOTICES.md" Link="THIRD-PARTY-NOTICES.md"
+          CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="..\..\licenses\**\*"
+          Link="licenses\%(RecursiveDir)%(Filename)%(Extension)"
+          CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <!--
     Build channel metadata. CI overwrites this JSON before compiling so a downloaded binary can
     identify its own channel/version/commit; local builds keep the committed "dev" values.
     LogicalName keeps the resource id stable regardless of folder layout.

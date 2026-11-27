@@ -446,7 +446,8 @@ SMBLibrary is LGPL-3.0-or-later while FileHub itself is MIT, the following appli
 3. The complete corresponding source for SMBLibrary 1.5.8.1 is available from the project URL
    above (tag `1.5.8.1`) and from nuget.org as the `SMBLibrary` package.
 4. The LGPL notice, copyright line and links to the full licence text ship as
-   `licenses/SMBLibrary/NOTICE.txt`, together with this file.
+   `licenses/SMBLibrary/NOTICE.txt`. The file is copied next to the executable and into every
+   published archive, together with this document and `LICENSE`.
 
 If you redistribute FileHub, keep `THIRD-PARTY-NOTICES.md` and the `licenses/` folder intact.
 If you prefer a build without any LGPL component, remove the `SMBLibrary` package reference from

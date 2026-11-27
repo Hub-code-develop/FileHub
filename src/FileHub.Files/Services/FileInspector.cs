@@ -96,8 +96,8 @@ public sealed class FileInspection
     public string? HtmlFragment;
 
     /// <summary>
-    /// Small embedded picture decoded from the file itself (currently an ID3 APIC frame);
-    /// null when the format has no cheap thumbnail to extract.
+    /// Small embedded picture decoded from the file itself: an ID3 APIC frame in MP3 or the
+    /// MP4 "covr" atom. Null when the format has no cheap thumbnail to extract.
     /// </summary>
     public byte[]? ThumbnailBytes;
 
@@ -1768,6 +1768,7 @@ public static class FileInspector
         public int Height;
         public readonly Dictionary<string, string> Tags = new(StringComparer.Ordinal);
         public bool HasVideoTrack;
+        public byte[]? Artwork;
     }
 
     private static void ParseVideo(byte[] data, Draft d, string path)
@@ -1827,6 +1828,8 @@ public static class FileInspector
                                       info.Height.ToString(CultureInfo.InvariantCulture));
             }
         }
+
+        if (info.Artwork is not null) d.Thumbnail = info.Artwork;
 
         foreach (string[] pair in new[]
                  {
@@ -1970,10 +1973,40 @@ public static class FileInspector
                     if (!string.IsNullOrWhiteSpace(text)) info.Tags[type] = text!;
                     break;
                 }
+
+                case "covr" when info.Artwork is null:
+                    info.Artwork = ReadIlstData(data, payload, boxEnd);
+                    break;
             }
 
             pos = boxEnd;
         }
+    }
+
+    private static byte[]? ReadIlstData(byte[] data, long start, long end)
+    {
+        long pos = start;
+        int guard = 0;
+        while (pos + 8 <= end && guard++ < 8)
+        {
+            long size = ReadU32BE(data, (int)pos);
+            string type = Encoding.Latin1.GetString(data, (int)pos + 4, 4);
+            if (size < 8 || pos + size > end) return null;
+            if (type == "data")
+            {
+                int payloadStart = (int)pos + 16;
+                int length = (int)(pos + size) - payloadStart;
+                if (length <= 8 || length > ThumbnailLimit) return null;
+                bool image = data[payloadStart] == 0xFF && data[payloadStart + 1] == 0xD8
+                             || data[payloadStart] == 0x89 && data[payloadStart + 1] == 0x50;
+                if (!image) return null;
+                var result = new byte[length];
+                Array.Copy(data, payloadStart, result, 0, length);
+                return result;
+            }
+            pos += size;
+        }
+        return null;
     }
 
     private static string? ReadIlstText(byte[] data, long start, long end)
