@@ -85,6 +85,21 @@ jobs:
           path: ./FileHub.Release/
           merge-multiple: true
 
+      # The fixed tag keeps one release, but versioned asset names would otherwise accumulate
+      # forever (action-gh-release only overwrites same-name files). Delete the old assets only:
+      # never delete/recreate the release itself, which would leave a 404 window for update checks.
+      - name: Remove stale assets
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh release view preview --json assets --jq '.assets[].name' 2>/dev/null | while IFS= read -r name; do
+            [ -z "$name" ] && continue
+            echo "Removing stale asset: $name"
+            gh release delete-asset preview "$name" -y
+          done
+
       - name: Build release notes
         shell: bash
         run: |
