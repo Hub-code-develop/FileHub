@@ -234,5 +234,31 @@
     <Setter Property="HorizontalContentAlignment" Value="Center" />
     <Setter Property="VerticalContentAlignment" Value="Center" />
   </Style>
+  <!-- Self-drawn window buttons for the platforms where extending the client area removes the
+       decorations without leaving system buttons behind (Linux/X11). Sized and spaced like the
+       Windows caption buttons so the title bar reads the same everywhere. -->
+  <Style Selector="Button.captionButton">
+    <Setter Property="Width" Value="46" />
+    <Setter Property="Height" Value="32" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="CornerRadius" Value="0" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+  </Style>
+
+  <Style Selector="Path.glyph">
+    <Setter Property="Stroke" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+    <Setter Property="StrokeThickness" Value="1" />
+  </Style>
+
+  <Style Selector="Button.captionClose:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="#C42B1C" />
+  </Style>
+
+  <Style Selector="Button.captionClose:pointerover Path.glyph">
+    <Setter Property="Stroke" Value="White" />
+  </Style>
 
 </Styles>

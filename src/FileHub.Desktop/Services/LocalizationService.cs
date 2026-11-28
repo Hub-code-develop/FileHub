@@ -85,6 +85,9 @@ public static class Loc
         ["DlgCancel"] = new[] { "Cancel", "取消" },
         ["DlgOK"] = new[] { "OK", "确定" },
         ["DlgClose"] = new[] { "Close", "关闭" },
+        ["WinMinimize"] = new[] { "Minimize", "最小化" },
+        ["WinMaximize"] = new[] { "Maximize", "最大化" },
+        ["WinClose"] = new[] { "Close window", "关闭窗口" },
         ["DlgNewFolderTitle"] = new[] { "New folder", "新建文件夹" },
         ["DlgNewFolderMessage"] = new[] { "Will be created in {0}", "将在 {0} 创建" },
         ["DlgNewFolderDefault"] = new[] { "New folder", "新建文件夹" },
@@ -795,6 +798,9 @@ public static class Strings
     public static string DlgCancel => Loc.T("DlgCancel");
     public static string DlgOK => Loc.T("DlgOK");
     public static string DlgClose => Loc.T("DlgClose");
+    public static string WinMinimize => Loc.T("WinMinimize");
+    public static string WinMaximize => Loc.T("WinMaximize");
+    public static string WinClose => Loc.T("WinClose");
     public static string DlgNewFolderTitle => Loc.T("DlgNewFolderTitle");
     public static string DlgNewFolderMessage => Loc.T("DlgNewFolderMessage");
     public static string DlgNewFolderDefault => Loc.T("DlgNewFolderDefault");

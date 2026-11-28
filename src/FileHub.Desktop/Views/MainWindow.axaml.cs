@@ -13,6 +13,7 @@ using FileHub.Code.Services;
 using FileHub.Desktop.Actions;
 using FileHub.Desktop.Controls;
 using FileHub.Desktop.Models;
+using FileHub.Desktop.Platform;
 using FileHub.Desktop.Services;
 using FileHub.Desktop.ViewModels;
 using FileHub.Files.Models;
@@ -84,49 +85,91 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Makes the window chromeless on macOS/Linux and reserves the space the platform still draws
-    /// on top of the client area (the macOS traffic lights).
-    ///
-    /// Both layers are needed: ExtendClientAreaToDecorationsHint is what actually lets the client
-    /// area reach the window edge — without it the native title bar stays, and the tab strip only
-    /// looks like it sits below a caption. Nothing is needed from FluentAvalonia here because this
+    /// Makes the window chromeless everywhere. ExtendClientAreaToDecorationsHint is what actually
+    /// lets the client area reach the window edge, so row 0 of MainWindow.axaml *is* the title bar
+    /// on macOS, Windows and Linux alike. Nothing is needed from FluentAvalonia here because this
     /// window is a plain Window.
     ///
-    /// Windows deliberately keeps its native caption. Extending there leaves the system
-    /// min/max/close buttons painted over the client area, and their width has to be measured
-    /// from DWM before the row can be padded correctly; that measurement is not implemented yet,
-    /// so Windows keeps the stock chrome rather than letting the buttons cover the tabs.
+    /// Each platform still paints something over the extended client area, and the row has to
+    /// leave room for it:
+    ///   macOS   — traffic lights on the left;
+    ///   Windows — minimise / maximise / close on the right, width measured from DWM;
+    ///   Linux   — nothing: X11 drops the decorations (_MOTIF_WM_HINTS), so the row draws its own
+    ///             buttons. Wayland ignores that hint and keeps compositor decorations, so there
+    ///             the row stays pure content and the compositor keeps its own buttons.
     /// </summary>
     private void ConfigureWindowChrome()
     {
-        if (!OperatingSystem.IsMacOS() && !OperatingSystem.IsLinux())
-        {
-            UpdateChromeInsets();
-            return;
-        }
-
         ExtendClientAreaToDecorationsHint = true;
         ExtendClientAreaTitleBarHeightHint = TitleBarHeight;
 
         // The decoration margin only exists once the platform window does, and it changes with
-        // window state (fullscreen has no traffic lights), so it is re-read on every activation.
+        // window state (fullscreen has neither traffic lights nor caption buttons), so it is
+        // re-read on every activation and resize.
         UpdateChromeInsets();
         Loaded += (_, _) => UpdateChromeInsets();
         Activated += (_, _) => UpdateChromeInsets();
+        SizeChanged += (_, _) => UpdateChromeInsets();
     }
 
     /// <summary>
-    /// Reserves the width the platform draws over the client area: the macOS traffic lights.
-    /// WindowDecorationMargin carries the real value; the constant only covers the first layout
-    /// pass, before the platform window has been created.
+    /// Reserves the space the platform still draws over the client area. WindowDecorationMargin
+    /// carries the real left inset; the constants only cover the first layout pass, before the
+    /// platform window exists.
     /// </summary>
     private void UpdateChromeInsets()
     {
-        var fromPlatform = WindowDecorationMargin.Left;
-        var inset = fromPlatform > 0 ? fromPlatform : OperatingSystem.IsMacOS() ? 78 : 8;
-        if (Math.Abs(TrafficLightSpacer.Width - inset) < 0.5) return;
-        TrafficLightSpacer.Width = inset;
+        var left = WindowDecorationMargin.Left;
+        if (left <= 0) left = OperatingSystem.IsMacOS() ? 78 : 8;
+        // NaN means "auto" and fails every comparison, so it has to be checked explicitly.
+        if (double.IsNaN(ChromeLeftSpacer.Width) || Math.Abs(ChromeLeftSpacer.Width - left) > 0.5)
+            ChromeLeftSpacer.Width = left;
+
+        var right = SystemCaptionButtonsWidth();
+        if (double.IsNaN(WindowCaptionSpacer.Width) || Math.Abs(WindowCaptionSpacer.Width - right) > 0.5)
+            WindowCaptionSpacer.Width = right;
+
+        if (WindowButtons.IsVisible != UsesOwnWindowButtons) WindowButtons.IsVisible = UsesOwnWindowButtons;
     }
+
+    /// <summary>
+    /// Linux gets self-drawn buttons only where the decorations are actually gone: X11 follows
+    /// _MOTIF_WM_HINTS (the hint Avalonia's extension sets), Wayland does not, and drawing a
+    /// second set of buttons under a compositor title bar would look broken.
+    /// </summary>
+    private static bool UsesOwnWindowButtons =>
+        OperatingSystem.IsLinux()
+        && string.IsNullOrEmpty(Environment.GetEnvironmentVariable("WAYLAND_DISPLAY"))
+        && !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("DISPLAY"));
+
+    /// <summary>
+    /// Width the Windows caption buttons occupy on the right edge, in DIPs.
+    /// Avalonia reports left/right as 0 on Win32, so the rectangle comes from DWM.
+    /// </summary>
+    private double SystemCaptionButtonsWidth()
+    {
+        if (!OperatingSystem.IsWindows()) return 0;
+        if (WindowState == WindowState.FullScreen) return 0;
+
+        var scaling = RenderScaling <= 0 ? 1 : RenderScaling;
+        var handle = TryGetPlatformHandle()?.Handle ?? IntPtr.Zero;
+        var pixels = WindowCaptionMetrics.GetCaptionButtonsWidth(handle, (uint)Math.Round(96 * scaling));
+        if (pixels <= 0) return 0;
+
+        var inset = pixels / scaling + WindowCaptionMetrics.Gap;
+
+        // Defensive: the DWM attribute differs across Windows versions. A nonsense width would
+        // push the tabs off screen, so ignore anything wider than a sane chunk of the window.
+        var limit = Bounds.Width * 0.4;
+        return limit <= 0 || inset <= limit ? inset : 0;
+    }
+
+    private void OnMinimizeWindow(object? sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
+
+    private void OnToggleMaximizeWindow(object? sender, RoutedEventArgs e) =>
+        WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+
+    private void OnCloseWindow(object? sender, RoutedEventArgs e) => Close();
 
     /// <summary>
     /// Dragging the title bar: the surface behind the tab strip receives presses that no tab
