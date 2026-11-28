@@ -107,7 +107,9 @@
   <!-- Files DetailsLayoutPage header: Height=40, left padding 24 -->
   <Style Selector="Border.columnHeaderSurface">
     <Setter Property="Height" Value="40" />
-    <Setter Property="Padding" Value="10,0,12,0" />
+    <!-- 10 left / 10 right, matching the ListBox padding so the header grid and the row
+         grids share the same origin and the same star-column width. -->
+    <Setter Property="Padding" Value="10,0,10,0" />
     <Setter Property="BorderThickness" Value="0,0,0,1" />
     <Setter Property="BorderBrush" Value="{DynamicResource DividerStrokeColorDefaultBrush}" />
   </Style>
@@ -115,7 +117,8 @@
   <Style Selector="Button.columnHeader">
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="BorderThickness" Value="0" />
-    <Setter Property="Padding" Value="8,4,8,4" />
+    <!-- Left padding 10 = the row's TextBlock margin, so header and cell text share a left edge. -->
+    <Setter Property="Padding" Value="10,4,8,4" />
     <Setter Property="HorizontalAlignment" Value="Stretch" />
     <Setter Property="HorizontalContentAlignment" Value="Left" />
     <Setter Property="FontSize" Value="12" />
@@ -124,7 +127,11 @@
 
   <!-- Files list rows: 36px, 20px icon, hover / selected surfaces -->
   <Style Selector="ListBoxItem">
-    <Setter Property="Padding" Value="10,2,10,2" />
+    <!-- No horizontal padding: the ListBox already pads 10 on both sides, and the column
+         header is padded 10 as well. Adding 10 here shifted every row grid 10 px to the
+         right of its header and narrowed the star column by 20, so Name/Size/Kind/Modified
+         each drifted by a different amount. -->
+    <Setter Property="Padding" Value="0,2,0,2" />
     <Setter Property="MinHeight" Value="36" />
     <Setter Property="HorizontalContentAlignment" Value="Stretch" />
   </Style>

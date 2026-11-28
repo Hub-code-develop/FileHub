@@ -15,7 +15,9 @@
   -->
   <Grid RowDefinitions="Auto,*">
 
-    <Border Grid.Row="0" Classes="columnHeaderSurface">
+    <!-- The header belongs to the details layout only; in the tile layout it used to stay on
+         screen above the grid, which reads as a stray, empty row. -->
+    <Border Grid.Row="0" Classes="columnHeaderSurface" IsVisible="{Binding IsDetailsView}">
       <Grid>
         <Grid ColumnDefinitions="34,*,110,150,160">
           <Button Grid.Column="1" Classes="columnHeader"

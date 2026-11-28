@@ -57,10 +57,15 @@
               </Border.Transitions>
             </Border>
 
+            <!-- Row 0 must be "*", not "Auto": icon and label both live in row 0 and are
+                 centre-aligned, so an Auto row collapses to the 16 px icon and leaves the rest
+                 of the 48 px button as dead space below — the whole row then renders 16 px
+                 above centre, which is what makes the command bar look misaligned. Row 1 only
+                 exists for the label-bottom layout. -->
             <Grid Name="PART_ContentRoot"
                   MinHeight="48"
                   ColumnDefinitions="Auto,Auto,*"
-                  RowDefinitions="Auto,Auto">
+                  RowDefinitions="*,Auto">
 
               <Viewbox Name="PART_IconBox"
                        Grid.Row="0" Grid.Column="0"
@@ -109,6 +114,8 @@
         <Setter Property="Grid.Row" Value="0" />
         <Setter Property="Margin" Value="12,16,0,10" />
         <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <!-- Row 0 is now star-sized; keep the icon at its WinUI distance from the top. -->
+        <Setter Property="VerticalAlignment" Value="Top" />
       </Style>
       <Style Selector="^:label-bottom /template/ TextBlock#PART_Label">
         <Setter Property="Grid.Row" Value="1" />
