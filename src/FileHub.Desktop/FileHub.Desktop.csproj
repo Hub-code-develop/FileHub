@@ -14,6 +14,19 @@
     <AvaloniaUseCompiledBindingsByDefault>false</AvaloniaUseCompiledBindingsByDefault>
   </PropertyGroup>
 
+  <!--
+    macOS 27 kills the stock CoreCLR Mach-exception path, so the app runs on a CodeNet runtime.
+    That runtime's GC crashes inside GC marking while a document is being loaded — the first
+    version of document mode died within ~2s with SIGSEGV inside WKS::gc_heap::background_mark_*
+    while scanning the handle table. Blocking GC instead of concurrent GC has kept repeated
+    14-second document-mode runs alive; the cost is negligible for a desktop file manager, and
+    the crash is not reachable through any FileHub code path (it is a runtime bug), so a switch
+    is the only lever available here. Scoped to macOS: other platforms run the stock runtime.
+  -->
+  <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('OSX'))">
+    <ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="Avalonia" Version="12.1.0" />
     <PackageReference Include="Avalonia.Desktop" Version="12.1.0" />

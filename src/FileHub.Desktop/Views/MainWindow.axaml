@@ -31,38 +31,62 @@
   -->
   <Grid RowDefinitions="Auto,Auto,*,Auto">
 
-    <!-- Row 0: Tab Bar (Files MainPage: tabbar:TabBar / TitlebarArea / TabView).
-         The strip is our own WinUI 3 TabView port (WinUI3.Fluent), not the FluentAvalonia
-         one: FA's add/close buttons are icon-font glyphs, and that font is not present on
-         macOS or Linux, so they rendered as empty boxes. -->
-    <Border Grid.Row="0" Classes="tabBarSurface" IsVisible="{Binding IsFilesChromeVisible}">
-      <Grid ColumnDefinitions="*,Auto" Margin="8,0,8,0" VerticalAlignment="Bottom">
-        <win:WinTabStrip x:Name="TabStrip" Grid.Column="0"
-                         ItemsSource="{Binding Tabs}"
-                         SelectedItem="{Binding SelectedTab, Mode=TwoWay}">
-          <win:WinTabStrip.ItemTemplate>
-            <DataTemplate>
-              <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                <ui:FASymbolIcon Symbol="Folder" FontSize="14" VerticalAlignment="Center" />
-                <TextBlock Text="{Binding TabTitle}" FontSize="12" VerticalAlignment="Center"
-                           TextTrimming="CharacterEllipsis" />
-              </StackPanel>
-            </DataTemplate>
-          </win:WinTabStrip.ItemTemplate>
-        </win:WinTabStrip>
+    <!-- Row 0: Title bar. The window runs chromeless on macOS (MainWindow.ConfigureWindowChrome
+         extends the client area over the window decorations), so this row *is* the title bar:
+         the tab strip sits next to the traffic lights and the whole row drags the window.
+         Files MainPage keeps these two in separate rows (tabbar:TabBar + TitlebarArea); merging
+         them is what gives the "tabs are the title bar" look.
 
-        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="2"
-                    VerticalAlignment="Bottom" Margin="4,0,0,4">
-          <Button Classes="tabAction" ToolTip.Tip="{x:Static loc:Strings.NewTab}"
+         The strip is our own WinUI 3 TabView port (WinUI3.Fluent), not the FluentAvalonia one:
+         FA's add/close buttons are icon-font glyphs, and that font is not present on macOS or
+         Linux, so they rendered as empty boxes. -->
+    <Border Grid.Row="0" x:Name="TitleBar" Classes="titleBar">
+      <Grid ColumnDefinitions="Auto,*,Auto">
+
+        <!-- macOS keeps drawing the traffic lights on top of the client area. Their width comes
+             from WindowDecorationMargin and is applied in code; without it the first tab would
+             sit under the close button. -->
+        <Border Grid.Column="0" x:Name="TrafficLightSpacer" />
+
+        <Panel Grid.Column="1">
+          <!-- Drag surface sits *behind* the strip. Presses on empty chrome reach it and move the
+               window; presses on a tab are handled by the tab (select / reorder). Both the strip
+               and its scroller are background-less so the hit test falls through here. -->
+          <Border x:Name="TitleDragSurface" Background="Transparent"
+                  PointerPressed="OnTitleBarPointerPressed" />
+          <win:WinTabStrip x:Name="TabStrip"
+                           Background="{x:Null}"
+                           Margin="2,0,8,0"
+                           ItemsSource="{Binding Tabs}"
+                           SelectedItem="{Binding SelectedTab, Mode=TwoWay}">
+            <win:WinTabStrip.ItemTemplate>
+              <DataTemplate>
+                <Grid ColumnDefinitions="Auto,*" VerticalAlignment="Center">
+                  <ui:FASymbolIcon Grid.Column="0" Symbol="Folder" FontSize="13"
+                                   VerticalAlignment="Center" />
+                  <TextBlock Grid.Column="1" Text="{Binding TabTitle}" Margin="7,0,0,0"
+                             FontSize="12" VerticalAlignment="Center"
+                             TextTrimming="CharacterEllipsis" />
+                </Grid>
+              </DataTemplate>
+            </win:WinTabStrip.ItemTemplate>
+          </win:WinTabStrip>
+        </Panel>
+
+        <!-- Window actions. Kept out of the scrolling strip so they never scroll out of reach. -->
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="2"
+                    VerticalAlignment="Center" Margin="0,0,12,0">
+          <Button Classes="titleBarAction" ToolTip.Tip="{x:Static loc:Strings.NewTab}"
                   Command="{Binding NewTabCommand}">
             <ui:FASymbolIcon Symbol="Add" FontSize="12" />
           </Button>
-          <Button Classes="tabAction" Content="{Binding LanguageLabel}"
+          <Button Classes="titleBarAction" Content="{Binding LanguageLabel}"
+                  FontSize="11"
                   ToolTip.Tip="{Binding LanguageTooltip}"
                   Command="{Binding CycleLanguageCommand}" />
           <!-- No "Code" or "Extensions" button: the editor opens with a source file, and the
                extension manager now lives in the settings dialog. -->
-          <Button Classes="tabAction" ToolTip.Tip="{x:Static loc:Strings.LblSettings}"
+          <Button Classes="titleBarAction" ToolTip.Tip="{x:Static loc:Strings.LblSettings}"
                   Command="{Binding OpenSettingsCommand}">
             <ui:FASymbolIcon Symbol="Settings" FontSize="14" />
           </Button>

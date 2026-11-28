@@ -14,11 +14,44 @@
 <Styles xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
+  <Styles.Resources>
+    <!--
+      Avalonia's stock GridSplitter template draws a rounded grip pill in the middle of the
+      splitter. The panes on either side already carry their own hairline divider, so that grip
+      showed up as a grey capsule floating between the file list and the info pane. Replace the
+      template with a bare surface: invisible at rest, a 1px accent line while the pointer is on
+      it (the splitter keeps its 3px hit area either way).
+    -->
+    <ControlTheme x:Key="{x:Type GridSplitter}" TargetType="GridSplitter">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border Name="PART_SplitterRoot" Background="{TemplateBinding Background}" />
+        </ControlTemplate>
+      </Setter>
+      <Style Selector="^:pointerover /template/ Border#PART_SplitterRoot">
+        <Setter Property="Background" Value="{DynamicResource AccentFillColorDefaultBrush}" />
+      </Style>
+    </ControlTheme>
+  </Styles.Resources>
+
   <!-- Window-level surfaces (Files MainPage: App.Theme.BackgroundBrush / Sidebar.BackgroundBrush) -->
   <Style Selector="Border.tabBarSurface">
     <Setter Property="Height" Value="44" />
     <Setter Property="Padding" Value="4,0,4,0" />
     <Setter Property="Background" Value="{DynamicResource SubtleFillColorTransparentBrush}" />
+  </Style>
+
+  <!--
+    The title bar row. On macOS the window is chromeless, so this strip is the only piece of
+    chrome above the content: it holds the traffic-light spacer, the tab strip and the window
+    actions, and dragging it moves the window.
+  -->
+  <Style Selector="Border.titleBar">
+    <Setter Property="Height" Value="44" />
+    <Setter Property="Background" Value="{DynamicResource SolidBackgroundFillColorBaseBrush}" />
+    <Setter Property="BorderThickness" Value="0,0,0,1" />
+    <Setter Property="BorderBrush" Value="{DynamicResource DividerStrokeColorDefaultBrush}" />
   </Style>
 
   <Style Selector="Border.addressSurface">
@@ -181,6 +214,20 @@
     <Setter Property="Height" Value="30" />
     <Setter Property="Margin" Value="4,0,0,0" />
     <Setter Property="Padding" Value="0" />
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+  </Style>
+
+  <!-- Window actions in the title bar (new tab / language / settings): 28px tall, tight radius,
+       so they read as window chrome rather than as toolbar buttons. -->
+  <Style Selector="Button.titleBarAction">
+    <Setter Property="Height" Value="28" />
+    <Setter Property="MinWidth" Value="28" />
+    <Setter Property="Padding" Value="6,0" />
+    <Setter Property="CornerRadius" Value="6" />
     <Setter Property="FontSize" Value="12" />
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="BorderThickness" Value="0" />

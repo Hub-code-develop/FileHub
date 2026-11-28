@@ -83,6 +83,17 @@
         <GradientStop Offset="0.33" Color="#66000000" />
         <GradientStop Offset="1" Color="#14FFFFFF" />
       </LinearGradientBrush>
+
+      <!-- ===== Legacy UWP / WinUI 2 token names =====
+           The ported Files App XAML still uses these three. FluentAvalonia only ships the WinUI 3
+           names (SolidBackgroundFillColorBaseBrush and friends), so every surface referencing them
+           resolved to null and painted nothing: the window background, the chrome band and all
+           hairlines were transparent. Values follow the UWP palette — AltHigh is the opaque window
+           background, ChromeMediumLow a slightly lifted chrome band, ForegroundBaseLow a 6% stroke
+           (this code base only ever uses it as a BorderBrush, never as text). -->
+      <SolidColorBrush x:Key="SystemControlBackgroundAltHighBrush" Color="#F3F3F3" />
+      <SolidColorBrush x:Key="SystemControlBackgroundChromeMediumLowBrush" Color="#EAEAEA" />
+      <SolidColorBrush x:Key="SystemControlForegroundBaseLowBrush" Color="#0F000000" />
     </ResourceDictionary>
 
     <!-- ===================== Dark ===================== -->
@@ -151,6 +162,11 @@
         <GradientStop Offset="0.33" Color="#23000000" />
         <GradientStop Offset="1" Color="#14FFFFFF" />
       </LinearGradientBrush>
+
+      <!-- Legacy UWP / WinUI 2 names used by the ported Files App XAML; see the Light dictionary. -->
+      <SolidColorBrush x:Key="SystemControlBackgroundAltHighBrush" Color="#202020" />
+      <SolidColorBrush x:Key="SystemControlBackgroundChromeMediumLowBrush" Color="#2B2B2B" />
+      <SolidColorBrush x:Key="SystemControlForegroundBaseLowBrush" Color="#1FFFFFFF" />
     </ResourceDictionary>
 
   </ResourceDictionary.ThemeDictionaries>

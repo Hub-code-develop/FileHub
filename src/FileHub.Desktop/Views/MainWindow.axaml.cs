@@ -31,6 +31,9 @@ public partial class MainWindow : Window
     private MainViewModel? _boundTab;
     private bool _initialized;
 
+    /// <summary>Height of the merged title bar / tab strip row. Keep in sync with Border.titleBar.</summary>
+    private const double TitleBarHeight = 44;
+
     // The four Files App UserControls own their named elements; keep the old short names
     // here so the wiring code matches Files' own code-behind style.
     private FABreadcrumbBar Breadcrumb => NavToolbar.Breadcrumb;
@@ -46,6 +49,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        ConfigureWindowChrome();
 
         _shell = ShellViewModel.Current;
         DataContext = _shell;
@@ -79,6 +83,83 @@ public partial class MainWindow : Window
         };
     }
 
+    /// <summary>
+    /// Makes the window chromeless on macOS/Linux and reserves the space the platform still draws
+    /// on top of the client area (the macOS traffic lights).
+    ///
+    /// Both layers are needed: ExtendClientAreaToDecorationsHint is what actually lets the client
+    /// area reach the window edge — without it the native title bar stays, and the tab strip only
+    /// looks like it sits below a caption. Nothing is needed from FluentAvalonia here because this
+    /// window is a plain Window.
+    ///
+    /// Windows deliberately keeps its native caption. Extending there leaves the system
+    /// min/max/close buttons painted over the client area, and their width has to be measured
+    /// from DWM before the row can be padded correctly; that measurement is not implemented yet,
+    /// so Windows keeps the stock chrome rather than letting the buttons cover the tabs.
+    /// </summary>
+    private void ConfigureWindowChrome()
+    {
+        if (!OperatingSystem.IsMacOS() && !OperatingSystem.IsLinux())
+        {
+            UpdateChromeInsets();
+            return;
+        }
+
+        ExtendClientAreaToDecorationsHint = true;
+        ExtendClientAreaTitleBarHeightHint = TitleBarHeight;
+
+        // The decoration margin only exists once the platform window does, and it changes with
+        // window state (fullscreen has no traffic lights), so it is re-read on every activation.
+        UpdateChromeInsets();
+        Loaded += (_, _) => UpdateChromeInsets();
+        Activated += (_, _) => UpdateChromeInsets();
+    }
+
+    /// <summary>
+    /// Reserves the width the platform draws over the client area: the macOS traffic lights.
+    /// WindowDecorationMargin carries the real value; the constant only covers the first layout
+    /// pass, before the platform window has been created.
+    /// </summary>
+    private void UpdateChromeInsets()
+    {
+        var fromPlatform = WindowDecorationMargin.Left;
+        var inset = fromPlatform > 0 ? fromPlatform : OperatingSystem.IsMacOS() ? 78 : 8;
+        if (Math.Abs(TrafficLightSpacer.Width - inset) < 0.5) return;
+        TrafficLightSpacer.Width = inset;
+    }
+
+    /// <summary>
+    /// Dragging the title bar: the surface behind the tab strip receives presses that no tab
+    /// claimed. Double click toggles the window state, like a native title bar.
+    /// </summary>
+    private void OnTitleBarPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
+
+        if (e.ClickCount == 2)
+        {
+            WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+            e.Handled = true;
+            return;
+        }
+
+        BeginMoveDrag(e);
+    }
+
+    /// <summary>
+    /// The strip hides its scrollbar (one inside a 44px title bar is noise), so the wheel scrolls
+    /// the tab row horizontally instead — the behaviour browsers have in their tab bars.
+    /// </summary>
+    private void OnTabStripWheel(object? sender, PointerWheelEventArgs e)
+    {
+        var scroller = TabStrip.GetVisualDescendants().OfType<ScrollViewer>().FirstOrDefault();
+        if (scroller is null || scroller.Extent.Width <= scroller.Viewport.Width) return;
+
+        var limit = Math.Max(0, scroller.Extent.Width - scroller.Viewport.Width);
+        scroller.Offset = new Vector(Math.Clamp(scroller.Offset.X - e.Delta.Y * 64, 0, limit), 0);
+        e.Handled = true;
+    }
+
     private void OnShellPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
         switch (e.PropertyName)
@@ -107,7 +188,10 @@ public partial class MainWindow : Window
         var chrome = _shell.IsFilesChromeVisible;
         NavToolbar.IsVisible = chrome;
         InnerContent.IsVisible = chrome;
-        StatusBar.IsVisible = chrome;
+        // The code page carries its own cursor / encoding / status row, so the file manager's
+        // status bar would stack a second one underneath it. The document page has no such row,
+        // which is why this is scoped to the code page rather than to "any workspace page".
+        StatusBar.IsVisible = chrome && !_shell.IsCodePageOpen;
 
         CodeEditorView.IsVisible = _shell.IsCodePageOpen;
         DocumentView.IsVisible = _shell.IsOfficePageOpen;
@@ -512,6 +596,7 @@ public partial class MainWindow : Window
         TabStrip.AddHandler(WinTabStripItem.CloseRequestedEvent, OnTabCloseRequested);
         TabStrip.AddHandler(WinTabStripItem.ContextMenuRequestedEvent, OnTabContextMenuRequested);
         TabStrip.AddHandler(WinTabStrip.TabReorderedEvent, OnTabReordered);
+        TabStrip.PointerWheelChanged += OnTabStripWheel;
         Closing += (_, _) => _shell.SaveSession();
 
         Breadcrumb.ItemClicked += (_, args) =>

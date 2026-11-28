@@ -45,7 +45,20 @@ public sealed class CodeEditorViewModel : ViewModelBase
     public event Action<string>? OptionsPayloadReady;
     public event Action? SaveRequested;
 
-    public string FilePath { get => _filePath; private set => Set(ref _filePath, value); }
+    public string FilePath
+    {
+        get => _filePath;
+        private set
+        {
+            if (!Set(ref _filePath, value)) return;
+            // FileName and HasFile are derived; without these the page kept showing the empty
+            // "open a file from the list" hint and a blank title after a file was opened, because
+            // the bindings had already read the old (empty) values.
+            OnPropertyChanged(nameof(FileName));
+            OnPropertyChanged(nameof(HasFile));
+        }
+    }
+
     public string FileName => string.IsNullOrEmpty(FilePath) ? string.Empty : Path.GetFileName(FilePath);
     public bool HasFile => !string.IsNullOrEmpty(FilePath);
 

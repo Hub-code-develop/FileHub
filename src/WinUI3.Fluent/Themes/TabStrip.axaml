@@ -6,11 +6,11 @@
   Copyright (c) Microsoft Corporation. Licensed under the MIT License.
   See THIRD-PARTY-NOTICES.md.
 
-  WinUI geometry kept verbatim:
-    strip height 40 (tab 32) · item MinWidth 100 / MaxWidth 240 · CornerRadius 8,8,0,0
-    header padding 12,0,8,0 · close button 18x18 hit area, 8x8 glyph
-  The close button fades in on hover / selection, the way WinUI's CloseButtonOverlayMode
-  behaves for pointer input.
+  WinUI geometry, adapted for a title bar: WinUI draws 32px content tabs with 8,8,0,0 corners
+  that merge into the page below. Here the strip *is* the window's title bar, so the tabs are
+  30px pills centred in a 44px row (7px radius, 108/208 min/max width, 10,0,4,0 padding), and the
+  strip scrollbar is hidden in favour of wheel scrolling. The close button keeps WinUI's
+  16x16 hit area with an 8x8 glyph and still fades in on hover / selection.
 
   Order matters: the item theme is declared first because the strip theme pins it through
   StaticResource (the inherited Fluent list theme would otherwise dress tabs as list rows).
@@ -26,15 +26,17 @@
       <Setter Property="Background" Value="{DynamicResource SubtleFillColorTransparentBrush}" />
       <Setter Property="BorderBrush" Value="{DynamicResource SubtleFillColorTransparentBrush}" />
       <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
-      <Setter Property="Padding" Value="12,0,8,0" />
-      <Setter Property="Margin" Value="0,0,2,0" />
-      <Setter Property="MinWidth" Value="100" />
-      <Setter Property="MaxWidth" Value="240" />
-      <Setter Property="Height" Value="32" />
-      <Setter Property="MinHeight" Value="32" />
-      <Setter Property="CornerRadius" Value="8,8,0,0" />
+      <Setter Property="Padding" Value="10,0,4,0" />
+      <Setter Property="Margin" Value="2,0" />
+      <Setter Property="MinWidth" Value="108" />
+      <Setter Property="MaxWidth" Value="208" />
+      <Setter Property="Height" Value="30" />
+      <Setter Property="MinHeight" Value="30" />
+      <Setter Property="CornerRadius" Value="7" />
+      <Setter Property="BorderThickness" Value="1" />
       <Setter Property="HorizontalContentAlignment" Value="Stretch" />
       <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="VerticalAlignment" Value="Center" />
       <Setter Property="FontSize" Value="12" />
 
       <Setter Property="Template">
@@ -42,17 +44,19 @@
           <Border Name="PART_Root"
                   Background="{TemplateBinding Background}"
                   BorderBrush="{TemplateBinding BorderBrush}"
-                  BorderThickness="1,1,1,0"
+                  BorderThickness="{TemplateBinding BorderThickness}"
                   CornerRadius="{TemplateBinding CornerRadius}"
                   Padding="{TemplateBinding Padding}"
-                  VerticalAlignment="Bottom">
+                  VerticalAlignment="Center">
             <Border.Transitions>
               <Transitions>
                 <BrushTransition Property="Background" Duration="0:0:0.083" />
               </Transitions>
             </Border.Transitions>
 
-            <Grid ColumnDefinitions="*,18" ColumnSpacing="6">
+            <!-- Tabs live in the title bar, so they are a rounded pill centred in the row rather
+                 than WinUI's bottom-anchored content tab. 16x16 close button, 7x7 glyph. -->
+            <Grid ColumnDefinitions="*,16" ColumnSpacing="4">
 
               <ContentPresenter Grid.Column="0"
                                 Name="PART_ContentPresenter"
@@ -63,7 +67,7 @@
 
               <Button Grid.Column="1"
                       Name="PART_CloseButton"
-                      Width="18" Height="18" MinHeight="0"
+                      Width="16" Height="16" MinHeight="0"
                       Padding="0"
                       CornerRadius="4"
                       BorderThickness="0"
@@ -151,17 +155,22 @@
       <Setter Property="BorderThickness" Value="0" />
       <Setter Property="Padding" Value="0" />
       <Setter Property="HorizontalAlignment" Value="Stretch" />
-      <Setter Property="VerticalAlignment" Value="Bottom" />
+      <Setter Property="VerticalAlignment" Value="Stretch" />
       <Setter Property="ItemContainerTheme" Value="{StaticResource {x:Type c:WinTabStripItem}}" />
       <Setter Property="ItemsPanel">
         <ItemsPanelTemplate>
           <StackPanel Orientation="Horizontal" />
         </ItemsPanelTemplate>
       </Setter>
-      <!-- The strip scrolls horizontally once the tabs outgrow the titlebar (WinUI overflow). -->
+      <!-- The strip scrolls horizontally once the tabs outgrow the title bar (WinUI overflow).
+           The scrollbar itself stays hidden: a scrollbar inside a 44px title bar is noise, so
+           the strip is scrolled by the wheel instead (see MainWindow.OnTabStripWheel).
+           Both surfaces are background-less so presses on empty chrome fall through to the
+           window's drag surface behind the strip. -->
       <Setter Property="Template">
         <ControlTemplate>
-          <ScrollViewer HorizontalScrollBarVisibility="Auto"
+          <ScrollViewer Background="{x:Null}"
+                        HorizontalScrollBarVisibility="Hidden"
                         VerticalScrollBarVisibility="Disabled"
                         BringIntoViewOnFocusChange="False"
                         HorizontalAlignment="Stretch"

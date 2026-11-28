@@ -23,7 +23,7 @@
 | `src/Files.App.Controls/Sidebar/SidebarView.xaml` | `Views/Controls/FilesSidebar.axaml(.cs)`（头部 / 菜单项 / 页脚三行） |
 | `src/Files.App/UserControls/NavigationToolbar.xaml` | `Views/Controls/FilesNavigationToolbar.axaml(.cs)`（高 48，按钮 36x32） |
 | `src/Files.App/UserControls/Toolbar.xaml` | `Views/Controls/FilesToolbar.axaml(.cs)`（8px 卡片，按钮由命令集动态生成） |
-| `src/Files.App/UserControls/TabBar/TabBar.xaml` | `WinTabStrip` 标签栏（标签高 32，尾部操作区） |
+| `src/Files.App/UserControls/TabBar/TabBar.xaml` | `WinTabStrip` 标签栏（标签高 30，右侧窗口操作区） |
 | `src/Files.App/UserControls/StatusBar.xaml` | `Views/Controls/FilesStatusBar.axaml(.cs)`（高 32，1x18 分隔线） |
 | `src/Files.App/UserControls/Pane/InfoPane.xaml` | `Views/Controls/FilesInfoPane.axaml(.cs)`（宽 300，标签胶囊） |
 | `src/Files.App/Views/Layouts/DetailsLayoutPage.xaml` | `Views/Controls/DetailsLayoutPage.axaml(.cs)`（列头高 40，34/*/110/150/160 列宽） |
@@ -130,6 +130,9 @@ macOS 优先读系统语言偏好是故意的：从 Finder 启动的 GUI 应用�
   从 Finder / 资源管理器拖入的文件按复制导入。重名自动加序号，绝不覆盖。
 - **实时目录监视**：当前目录里外部新建 / 删除 / 重命名会自动刷新列表（合并事件、280 毫秒防抖），
   并保留当前选择。无法监视的卷仍可用 F5 手动刷新。
+- **无系统标题栏，标签栏就是标题栏**：macOS 上去掉原生标题栏，客户区一直顶到窗口边缘，
+  标签栏承担标题栏的职责 —— 拖动它移动窗口、双击缩放、滚轮在标签上横向翻页，红绿灯保留专属占位。
+  Windows 暂时保留系统标题栏，因为右上角那排系统按钮的宽度要先从 DWM 量出来，这条路还没接。
 - **Monaco 代码编辑器**：双击源代码文件即可打开本地 Monaco 编辑器，支持语法高亮、语言自动识别、
   Ctrl+S 保存、保留原编码写入、未保存标记与光标位置显示。所有资源都随应用打包，离线也能写代码。
   与文档模式一样，标签栏里没有「代码」按钮：编辑器只会因为你打开了文件而出现。

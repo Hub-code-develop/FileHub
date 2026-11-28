@@ -187,7 +187,12 @@
     <Border Grid.Row="3" Padding="12,6" BorderThickness="0,0,0,1"
             BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
       <Grid ColumnDefinitions="*,Auto">
-      <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+      <!-- This strip is a fixed-width row of tool groups (~1000px of controls). It used to be
+           clipped at the window's right edge with no way to reach the overflow; it scrolls
+           horizontally now, the way Office's own ribbon behaves. -->
+      <ScrollViewer Grid.Column="0" HorizontalScrollBarVisibility="Auto"
+                    VerticalScrollBarVisibility="Disabled">
+      <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
 
         <!-- Word tools -->
         <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding IsWord}">
@@ -260,6 +265,7 @@
                   Padding="10,4" />
         </StackPanel>
       </StackPanel>
+      </ScrollViewer>
 
         <!-- The advanced OOXML panel is collapsed by default so the document gets the height;
              this is its only always-visible toggle. -->

@@ -26,7 +26,7 @@ with Avalonia controls.
 | `src/Files.App.Controls/Sidebar/SidebarView.xaml` | `Views/Controls/FilesSidebar.axaml(.cs)` — header / items / footer |
 | `src/Files.App/UserControls/NavigationToolbar.xaml` | `Views/Controls/FilesNavigationToolbar.axaml(.cs)` — 48px, 36x32 buttons |
 | `src/Files.App/UserControls/Toolbar.xaml` | `Views/Controls/FilesToolbar.axaml(.cs)` — 8px card, buttons built from the command registry |
-| `src/Files.App/UserControls/TabBar/TabBar.xaml` | `WinTabStrip` tab strip (32px tabs, footer actions) |
+| `src/Files.App/UserControls/TabBar/TabBar.xaml` | `WinTabStrip` tab strip (30px tabs, window actions) |
 | `src/Files.App/UserControls/StatusBar.xaml` | `Views/Controls/FilesStatusBar.axaml(.cs)` — 32px, 1x18 dividers |
 | `src/Files.App/UserControls/Pane/InfoPane.xaml` | `Views/Controls/FilesInfoPane.axaml(.cs)` — 300px pane, tab pills |
 | `src/Files.App/Views/Layouts/DetailsLayoutPage.xaml` | `Views/Controls/DetailsLayoutPage.axaml(.cs)` — 40px header, 34/*/110/150/160 columns |
@@ -163,6 +163,11 @@ FluentUI-CodeHub widgets used: `FANavigationView` (sidebar), `FABreadcrumbBar` (
 - **Live directory watcher**: external creates, deletes and renames in the current folder refresh
   the list automatically (coalesced, 280 ms debounce), preserving the current selection. Manual
   refresh (F5) remains available for volumes that cannot be watched
+- **Chromeless window, tabs as the title bar**: on macOS the native title bar is gone. The client
+  area reaches the window edge and the tab strip does the title bar's job — drag it to move the
+  window, double-click to zoom, scroll the wheel over it to flip through tabs. The traffic lights
+  keep their own reserved inset. Windows keeps its native caption for now, because the system
+  min/max/close buttons have to be measured from DWM before that row can be padded correctly
 - **Monaco code editor**: double-click a source file to open a local Monaco editor with syntax
   highlighting, language auto-detection, Ctrl+S save, an encoding-preserving writer, a dirty
   marker and a cursor readout. All assets are bundled, so editing works offline. Like document

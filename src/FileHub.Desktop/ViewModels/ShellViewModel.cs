@@ -587,6 +587,13 @@ public sealed class ShellViewModel : ViewModelBase
     public void Activate(MainViewModel tab)
     {
         if (!Tabs.Contains(tab)) return;
+
+        // A document or editor page belongs to the tab it was opened from: the workspace page is a
+        // full-area overlay, so leaving it up while a different tab's chrome becomes active would
+        // show one tab's content under another tab's address bar. Switching tabs therefore returns
+        // to the file manager first (an unsaved office document still asks before discarding).
+        if (IsWorkspacePageOpen && !ReferenceEquals(tab, _activeTab)) CloseWorkspacePage();
+
         foreach (var item in Tabs) item.IsActive = ReferenceEquals(item, tab);
         if (Set(ref _activeTab, tab)) OnPropertyChanged(nameof(SelectedTab));
     }
